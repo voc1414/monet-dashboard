@@ -320,134 +320,6 @@ export default function StoreDetail() {
         </div>
       </div>
 
-      {/* Revenue Section (実データ) */}
-      <section className="mb-8">
-        <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-          <DollarSign className="w-5 h-5 text-[#9B8579]" />
-          売上情報
-          {reportStats && reportStats.monthLabel && (
-            <span className="text-xs font-normal text-muted-foreground">— {reportStats.monthLabel}分</span>
-          )}
-        </h2>
-        {reportStats ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-            {[
-              { label: "総売上", value: formatCurrency(reportStats.totalSales), sub: `技術: ${formatCurrency(reportStats.totalTechSales)} / 店販: ${formatCurrency(reportStats.totalRetailSales)}`, icon: DollarSign },
-              { label: "客単価", value: formatCurrency(reportStats.avgUnitPrice), sub: `総売上 ÷ 総客数`, icon: Scissors },
-              { label: "総客数", value: `${reportStats.totalCustomers}名`, sub: `新規: ${reportStats.totalNewCustomers} / 再来: ${reportStats.totalReturnCustomers}`, icon: Users },
-              { label: "次回予約率", value: `${reportStats.nextReservationRate}%`, sub: `予約: ${reportStats.totalNextReservation} / 総客: ${reportStats.totalCustomers}`, icon: TrendingUp },
-            ].map((item, i) => (
-              <motion.div key={item.label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.04 }}>
-                <Card className="border-border/50 shadow-sm">
-                  <CardContent className="p-4">
-                    <item.icon className="w-4 h-4 text-[#9B8579] mb-2" />
-                    <div className="font-mono-data text-lg md:text-xl font-bold">{item.value}</div>
-                    <div className="text-[10px] text-muted-foreground mt-1">{item.label}</div>
-                    <div className="text-[9px] text-muted-foreground/70 mt-0.5">{item.sub}</div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-        ) : (
-          <Card className="border-border/50 border-dashed mb-4">
-            <CardContent className="p-6 text-center text-muted-foreground">
-              <DollarSign className="w-6 h-6 mx-auto mb-2 opacity-40" />
-              <p className="text-sm">この期間の売上データはまだありません</p>
-            </CardContent>
-          </Card>
-        )}
-      </section>
-
-      {/* Staff Section (実データ) */}
-      <section className="mb-8">
-        <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-          <Users className="w-5 h-5 text-[#7D8B75]" />
-          スタッフ個人実績
-          {reportStats && (
-            <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2">{reportStats.staffCount}名</span>
-          )}
-        </h2>
-        {reportStats && reportStats.staffReports.length > 0 ? (
-          <div className="grid gap-3">
-            {reportStats.staffReports.map((sr: StaffReport, i: number) => (
-              <motion.div key={sr.answerId || i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.03 }}>
-                <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                      {/* Staff Name */}
-                      <div className="flex items-center gap-3 sm:w-48 shrink-0">
-                        <div className="w-10 h-10 rounded-full bg-[#9B8579]/10 flex items-center justify-center shrink-0">
-                          <span className="text-[#9B8579] font-bold text-sm">{sr.name.charAt(0)}</span>
-                        </div>
-                        <div>
-                          <div className="font-bold text-sm text-foreground">{sr.name}</div>
-                          <div className="text-[10px] text-muted-foreground">{sr.employmentType}</div>
-                        </div>
-                      </div>
-                      {/* Staff Stats */}
-                      <div className="flex-1 grid grid-cols-2 sm:grid-cols-5 gap-3">
-                        <div>
-                          <div className="text-[10px] text-muted-foreground">総売上</div>
-                          <div className="font-mono-data text-sm font-bold">{formatCurrency(sr.totalSales)}</div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] text-muted-foreground">客単価</div>
-                          <div className="font-mono-data text-sm font-bold">{formatCurrency(sr.unitPrice)}</div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] text-muted-foreground">総客数</div>
-                          <div className="font-mono-data text-sm font-bold">{sr.totalCustomers}名</div>
-                          <div className="text-[9px] text-muted-foreground/70">新規{sr.newCustomers} / 再来{sr.returnCustomers}</div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] text-muted-foreground">次回予約率</div>
-                          <div className="font-mono-data text-sm font-bold">{sr.nextReservationRate}%</div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] text-muted-foreground">店販売上</div>
-                          <div className="font-mono-data text-sm font-bold">{formatCurrency(sr.retailSales)}</div>
-                        </div>
-                      </div>
-                    </div>
-                    {/* Comments */}
-                    {(sr.reviewComment || sr.npsComment || sr.fankuruComment) && (
-                      <div className="mt-3 pt-3 border-t border-border/30 space-y-2">
-                        {sr.reviewComment && (
-                          <div>
-                            <span className="text-[10px] font-medium text-[#9B8579]">振り返り:</span>
-                            <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{sr.reviewComment}</p>
-                          </div>
-                        )}
-                        {sr.npsComment && (
-                          <div>
-                            <span className="text-[10px] font-medium text-[#2D9C8F]">NPS向上施策:</span>
-                            <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{sr.npsComment}</p>
-                          </div>
-                        )}
-                        {sr.fankuruComment && (
-                          <div>
-                            <span className="text-[10px] font-medium text-[#7D8B75]">ファンくる対策:</span>
-                            <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{sr.fankuruComment}</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-        ) : (
-          <Card className="border-border/50 border-dashed">
-            <CardContent className="p-6 text-center text-muted-foreground">
-              <Users className="w-6 h-6 mx-auto mb-2 opacity-40" />
-              <p className="text-sm">この期間のスタッフ実績データはまだありません</p>
-            </CardContent>
-          </Card>
-        )}
-      </section>
-
       {/* NPS Survey Results */}
       <section className="mb-8">
         <div className="flex items-center justify-between mb-4">
@@ -465,7 +337,6 @@ export default function StoreDetail() {
             </span>
           </Link>
         </div>
-
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
@@ -609,7 +480,7 @@ export default function StoreDetail() {
 
       {/* Recent Reviews */}
       {storeRecords.length > 0 && (
-        <section>
+        <section className="mb-8">
           <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
             <Star className="w-5 h-5 text-[#E5B85C]" />
             最新レビュー
@@ -659,7 +530,7 @@ export default function StoreDetail() {
       />
 
       {/* ファンくる調査結果 */}
-      <section className="mt-8">
+      <section className="mb-8">
         <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
           <FolderOpen className="w-5 h-5 text-[#7D8B75]" />
           ファンくる調査結果
@@ -787,6 +658,109 @@ export default function StoreDetail() {
               </motion.div>
             )}
           </>
+        )}
+      </section>
+
+      {/* スタッフ個人実績 */}
+      <section className="mb-8">
+        <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+          <Users className="w-5 h-5 text-[#9B8579]" />
+          スタッフ個人実績
+          {reportStats && (
+            <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2">{reportStats.staffCount}名</span>
+          )}
+        </h2>
+        {reportStats && reportStats.staffReports.length > 0 ? (
+          <div className="grid gap-3">
+            {reportStats.staffReports.map((sr: StaffReport, i: number) => (
+              <motion.div key={sr.answerId || i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.03 }}>
+                <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                      <div className="flex items-center gap-3 sm:w-48 shrink-0">
+                        <div className="w-10 h-10 rounded-full bg-[#9B8579]/10 flex items-center justify-center shrink-0">
+                          <span className="text-[#9B8579] font-bold text-sm">{sr.name.charAt(0)}</span>
+                        </div>
+                        <div>
+                          <div className="font-bold text-sm text-foreground">{sr.name}</div>
+                          <div className="text-[10px] text-muted-foreground">{sr.employmentType}</div>
+                        </div>
+                      </div>
+                      <div className="flex-1 grid grid-cols-2 sm:grid-cols-5 gap-3">
+                        <div>
+                          <div className="text-[10px] text-muted-foreground">総売上</div>
+                          <div className="font-mono-data text-sm font-bold">{formatCurrency(sr.totalSales)}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-muted-foreground">客単価</div>
+                          <div className="font-mono-data text-sm font-bold">{formatCurrency(sr.unitPrice)}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-muted-foreground">総客数</div>
+                          <div className="font-mono-data text-sm font-bold">{sr.totalCustomers}名</div>
+                          <div className="text-[9px] text-muted-foreground/70">新規{sr.newCustomers} / 再来{sr.returnCustomers}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-muted-foreground">次回予約率</div>
+                          <div className="font-mono-data text-sm font-bold">{sr.nextReservationRate}%</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-muted-foreground">店販売上</div>
+                          <div className="font-mono-data text-sm font-bold">{formatCurrency(sr.retailSales)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        ) : (
+          <Card className="border-border/50 border-dashed">
+            <CardContent className="p-6 text-center text-muted-foreground">
+              <Users className="w-6 h-6 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">この期間のスタッフ実績データはまだありません</p>
+            </CardContent>
+          </Card>
+        )}
+      </section>
+
+      {/* 店舗売上サマリ */}
+      <section className="mb-8">
+        <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+          <DollarSign className="w-5 h-5 text-[#9B8579]" />
+          店舗売上サマリ
+          {reportStats && reportStats.monthLabel && (
+            <span className="text-xs font-normal text-muted-foreground">— {reportStats.monthLabel}分</span>
+          )}
+        </h2>
+        {reportStats ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { label: "総売上", value: formatCurrency(reportStats.totalSales), sub: `技術: ${formatCurrency(reportStats.totalTechSales)} / 店販: ${formatCurrency(reportStats.totalRetailSales)}`, icon: DollarSign },
+              { label: "客単価", value: formatCurrency(reportStats.avgUnitPrice), sub: `総売上 ÷ 総客数`, icon: Scissors },
+              { label: "総客数", value: `${reportStats.totalCustomers}名`, sub: `新規: ${reportStats.totalNewCustomers} / 再来: ${reportStats.totalReturnCustomers}`, icon: Users },
+              { label: "次回予約率", value: `${reportStats.nextReservationRate}%`, sub: `予約: ${reportStats.totalNextReservation} / 総客: ${reportStats.totalCustomers}`, icon: TrendingUp },
+            ].map((item, i) => (
+              <motion.div key={item.label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.04 }}>
+                <Card className="border-border/50 shadow-sm">
+                  <CardContent className="p-4">
+                    <item.icon className="w-4 h-4 text-[#9B8579] mb-2" />
+                    <div className="font-mono-data text-lg md:text-xl font-bold">{item.value}</div>
+                    <div className="text-[10px] text-muted-foreground mt-1">{item.label}</div>
+                    <div className="text-[9px] text-muted-foreground/70 mt-0.5">{item.sub}</div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        ) : (
+          <Card className="border-border/50 border-dashed">
+            <CardContent className="p-6 text-center text-muted-foreground">
+              <DollarSign className="w-6 h-6 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">この期間の売上データはまだありません</p>
+            </CardContent>
+          </Card>
         )}
       </section>
     </DashboardLayout>

@@ -5,7 +5,7 @@
  * Typography: Cormorant Garamond (headings), Noto Sans JP (body), JetBrains Mono (data)
  */
 import { Link, useLocation } from "wouter";
-import { ChevronRight, RefreshCw, Home, BarChart3 } from "lucide-react";
+import { ChevronRight, RefreshCw, Home, BarChart3, Users } from "lucide-react";
 import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 
@@ -61,6 +61,16 @@ export default function DashboardLayout({
               >
                 <Home className="w-4 h-4" />
                 店舗一覧
+              </span>
+            </Link>
+            <Link href="/staff">
+              <span
+                className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-foreground ${
+                  location === "/staff" ? "text-foreground" : "text-muted-foreground"
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                スタッフ一覧
               </span>
             </Link>
           </nav>
