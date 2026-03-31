@@ -273,37 +273,35 @@ export default function StaffList() {
 
                         {/* Mobile Layout */}
                         <div className="md:hidden">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                                <span className="text-primary font-bold text-sm">{staff.name.charAt(0)}</span>
-                              </div>
-                              <div>
-                                <div className="font-bold text-sm text-foreground flex items-center gap-1">
-                                  {staff.name}
-                                  {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                              <span className="text-primary font-bold text-xs">{staff.name.charAt(0)}</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-bold text-sm text-foreground">{staff.name}</span>
+                                  <span className="text-[10px] text-muted-foreground">({staff.employmentType})</span>
+                                  {isExpanded ? <ChevronUp className="w-3 h-3 text-muted-foreground" /> : <ChevronDown className="w-3 h-3 text-muted-foreground" />}
                                 </div>
-                                <div className="text-[10px] text-muted-foreground">{staff.employmentType}</div>
+                                <span className="font-mono-data text-sm font-bold text-foreground shrink-0 ml-2">{formatCurrency(staff.totalSales)}</span>
+                              </div>
+                              <div className="flex items-center justify-between mt-1">
+                                <Link href={`/store/${encodeURIComponent(staff.storeNormalized)}`}>
+                                  <span className="text-[11px] text-primary hover:text-primary/80 transition-colors cursor-pointer flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                    <Building2 className="w-3 h-3" />
+                                    {staff.storeNormalized}
+                                  </span>
+                                </Link>
+                                <span className={`text-[11px] font-mono-data font-bold shrink-0 ${
+                                  staff.nextReservationRate >= 80 ? "text-[#2D9C8F]" :
+                                  staff.nextReservationRate >= 60 ? "text-[#E5B85C]" :
+                                  "text-[#C75C5C]"
+                                }`}>
+                                  次回予約 {staff.nextReservationRate}%
+                                </span>
                               </div>
                             </div>
-                            <div className="text-right">
-                              <div className="font-mono-data text-base font-bold text-foreground">{formatCurrency(staff.totalSales)}</div>
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between text-xs">
-                            <Link href={`/store/${encodeURIComponent(staff.storeNormalized)}`}>
-                              <span className="text-primary hover:text-primary/80 transition-colors cursor-pointer flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                                <Building2 className="w-3 h-3" />
-                                {staff.storeNormalized}
-                              </span>
-                            </Link>
-                            <span className={`font-mono-data font-bold ${
-                              staff.nextReservationRate >= 80 ? "text-[#2D9C8F]" :
-                              staff.nextReservationRate >= 60 ? "text-[#E5B85C]" :
-                              "text-[#C75C5C]"
-                            }`}>
-                              次回予約 {staff.nextReservationRate}%
-                            </span>
                           </div>
                         </div>
                       </div>
