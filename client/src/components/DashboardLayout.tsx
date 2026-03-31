@@ -39,10 +39,10 @@ export default function DashboardLayout({
           <Link href="/">
             <div className="flex items-center gap-3 group cursor-pointer">
               <div className="w-8 h-8 rounded-full bg-[#9B8579] flex items-center justify-center">
-                <span className="text-white font-display text-sm font-semibold">m</span>
+                <span className="text-white text-sm font-bold">m</span>
               </div>
               <div className="flex flex-col">
-                <span className="font-display text-lg font-semibold tracking-wide text-foreground leading-tight">
+                <span className="text-base font-bold text-foreground leading-tight">
                   monet
                 </span>
                 <span className="text-[10px] text-muted-foreground leading-tight tracking-wider">

@@ -86,7 +86,7 @@ const NPS_COLORS = {
 function NpsGauge({ score, size = "lg" }: { score: number; size?: "sm" | "lg" }) {
   const npsClass = getNpsClass(score);
   const sizeClass = size === "lg" ? "w-28 h-28" : "w-16 h-16";
-  const textClass = size === "lg" ? "text-3xl" : "text-lg";
+  const textClass = size === "lg" ? "text-2xl" : "text-base";
 
   return (
     <div className="flex flex-col items-center">
@@ -176,7 +176,7 @@ function AdviceSection({ stats, records }: { stats: StoreStats; records: NpsReco
 
   return (
     <section className="mb-8">
-      <h2 className="font-display text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+      <h2 className="text-base font-bold text-foreground mb-4 flex items-center gap-2">
         <Lightbulb className="w-5 h-5 text-[#E5B85C]" />
         総合アドバイス
       </h2>
@@ -326,10 +326,10 @@ export default function StoreDetail() {
               <MapPin className="w-6 h-6 text-[#9B8579]" />
             </div>
             <div>
-              <h1 className="font-display text-2xl md:text-3xl font-semibold text-foreground tracking-wide">
+              <h1 className="text-xl md:text-2xl font-bold text-foreground">
                 {storeId}
               </h1>
-              <p className="text-sm text-muted-foreground">monet 白髪染めと髪質改善のサロン</p>
+              <p className="text-xs text-muted-foreground">monet 白髪染めと髪質改善のサロン</p>
             </div>
           </div>
         </div>
@@ -353,7 +353,7 @@ export default function StoreDetail() {
 
       {/* Revenue Section (Sample) */}
       <section className="mb-8">
-        <h2 className="font-display text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+        <h2 className="text-base font-bold text-foreground mb-4 flex items-center gap-2">
           <DollarSign className="w-5 h-5 text-[#9B8579]" />
           売上情報
           <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2">サンプル</span>
@@ -369,8 +369,8 @@ export default function StoreDetail() {
               <Card className="border-border/50 shadow-sm">
                 <CardContent className="p-4">
                   <item.icon className="w-4 h-4 text-[#9B8579] mb-2" />
-                  <div className="font-mono-data text-lg font-semibold">{item.value}</div>
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">{item.label}</div>
+                  <div className="font-mono-data text-base font-bold">{item.value}</div>
+                  <div className="text-[10px] text-muted-foreground mt-1">{item.label}</div>
                 </CardContent>
               </Card>
             </motion.div>
@@ -380,7 +380,7 @@ export default function StoreDetail() {
 
       {/* Staff Section (Sample) */}
       <section className="mb-8">
-        <h2 className="font-display text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+        <h2 className="text-base font-bold text-foreground mb-4 flex items-center gap-2">
           <Users className="w-5 h-5 text-[#7D8B75]" />
           在籍スタッフ
           <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2">サンプル</span>
@@ -405,11 +405,11 @@ export default function StoreDetail() {
       {/* NPS Survey Results */}
       <section className="mb-8">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-display text-lg font-semibold text-foreground flex items-center gap-2">
+          <h2 className="text-base font-bold text-foreground flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-[#2D9C8F]" />
             NPS調査結果
             {selectedMonth !== "all" && (
-              <span className="text-sm font-normal text-muted-foreground">— {formatMonth(selectedMonth)}</span>
+              <span className="text-xs font-normal text-muted-foreground">— {formatMonth(selectedMonth)}</span>
             )}
           </h2>
           <Link href={`/store/${encodeURIComponent(storeId)}/nps`}>
@@ -437,17 +437,17 @@ export default function StoreDetail() {
                 <div className="mt-4 grid grid-cols-3 gap-4 w-full text-center">
                   <div>
                     <div className="text-xs text-muted-foreground mb-1">推奨者</div>
-                    <div className="font-mono-data text-sm font-semibold text-[#2D9C8F]">{storeStats.promoterPct}%</div>
+                    <div className="font-mono-data text-xs font-bold text-[#2D9C8F]">{storeStats.promoterPct}%</div>
                     <div className="text-[10px] text-muted-foreground">{storeStats.promoters}件</div>
                   </div>
                   <div>
                     <div className="text-xs text-muted-foreground mb-1">中立者</div>
-                    <div className="font-mono-data text-sm font-semibold text-[#B8922A]">{storeStats.passivePct}%</div>
+                    <div className="font-mono-data text-xs font-bold text-[#B8922A]">{storeStats.passivePct}%</div>
                     <div className="text-[10px] text-muted-foreground">{storeStats.passives}件</div>
                   </div>
                   <div>
                     <div className="text-xs text-muted-foreground mb-1">批判者</div>
-                    <div className="font-mono-data text-sm font-semibold text-[#C75C5C]">{storeStats.detractorPct}%</div>
+                    <div className="font-mono-data text-xs font-bold text-[#C75C5C]">{storeStats.detractorPct}%</div>
                     <div className="text-[10px] text-muted-foreground">{storeStats.detractors}件</div>
                   </div>
                 </div>
@@ -532,7 +532,7 @@ export default function StoreDetail() {
       {/* Category Analysis */}
       {storeRecords.length > 0 && (
         <section className="mb-8">
-          <h2 className="font-display text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+          <h2 className="text-base font-bold text-foreground mb-4 flex items-center gap-2">
             <MessageSquare className="w-5 h-5 text-[#9B8579]" />
             カテゴリ別評価
           </h2>
@@ -564,7 +564,7 @@ export default function StoreDetail() {
       {/* Recent Reviews */}
       {storeRecords.length > 0 && (
         <section>
-          <h2 className="font-display text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+          <h2 className="text-base font-bold text-foreground mb-4 flex items-center gap-2">
             <Star className="w-5 h-5 text-[#E5B85C]" />
             最新レビュー
           </h2>
@@ -614,7 +614,7 @@ export default function StoreDetail() {
 
       {/* ファンくる調査結果 */}
       <section className="mt-8">
-        <h2 className="font-display text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+        <h2 className="text-base font-bold text-foreground mb-4 flex items-center gap-2">
           <FolderOpen className="w-5 h-5 text-[#7D8B75]" />
           ファンくる調査結果
           {fankuruPdfs.length > 0 && (
