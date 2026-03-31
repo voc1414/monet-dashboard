@@ -200,7 +200,7 @@ export default function Home() {
       </div>
 
       {/* KPIカード 6項目: NPSスコア、全店総合売上、全店総合技術売上、全店総合店販売上、全店売上単価、店舗数 */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
         {[
           { label: "NPSスコア", value: `${overallNps > 0 ? "+" : ""}${overallNps}`, icon: TrendingUp, color: "text-[#2D9C8F]", extra: loading ? undefined : getNpsClass(overallNps) },
           { label: "全店総合売上", value: formatCurrency(totalAllSales), icon: DollarSign, color: "text-primary" },
@@ -215,15 +215,15 @@ export default function Home() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 + i * 0.05 }}
           >
-            <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow h-full">
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between mb-2">
+            <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow h-full overflow-hidden">
+              <CardContent className="p-3 lg:p-4">
+                <div className="flex items-start justify-between mb-1.5">
                   <stat.icon className={`w-4 h-4 ${stat.color}`} />
                 </div>
-                <div className="font-mono-data text-xl md:text-2xl font-bold text-foreground mb-1">
+                <div className="font-mono-data text-lg lg:text-xl font-bold text-foreground mb-1 truncate">
                   {loading ? "..." : stat.value}
                 </div>
-                <div className="text-[10px] text-muted-foreground leading-tight">{stat.label}</div>
+                <div className="text-[10px] text-muted-foreground leading-tight truncate">{stat.label}</div>
                 {stat.extra && (
                   <div className="mt-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded inline-block" style={{ color: stat.extra.color, backgroundColor: stat.extra.bgColor }}>
                     {stat.extra.label}
@@ -319,7 +319,7 @@ export default function Home() {
                                 </div>
 
                                 {/* Stats Row */}
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2">
+                                <div className="grid grid-cols-3 sm:grid-cols-5 gap-x-4 gap-y-2">
                                   <div>
                                     <div className="text-[10px] text-muted-foreground mb-0.5">総売上</div>
                                     <div className="font-mono-data text-sm font-bold">
@@ -336,6 +336,12 @@ export default function Home() {
                                     <div className="text-[10px] text-muted-foreground mb-0.5">総客数</div>
                                     <div className="font-mono-data text-sm font-bold">
                                       {st.hasReportData ? `${st.totalCustomers}名` : "—"}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <div className="text-[10px] text-muted-foreground mb-0.5">新規数</div>
+                                    <div className="font-mono-data text-sm font-bold">
+                                      {st.hasReportData && st.totalNewCustomers > 0 ? `${st.totalNewCustomers}名` : "—"}
                                     </div>
                                   </div>
                                   <div>

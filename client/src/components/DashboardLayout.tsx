@@ -133,10 +133,32 @@ export default function DashboardLayout({
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, ease: "easeOut" }}
-        className="container py-6 pb-16"
+        className="container py-6 pb-24 md:pb-16"
       >
         {children}
       </motion.main>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden border-t border-border/60 bg-white/95 backdrop-blur-md safe-area-bottom">
+        <div className="flex items-center justify-around h-14">
+          <Link href="/">
+            <div className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-colors ${
+              location === "/" || location.startsWith("/store") ? "text-primary" : "text-muted-foreground"
+            }`}>
+              <Home className="w-5 h-5" />
+              <span className="text-[10px] font-medium">店舗一覧</span>
+            </div>
+          </Link>
+          <Link href="/staff">
+            <div className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-colors ${
+              location === "/staff" ? "text-primary" : "text-muted-foreground"
+            }`}>
+              <Users className="w-5 h-5" />
+              <span className="text-[10px] font-medium">スタッフ一覧</span>
+            </div>
+          </Link>
+        </div>
+      </nav>
     </div>
   );
 }
