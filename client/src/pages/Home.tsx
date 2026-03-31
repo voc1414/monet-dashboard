@@ -169,7 +169,7 @@ export default function Home() {
               monet Dashboard
             </h1>
             <p className="text-white/80 text-xs md:text-sm max-w-lg">
-              五感を満たす唯一無二の美容室 — 店舗パフォーマンス管理
+              五感を満たす唯一無二の美容室 — 店舗データ
             </p>
           </motion.div>
         </div>
