@@ -3,6 +3,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
+import ScrollToTop from "./components/ScrollToTop";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import StoreDetail from "./pages/StoreDetail";
@@ -11,14 +12,17 @@ import StaffList from "./pages/StaffList";
 
 function Router() {
   return (
-    <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/store/:storeId" component={StoreDetail} />
-      <Route path="/staff" component={StaffList} />
-      <Route path="/store/:storeId/nps" component={NpsOverview} />
-      <Route path="/404" component={NotFound} />
-      <Route component={NotFound} />
-    </Switch>
+    <>
+      <ScrollToTop />
+      <Switch>
+        <Route path="/" component={Home} />
+        <Route path="/store/:storeId" component={StoreDetail} />
+        <Route path="/staff" component={StaffList} />
+        <Route path="/store/:storeId/nps" component={NpsOverview} />
+        <Route path="/404" component={NotFound} />
+        <Route component={NotFound} />
+      </Switch>
+    </>
   );
 }
 

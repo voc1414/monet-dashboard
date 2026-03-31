@@ -6,7 +6,7 @@
 import { Link } from "wouter";
 import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
-import { MapPin, Users, TrendingUp, BarChart3, ArrowRight, Sparkles, Calendar } from "lucide-react";
+import { MapPin, Users, TrendingUp, BarChart3, ArrowRight, DollarSign, Scissors, ShoppingBag, Calendar, ChevronDown } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -15,7 +15,6 @@ import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { getNpsClass, NPS_INDUSTRY_AVERAGE } from "@/lib/npsClass";
 
 const HERO_IMAGE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663489426081/aLPZvLfFDC4rFYToBquZNR/monet-salon_83a99286.jpg";
-const MONET_LOGO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663489426081/aLPZvLfFDC4rFYToBquZNR/monet-logo_cd6a82da.png";
 
 const formatMonth = (ym: string) => {
   const [y, m] = ym.split("-");
@@ -46,6 +45,15 @@ function NpsScoreBadge({ score }: { score: number }) {
     </div>
   );
 }
+
+/* エリア定義 */
+const AREA_STORES: { area: string; stores: string[] }[] = [
+  { area: "大阪エリア", stores: ["堀江院", "堀江院2nd", "福島院", "高槻院"] },
+  { area: "福岡エリア", stores: ["姪浜院"] },
+  { area: "広島エリア", stores: ["楽々園院"] },
+];
+
+const ALL_STORES = AREA_STORES.flatMap((a) => a.stores);
 
 export default function Home() {
   const { records, loading: npsLoading, error: npsError, lastUpdated, refresh } = useNpsData();
@@ -83,7 +91,6 @@ export default function Home() {
 
   const filteredStoreStats = calculateStoreStats(filteredRecords);
 
-  const ALL_STORES = ["堀江院", "堀江院2nd", "福島院", "高槻院", "姪浜院", "楽々園院"];
   const storeStats = ALL_STORES.map((name) => {
     const nps = filteredStoreStats.find((s) => s.shortName === name);
     const activeMonth = selectedMonth === "all" || selectedMonth === "__init__" ? undefined : selectedMonth;
@@ -114,17 +121,31 @@ export default function Home() {
     };
   });
 
+  /* 全店舗サマリー集計 */
   const storesWithNps = storeStats.filter((s) => s.totalResponses > 0);
   const totalResponses = storesWithNps.reduce((s, st) => s + st.totalResponses, 0);
   const totalPromoters = storesWithNps.reduce((s, st) => s + st.promoters, 0);
   const totalDetractors = storesWithNps.reduce((s, st) => s + st.detractors, 0);
   const overallNps = totalResponses > 0 ? Math.round(((totalPromoters - totalDetractors) / totalResponses) * 100) : 0;
-  const overallAvg = totalResponses > 0 ? Math.round((filteredRecords.reduce((s, r) => s + r.npsScore, 0) / totalResponses) * 10) / 10 : 0;
 
   const storesWithReport = storeStats.filter((s) => s.hasReportData);
   const totalAllSales = storesWithReport.reduce((s, st) => s + st.totalSales, 0);
+  const totalAllTechSales = storesWithReport.reduce((s, st) => s + st.totalTechSales, 0);
+  const totalAllRetailSales = storesWithReport.reduce((s, st) => s + st.totalRetailSales, 0);
   const totalAllCustomers = storesWithReport.reduce((s, st) => s + st.totalCustomers, 0);
   const overallUnitPrice = totalAllCustomers > 0 ? Math.round(totalAllSales / totalAllCustomers) : 0;
+  const storeCount = Math.max(storesWithNps.length, storesWithReport.length, ALL_STORES.length);
+
+  /* エリアトグル状態（デフォルト全開） */
+  const [openAreas, setOpenAreas] = useState<Set<string>>(new Set(AREA_STORES.map((a) => a.area)));
+  const toggleArea = (area: string) => {
+    setOpenAreas((prev) => {
+      const next = new Set(prev);
+      if (next.has(area)) next.delete(area);
+      else next.add(area);
+      return next;
+    });
+  };
 
   return (
     <DashboardLayout lastUpdated={lastUpdated} onRefresh={refresh} loading={loading}>
@@ -178,13 +199,15 @@ export default function Home() {
         </div>
       </div>
 
-      {/* 上段: NPS関連 4カード */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+      {/* KPIカード 6項目: NPSスコア、全店総合売上、全店総合技術売上、全店総合店販売上、全店売上単価、店舗数 */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
         {[
-          { label: "全店舗NPS", value: `${overallNps > 0 ? "+" : ""}${overallNps}`, icon: TrendingUp, color: "text-[#2D9C8F]", extra: loading ? undefined : getNpsClass(overallNps) },
-          { label: "業界平均NPS", value: `${NPS_INDUSTRY_AVERAGE}`, icon: BarChart3, color: "text-muted-foreground", extra: undefined },
-          { label: "平均スコア", value: `${overallAvg}`, icon: Sparkles, color: "text-primary", extra: undefined },
-          { label: "総回答数", value: `${totalResponses}`, icon: BarChart3, color: "text-sage", extra: undefined },
+          { label: "NPSスコア", value: `${overallNps > 0 ? "+" : ""}${overallNps}`, icon: TrendingUp, color: "text-[#2D9C8F]", extra: loading ? undefined : getNpsClass(overallNps) },
+          { label: "全店総合売上", value: formatCurrency(totalAllSales), icon: DollarSign, color: "text-primary" },
+          { label: "全店総合技術売上", value: formatCurrency(totalAllTechSales), icon: Scissors, color: "text-primary" },
+          { label: "全店総合店販売上", value: formatCurrency(totalAllRetailSales), icon: ShoppingBag, color: "text-primary" },
+          { label: "全店売上単価", value: formatCurrency(overallUnitPrice), icon: BarChart3, color: "text-primary" },
+          { label: "店舗数", value: `${storeCount}`, icon: MapPin, color: "text-primary" },
         ].map((stat, i) => (
           <motion.div
             key={stat.label}
@@ -192,15 +215,15 @@ export default function Home() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 + i * 0.05 }}
           >
-            <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
+            <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow h-full">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between mb-2">
                   <stat.icon className={`w-4 h-4 ${stat.color}`} />
                 </div>
-                <div className="font-mono-data text-2xl md:text-3xl font-bold text-foreground mb-1">
+                <div className="font-mono-data text-xl md:text-2xl font-bold text-foreground mb-1">
                   {loading ? "..." : stat.value}
                 </div>
-                <div className="text-[11px] text-muted-foreground">{stat.label}</div>
+                <div className="text-[10px] text-muted-foreground leading-tight">{stat.label}</div>
                 {stat.extra && (
                   <div className="mt-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded inline-block" style={{ color: stat.extra.color, backgroundColor: stat.extra.bgColor }}>
                     {stat.extra.label}
@@ -212,35 +235,7 @@ export default function Home() {
         ))}
       </div>
 
-      {/* 下段: 売上関連 3カード */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-        {[
-          { label: "全店舗総売上", value: formatCurrency(totalAllSales), icon: TrendingUp, color: "text-[#2D9C8F]" },
-          { label: "全店舗客単価", value: formatCurrency(overallUnitPrice), icon: BarChart3, color: "text-primary" },
-          { label: "店舗数", value: `${storesWithNps.length > 0 ? storesWithNps.length : storesWithReport.length}`, icon: MapPin, color: "text-primary" },
-        ].map((stat, i) => (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.35 + i * 0.05 }}
-          >
-            <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between mb-2">
-                  <stat.icon className={`w-4 h-4 ${stat.color}`} />
-                </div>
-                <div className="font-mono-data text-2xl md:text-3xl font-bold text-foreground mb-1">
-                  {loading ? "..." : stat.value}
-                </div>
-                <div className="text-[11px] text-muted-foreground">{stat.label}</div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Store List */}
+      {/* Store List Header */}
       <div className="mb-4">
         <h2 className="text-xl font-bold text-foreground">
           店舗一覧
@@ -259,123 +254,128 @@ export default function Home() {
         </div>
       )}
 
-      <div className="grid gap-4">
-        {(loading ? Array.from({ length: 4 }) : storeStats).map((store, i) => {
-          if (loading) {
-            return (
-              <Card key={i} className="border-border/50 animate-pulse">
-                <CardContent className="p-6">
-                  <div className="h-6 bg-muted rounded w-32 mb-4" />
-                  <div className="h-4 bg-muted rounded w-48" />
-                </CardContent>
-              </Card>
-            );
-          }
-
-          const st = store as NonNullable<typeof storeStats>[number];
+      {/* エリア別トグル店舗一覧 */}
+      <div className="space-y-3">
+        {AREA_STORES.map((areaGroup) => {
+          const isOpen = openAreas.has(areaGroup.area);
+          const areaStores = storeStats.filter((s) => areaGroup.stores.includes(s.shortName));
 
           return (
-            <motion.div
-              key={st.shortName}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 + i * 0.04 }}
-            >
-              <Link href={`/store/${encodeURIComponent(st.shortName)}`}>
-                <Card className="border-border/50 shadow-sm hover:shadow-lg hover:border-primary/30 transition-all cursor-pointer group">
-                  <CardContent className="p-0">
-                    <div className="flex flex-col md:flex-row md:items-center">
-                      {/* Store Info */}
-                      <div className="flex-1 p-5 md:p-6">
-                        <div className="flex items-center gap-3 mb-3">
-                          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                            <MapPin className="w-5 h-5 text-primary" />
-                          </div>
-                          <div>
-                            <h3 className="font-bold text-foreground text-base group-hover:text-primary transition-colors">
-                              {st.shortName}
-                            </h3>
-                            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                              <Users className="w-3 h-3" />
-                              <span>{st.staffCount > 0 ? `${st.staffCount}名` : "—"}</span>
-                              {st.reportMonthLabel && (
-                                <span className="text-primary">（{st.reportMonthLabel}分）</span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
+            <div key={areaGroup.area} className="border border-border/50 rounded-xl overflow-hidden bg-card">
+              {/* Area Toggle Header */}
+              <button
+                onClick={() => toggleArea(areaGroup.area)}
+                className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-accent/50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <MapPin className="w-4 h-4 text-primary" />
+                  <span className="font-bold text-sm text-foreground">{areaGroup.area}</span>
+                  <span className="text-xs text-muted-foreground">{areaGroup.stores.length}店舗</span>
+                </div>
+                <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+              </button>
 
-                        {/* Stats Row */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 mt-4">
-                          <div>
-                            <div className="text-[11px] text-muted-foreground mb-1">総売上</div>
-                            <div className="font-mono-data text-sm md:text-base font-bold">
-                              {st.hasReportData ? formatCurrency(st.totalSales) : "—"}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-[11px] text-muted-foreground mb-1">客単価</div>
-                            <div className="font-mono-data text-sm md:text-base font-bold">
-                              {st.hasReportData && st.avgUnitPrice > 0 ? formatCurrency(st.avgUnitPrice) : "—"}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-[11px] text-muted-foreground mb-1">総客数</div>
-                            <div className="font-mono-data text-sm md:text-base font-bold">
-                              {st.hasReportData ? `${st.totalCustomers}名` : "—"}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-[11px] text-muted-foreground mb-1">次回予約率</div>
-                            <div className="font-mono-data text-sm md:text-base font-bold">
-                              {st.hasReportData && st.nextReservationRate > 0 ? `${st.nextReservationRate}%` : "—"}
-                            </div>
-                          </div>
+              {/* Area Content */}
+              {isOpen && (
+                <div className="border-t border-border/30">
+                  {loading ? (
+                    <div className="p-4 space-y-3">
+                      {areaGroup.stores.map((_, idx) => (
+                        <div key={idx} className="animate-pulse">
+                          <div className="h-6 bg-muted rounded w-32 mb-2" />
+                          <div className="h-4 bg-muted rounded w-48" />
                         </div>
-
-                        {/* NPS Row */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 mt-3 pt-3 border-t border-border/30">
-                          <div>
-                            <div className="text-[11px] text-muted-foreground mb-1">NPS回答数</div>
-                            <div className="font-mono-data text-sm md:text-base font-bold">
-                              {st.totalResponses > 0 ? `${st.totalResponses}件` : "—"}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-[11px] text-muted-foreground mb-1">平均スコア</div>
-                            <div className="font-mono-data text-sm md:text-base font-bold">
-                              {st.totalResponses > 0 ? st.avgScore : "—"}
-                            </div>
-                          </div>
-                          <div className="col-span-2 sm:col-span-2" />
-                        </div>
-                      </div>
-
-                      {/* NPS Score */}
-                      <div className="flex items-center gap-4 px-5 pb-5 md:px-6 md:py-6 md:border-l border-border/40">
-                        {st.totalResponses > 0 ? (
-                          <div className="text-center">
-                            <NpsScoreBadge score={st.npsScore} />
-                            <div className="mt-2 flex gap-1">
-                              <div className="h-1.5 rounded-full bg-[#2D9C8F]" style={{ width: `${Math.max(st.promoterPct * 0.6, 4)}px` }} />
-                              <div className="h-1.5 rounded-full bg-[#E5B85C]" style={{ width: `${Math.max(st.passivePct * 0.6, 4)}px` }} />
-                              <div className="h-1.5 rounded-full bg-[#C75C5C]" style={{ width: `${Math.max(st.detractorPct * 0.6, 4)}px` }} />
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-center">
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium text-muted-foreground bg-muted/50 border border-border/50">
-                              データなし
-                            </span>
-                          </div>
-                        )}
-                        <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors group-hover:translate-x-0.5 transition-transform" />
-                      </div>
+                      ))}
                     </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            </motion.div>
+                  ) : (
+                    <div className="divide-y divide-border/30">
+                      {areaStores.map((st, i) => (
+                        <motion.div
+                          key={st.shortName}
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.05 * i }}
+                        >
+                          <Link href={`/store/${encodeURIComponent(st.shortName)}`}>
+                            <div className="flex flex-col md:flex-row md:items-center hover:bg-accent/30 transition-colors cursor-pointer group">
+                              {/* Store Info */}
+                              <div className="flex-1 p-4 md:p-5">
+                                <div className="flex items-center gap-3 mb-3">
+                                  <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                                    <MapPin className="w-4 h-4 text-primary" />
+                                  </div>
+                                  <div>
+                                    <h3 className="font-bold text-foreground text-sm group-hover:text-primary transition-colors">
+                                      {st.shortName}
+                                    </h3>
+                                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                                      <Users className="w-3 h-3" />
+                                      <span>{st.staffCount > 0 ? `${st.staffCount}名` : "—"}</span>
+                                      {st.reportMonthLabel && (
+                                        <span className="text-primary">（{st.reportMonthLabel}分）</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Stats Row */}
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2">
+                                  <div>
+                                    <div className="text-[10px] text-muted-foreground mb-0.5">総売上</div>
+                                    <div className="font-mono-data text-sm font-bold">
+                                      {st.hasReportData ? formatCurrency(st.totalSales) : "—"}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <div className="text-[10px] text-muted-foreground mb-0.5">客単価</div>
+                                    <div className="font-mono-data text-sm font-bold">
+                                      {st.hasReportData && st.avgUnitPrice > 0 ? formatCurrency(st.avgUnitPrice) : "—"}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <div className="text-[10px] text-muted-foreground mb-0.5">総客数</div>
+                                    <div className="font-mono-data text-sm font-bold">
+                                      {st.hasReportData ? `${st.totalCustomers}名` : "—"}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <div className="text-[10px] text-muted-foreground mb-0.5">次回予約率</div>
+                                    <div className="font-mono-data text-sm font-bold">
+                                      {st.hasReportData && st.nextReservationRate > 0 ? `${st.nextReservationRate}%` : "—"}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* NPS Score */}
+                              <div className="flex items-center gap-4 px-4 pb-4 md:px-5 md:py-5 md:border-l border-border/30">
+                                {st.totalResponses > 0 ? (
+                                  <div className="text-center">
+                                    <NpsScoreBadge score={st.npsScore} />
+                                    <div className="mt-2 flex gap-1">
+                                      <div className="h-1.5 rounded-full bg-[#2D9C8F]" style={{ width: `${Math.max(st.promoterPct * 0.6, 4)}px` }} />
+                                      <div className="h-1.5 rounded-full bg-[#E5B85C]" style={{ width: `${Math.max(st.passivePct * 0.6, 4)}px` }} />
+                                      <div className="h-1.5 rounded-full bg-[#C75C5C]" style={{ width: `${Math.max(st.detractorPct * 0.6, 4)}px` }} />
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="text-center">
+                                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium text-muted-foreground bg-muted/50 border border-border/50">
+                                      データなし
+                                    </span>
+                                  </div>
+                                )}
+                                <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors group-hover:translate-x-0.5" />
+                              </div>
+                            </div>
+                          </Link>
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           );
         })}
 
