@@ -301,8 +301,8 @@ export default function Home() {
                               {/* Store Info */}
                               <div className="flex-1 p-4 md:p-5">
                                 <div className="flex items-center gap-3 mb-3">
-                                  <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                                    <MapPin className="w-4 h-4 text-primary" />
+                                  <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0">
+                                    <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663489426081/aLPZvLfFDC4rFYToBquZNR/monet-parasol_bfd1d990.jpg" alt="monet" className="w-full h-full object-cover" />
                                   </div>
                                   <div>
                                     <h3 className="font-bold text-foreground text-sm group-hover:text-primary transition-colors">
