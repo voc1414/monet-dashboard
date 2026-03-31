@@ -320,8 +320,72 @@ export default function StoreDetail() {
         </div>
       </div>
 
+      {/* スタッフ個人実績 */}
+      <section className="mb-8 pt-6 border-t-2 border-[#9B8579]/20">
+        <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+          <Users className="w-5 h-5 text-[#9B8579]" />
+          スタッフ個人実績
+          {reportStats && (
+            <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2">{reportStats.staffCount}名</span>
+          )}
+        </h2>
+        {reportStats && reportStats.staffReports.length > 0 ? (
+          <div className="grid gap-3">
+            {reportStats.staffReports.map((sr: StaffReport, i: number) => (
+              <motion.div key={sr.answerId || i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.03 }}>
+                <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                      <div className="flex items-center gap-3 sm:w-48 shrink-0">
+                        <div className="w-10 h-10 rounded-full bg-[#9B8579]/10 flex items-center justify-center shrink-0">
+                          <span className="text-[#9B8579] font-bold text-sm">{sr.name.charAt(0)}</span>
+                        </div>
+                        <div>
+                          <div className="font-bold text-sm text-foreground">{sr.name}</div>
+                          <div className="text-[10px] text-muted-foreground">{sr.employmentType}</div>
+                        </div>
+                      </div>
+                      <div className="flex-1 grid grid-cols-2 sm:grid-cols-5 gap-3">
+                        <div>
+                          <div className="text-[10px] text-muted-foreground">総売上</div>
+                          <div className="font-mono-data text-sm font-bold">{formatCurrency(sr.totalSales)}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-muted-foreground">客単価</div>
+                          <div className="font-mono-data text-sm font-bold">{formatCurrency(sr.unitPrice)}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-muted-foreground">総客数</div>
+                          <div className="font-mono-data text-sm font-bold">{sr.totalCustomers}名</div>
+                          <div className="text-[9px] text-muted-foreground/70">新規{sr.newCustomers} / 再来{sr.returnCustomers}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-muted-foreground">次回予約率</div>
+                          <div className="font-mono-data text-sm font-bold">{sr.nextReservationRate}%</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-muted-foreground">店販売上</div>
+                          <div className="font-mono-data text-sm font-bold">{formatCurrency(sr.retailSales)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        ) : (
+          <Card className="border-border/50 border-dashed">
+            <CardContent className="p-6 text-center text-muted-foreground">
+              <Users className="w-6 h-6 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">この期間のスタッフ実績データはまだありません</p>
+            </CardContent>
+          </Card>
+        )}
+      </section>
+
       {/* NPS Survey Results */}
-      <section className="mb-8">
+      <section className="mb-8 pt-6 border-t-2 border-[#2D9C8F]/20">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-[#2D9C8F]" />
@@ -530,7 +594,7 @@ export default function StoreDetail() {
       />
 
       {/* ファンくる調査結果 */}
-      <section className="mb-8">
+      <section className="mb-8 pt-6 border-t-2 border-[#7D8B75]/20">
         <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
           <FolderOpen className="w-5 h-5 text-[#7D8B75]" />
           ファンくる調査結果
@@ -661,72 +725,8 @@ export default function StoreDetail() {
         )}
       </section>
 
-      {/* スタッフ個人実績 */}
-      <section className="mb-8">
-        <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-          <Users className="w-5 h-5 text-[#9B8579]" />
-          スタッフ個人実績
-          {reportStats && (
-            <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2">{reportStats.staffCount}名</span>
-          )}
-        </h2>
-        {reportStats && reportStats.staffReports.length > 0 ? (
-          <div className="grid gap-3">
-            {reportStats.staffReports.map((sr: StaffReport, i: number) => (
-              <motion.div key={sr.answerId || i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.03 }}>
-                <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                      <div className="flex items-center gap-3 sm:w-48 shrink-0">
-                        <div className="w-10 h-10 rounded-full bg-[#9B8579]/10 flex items-center justify-center shrink-0">
-                          <span className="text-[#9B8579] font-bold text-sm">{sr.name.charAt(0)}</span>
-                        </div>
-                        <div>
-                          <div className="font-bold text-sm text-foreground">{sr.name}</div>
-                          <div className="text-[10px] text-muted-foreground">{sr.employmentType}</div>
-                        </div>
-                      </div>
-                      <div className="flex-1 grid grid-cols-2 sm:grid-cols-5 gap-3">
-                        <div>
-                          <div className="text-[10px] text-muted-foreground">総売上</div>
-                          <div className="font-mono-data text-sm font-bold">{formatCurrency(sr.totalSales)}</div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] text-muted-foreground">客単価</div>
-                          <div className="font-mono-data text-sm font-bold">{formatCurrency(sr.unitPrice)}</div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] text-muted-foreground">総客数</div>
-                          <div className="font-mono-data text-sm font-bold">{sr.totalCustomers}名</div>
-                          <div className="text-[9px] text-muted-foreground/70">新規{sr.newCustomers} / 再来{sr.returnCustomers}</div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] text-muted-foreground">次回予約率</div>
-                          <div className="font-mono-data text-sm font-bold">{sr.nextReservationRate}%</div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] text-muted-foreground">店販売上</div>
-                          <div className="font-mono-data text-sm font-bold">{formatCurrency(sr.retailSales)}</div>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-        ) : (
-          <Card className="border-border/50 border-dashed">
-            <CardContent className="p-6 text-center text-muted-foreground">
-              <Users className="w-6 h-6 mx-auto mb-2 opacity-40" />
-              <p className="text-sm">この期間のスタッフ実績データはまだありません</p>
-            </CardContent>
-          </Card>
-        )}
-      </section>
-
       {/* 店舗売上サマリ */}
-      <section className="mb-8">
+      <section className="mb-8 pt-6 border-t-2 border-[#9B8579]/20">
         <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
           <DollarSign className="w-5 h-5 text-[#9B8579]" />
           店舗売上サマリ

@@ -185,15 +185,13 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
+      {/* 上段: NPS関連 4カード */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
         {[
           { label: "全店舗NPS", value: `${overallNps > 0 ? "+" : ""}${overallNps}`, icon: TrendingUp, color: "text-[#2D9C8F]", extra: loading ? undefined : getNpsClass(overallNps) },
           { label: "業界平均NPS", value: `${NPS_INDUSTRY_AVERAGE}`, icon: BarChart3, color: "text-muted-foreground", extra: undefined },
           { label: "平均スコア", value: `${overallAvg}`, icon: Sparkles, color: "text-[#9B8579]", extra: undefined },
           { label: "総回答数", value: `${totalResponses}`, icon: BarChart3, color: "text-[#7D8B75]", extra: undefined },
-          { label: "全店舗総売上", value: formatCurrency(totalAllSales), icon: TrendingUp, color: "text-[#2D9C8F]", extra: undefined },
-          { label: "全店舗客単価", value: formatCurrency(overallUnitPrice), icon: BarChart3, color: "text-[#9B8579]", extra: undefined },
-          { label: "店舗数", value: `${storesWithNps.length > 0 ? storesWithNps.length : storesWithReport.length}`, icon: MapPin, color: "text-[#9B8579]", extra: undefined },
         ].map((stat, i) => (
           <motion.div
             key={stat.label}
@@ -206,15 +204,43 @@ export default function Home() {
                 <div className="flex items-start justify-between mb-2">
                   <stat.icon className={`w-4 h-4 ${stat.color}`} />
                 </div>
-                <div className="font-mono-data text-xl md:text-2xl font-bold text-foreground mb-1 truncate">
+                <div className="font-mono-data text-2xl md:text-3xl font-bold text-foreground mb-1">
                   {loading ? "..." : stat.value}
                 </div>
-                <div className="text-[10px] text-muted-foreground">{stat.label}</div>
+                <div className="text-[11px] text-muted-foreground">{stat.label}</div>
                 {stat.extra && (
                   <div className="mt-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded inline-block" style={{ color: stat.extra.color, backgroundColor: stat.extra.bgColor }}>
                     {stat.extra.label}
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* 下段: 売上関連 3カード */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+        {[
+          { label: "全店舗総売上", value: formatCurrency(totalAllSales), icon: TrendingUp, color: "text-[#2D9C8F]" },
+          { label: "全店舗客単価", value: formatCurrency(overallUnitPrice), icon: BarChart3, color: "text-[#9B8579]" },
+          { label: "店舗数", value: `${storesWithNps.length > 0 ? storesWithNps.length : storesWithReport.length}`, icon: MapPin, color: "text-[#9B8579]" },
+        ].map((stat, i) => (
+          <motion.div
+            key={stat.label}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 + i * 0.05 }}
+          >
+            <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between mb-2">
+                  <stat.icon className={`w-4 h-4 ${stat.color}`} />
+                </div>
+                <div className="font-mono-data text-2xl md:text-3xl font-bold text-foreground mb-1">
+                  {loading ? "..." : stat.value}
+                </div>
+                <div className="text-[11px] text-muted-foreground">{stat.label}</div>
               </CardContent>
             </Card>
           </motion.div>

@@ -2,15 +2,20 @@
  * Design: Atelier Blanc — クリーンアトリエ
  * Page: スタッフ一覧（全店舗横断・総売上順）
  * Columns: 氏名、総売上、配属店舗、雇用形態、次回予約率
+ * Feature: 名前タップで詳細展開（売上内訳・NPS情報）
  */
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "wouter";
-import { motion } from "framer-motion";
-import { Users, Calendar, Building2, ArrowRight } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Users, Calendar, Building2, ArrowRight, ChevronDown, ChevronUp,
+  DollarSign, UserCheck, Scissors, TrendingUp, BarChart3
+} from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
+import { useNpsData, filterByMonth } from "@/hooks/useNpsData";
 import type { StaffReport } from "@/hooks/useMonthlyReport";
 
 const formatCurrency = (n: number) => {
@@ -23,8 +28,24 @@ const formatMonth = (m: string) => {
   return `${y}年${parseInt(mo)}月`;
 };
 
+const NPS_COLORS = {
+  promoter: "#2D9C8F",
+  passive: "#E5B85C",
+  detractor: "#C75C5C",
+};
+
+interface StaffNpsInfo {
+  totalResponses: number;
+  avgScore: number;
+  npsScore: number;
+  promoters: number;
+  passives: number;
+  detractors: number;
+}
+
 export default function StaffList() {
   const { rawData, loading, error, availableMonths } = useMonthlyReport();
+  const { records: npsRecords, loading: npsLoading } = useNpsData();
 
   // デフォルトは先月
   const defaultMonth = useMemo(() => {
@@ -34,6 +55,7 @@ export default function StaffList() {
   }, []);
 
   const [selectedMonth, setSelectedMonth] = useState<string>("__init__");
+  const [expandedStaff, setExpandedStaff] = useState<string | null>(null);
 
   useEffect(() => {
     if (availableMonths.length > 0 && selectedMonth === "__init__") {
@@ -49,7 +71,6 @@ export default function StaffList() {
     if (!rawData.length) return [];
     let filtered: StaffReport[];
     if (activeMonth === "all") {
-      // 全期間: 同一名+同一店舗で最新のレコードのみ
       const map = new Map<string, StaffReport>();
       for (const r of rawData) {
         const key = `${r.name}__${r.storeNormalized}`;
@@ -65,12 +86,45 @@ export default function StaffList() {
     return [...filtered].sort((a, b) => b.totalSales - a.totalSales);
   }, [rawData, activeMonth]);
 
+  // スタッフごとのNPS情報を計算
+  const staffNpsMap = useMemo(() => {
+    const map = new Map<string, StaffNpsInfo>();
+    if (!npsRecords.length) return map;
+
+    // 期間フィルタリング
+    const filteredNps = activeMonth === "all" ? npsRecords : filterByMonth(npsRecords, activeMonth);
+
+    // スタッフ名でグルーピング
+    const grouped = new Map<string, number[]>();
+    for (const r of filteredNps) {
+      const staffName = r.staff?.trim();
+      if (!staffName) continue;
+      if (!grouped.has(staffName)) grouped.set(staffName, []);
+      grouped.get(staffName)!.push(r.npsScore);
+    }
+
+    for (const [name, scores] of Array.from(grouped.entries())) {
+      const total = scores.length;
+      const avg = scores.reduce((a: number, b: number) => a + b, 0) / total;
+      const promoters = scores.filter((s: number) => s >= 9).length;
+      const passives = scores.filter((s: number) => s >= 7 && s <= 8).length;
+      const detractors = scores.filter((s: number) => s <= 6).length;
+      const npsScore = Math.round(((promoters - detractors) / total) * 100);
+      map.set(name, { totalResponses: total, avgScore: Math.round(avg * 10) / 10, npsScore, promoters, passives, detractors });
+    }
+    return map;
+  }, [npsRecords, activeMonth]);
+
   const monthLabel = activeMonth === "all" ? "全期間" : formatMonth(activeMonth);
 
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   useEffect(() => {
     if (rawData.length > 0) setLastUpdated(new Date());
   }, [rawData]);
+
+  const toggleExpand = (id: string) => {
+    setExpandedStaff((prev) => (prev === id ? null : id));
+  };
 
   return (
     <DashboardLayout
@@ -160,84 +214,206 @@ export default function StaffList() {
           </div>
 
           <div className="space-y-2">
-            {staffList.map((staff, i) => (
-              <motion.div
-                key={`${staff.answerId}-${i}`}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.02 * i }}
-              >
-                <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
-                    {/* Desktop Layout */}
-                    <div className="hidden md:grid grid-cols-12 gap-4 items-center">
-                      <div className="col-span-3 flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-[#9B8579]/10 flex items-center justify-center shrink-0">
-                          <span className="text-[#9B8579] font-bold text-sm">{staff.name.charAt(0)}</span>
-                        </div>
-                        <span className="font-bold text-sm text-foreground">{staff.name}</span>
-                      </div>
-                      <div className="col-span-3 text-right">
-                        <span className="font-mono-data text-base font-bold text-foreground">{formatCurrency(staff.totalSales)}</span>
-                      </div>
-                      <div className="col-span-2">
-                        <Link href={`/store/${encodeURIComponent(staff.storeNormalized)}`}>
-                          <span className="text-sm text-[#9B8579] hover:text-[#7D6B61] transition-colors cursor-pointer flex items-center gap-1">
-                            {staff.storeNormalized}
-                            <ArrowRight className="w-3 h-3" />
-                          </span>
-                        </Link>
-                      </div>
-                      <div className="col-span-2">
-                        <span className="text-sm text-muted-foreground">{staff.employmentType}</span>
-                      </div>
-                      <div className="col-span-2 text-right">
-                        <span className={`font-mono-data text-base font-bold ${
-                          staff.nextReservationRate >= 80 ? "text-[#2D9C8F]" :
-                          staff.nextReservationRate >= 60 ? "text-[#E5B85C]" :
-                          "text-[#C75C5C]"
-                        }`}>
-                          {staff.nextReservationRate}%
-                        </span>
-                      </div>
-                    </div>
+            {staffList.map((staff, i) => {
+              const staffKey = `${staff.answerId}-${i}`;
+              const isExpanded = expandedStaff === staffKey;
+              const npsInfo = staffNpsMap.get(staff.name);
 
-                    {/* Mobile Layout */}
-                    <div className="md:hidden">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-[#9B8579]/10 flex items-center justify-center shrink-0">
-                            <span className="text-[#9B8579] font-bold text-sm">{staff.name.charAt(0)}</span>
+              return (
+                <motion.div
+                  key={staffKey}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.02 * i }}
+                >
+                  <Card className={`border-border/50 shadow-sm transition-all ${isExpanded ? "ring-2 ring-[#9B8579]/30 shadow-md" : "hover:shadow-md"}`}>
+                    <CardContent className="p-0">
+                      {/* Clickable Row */}
+                      <div
+                        className="p-4 cursor-pointer select-none"
+                        onClick={() => toggleExpand(staffKey)}
+                      >
+                        {/* Desktop Layout */}
+                        <div className="hidden md:grid grid-cols-12 gap-4 items-center">
+                          <div className="col-span-3 flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-[#9B8579]/10 flex items-center justify-center shrink-0">
+                              <span className="text-[#9B8579] font-bold text-sm">{staff.name.charAt(0)}</span>
+                            </div>
+                            <span className="font-bold text-sm text-foreground hover:text-[#9B8579] transition-colors">{staff.name}</span>
+                            {isExpanded ? (
+                              <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                            )}
                           </div>
-                          <div>
-                            <div className="font-bold text-sm text-foreground">{staff.name}</div>
-                            <div className="text-[10px] text-muted-foreground">{staff.employmentType}</div>
+                          <div className="col-span-3 text-right">
+                            <span className="font-mono-data text-base font-bold text-foreground">{formatCurrency(staff.totalSales)}</span>
+                          </div>
+                          <div className="col-span-2">
+                            <Link href={`/store/${encodeURIComponent(staff.storeNormalized)}`}>
+                              <span className="text-sm text-[#9B8579] hover:text-[#7D6B61] transition-colors cursor-pointer flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                {staff.storeNormalized}
+                                <ArrowRight className="w-3 h-3" />
+                              </span>
+                            </Link>
+                          </div>
+                          <div className="col-span-2">
+                            <span className="text-sm text-muted-foreground">{staff.employmentType}</span>
+                          </div>
+                          <div className="col-span-2 text-right">
+                            <span className={`font-mono-data text-base font-bold ${
+                              staff.nextReservationRate >= 80 ? "text-[#2D9C8F]" :
+                              staff.nextReservationRate >= 60 ? "text-[#E5B85C]" :
+                              "text-[#C75C5C]"
+                            }`}>
+                              {staff.nextReservationRate}%
+                            </span>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="font-mono-data text-base font-bold text-foreground">{formatCurrency(staff.totalSales)}</div>
+
+                        {/* Mobile Layout */}
+                        <div className="md:hidden">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-full bg-[#9B8579]/10 flex items-center justify-center shrink-0">
+                                <span className="text-[#9B8579] font-bold text-sm">{staff.name.charAt(0)}</span>
+                              </div>
+                              <div>
+                                <div className="font-bold text-sm text-foreground flex items-center gap-1">
+                                  {staff.name}
+                                  {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
+                                </div>
+                                <div className="text-[10px] text-muted-foreground">{staff.employmentType}</div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-mono-data text-base font-bold text-foreground">{formatCurrency(staff.totalSales)}</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <Link href={`/store/${encodeURIComponent(staff.storeNormalized)}`}>
+                              <span className="text-[#9B8579] hover:text-[#7D6B61] transition-colors cursor-pointer flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                <Building2 className="w-3 h-3" />
+                                {staff.storeNormalized}
+                              </span>
+                            </Link>
+                            <span className={`font-mono-data font-bold ${
+                              staff.nextReservationRate >= 80 ? "text-[#2D9C8F]" :
+                              staff.nextReservationRate >= 60 ? "text-[#E5B85C]" :
+                              "text-[#C75C5C]"
+                            }`}>
+                              次回予約 {staff.nextReservationRate}%
+                            </span>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <Link href={`/store/${encodeURIComponent(staff.storeNormalized)}`}>
-                          <span className="text-[#9B8579] hover:text-[#7D6B61] transition-colors cursor-pointer flex items-center gap-1">
-                            <Building2 className="w-3 h-3" />
-                            {staff.storeNormalized}
-                          </span>
-                        </Link>
-                        <span className={`font-mono-data font-bold ${
-                          staff.nextReservationRate >= 80 ? "text-[#2D9C8F]" :
-                          staff.nextReservationRate >= 60 ? "text-[#E5B85C]" :
-                          "text-[#C75C5C]"
-                        }`}>
-                          次回予約 {staff.nextReservationRate}%
-                        </span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
+
+                      {/* Expanded Detail */}
+                      <AnimatePresence>
+                        {isExpanded && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.25, ease: "easeInOut" }}
+                            className="overflow-hidden"
+                          >
+                            <div className="px-4 pb-4 pt-2 border-t border-border/40">
+                              {/* 売上内訳 */}
+                              <div className="mb-4">
+                                <h4 className="text-xs font-bold text-muted-foreground mb-3 flex items-center gap-1.5">
+                                  <DollarSign className="w-3.5 h-3.5" />
+                                  売上内訳
+                                </h4>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+                                  <div className="bg-muted/40 rounded-lg p-3">
+                                    <div className="text-[10px] text-muted-foreground mb-1">技術売上</div>
+                                    <div className="font-mono-data text-sm font-bold">{formatCurrency(staff.techSales)}</div>
+                                  </div>
+                                  <div className="bg-muted/40 rounded-lg p-3">
+                                    <div className="text-[10px] text-muted-foreground mb-1">店販売上</div>
+                                    <div className="font-mono-data text-sm font-bold">{formatCurrency(staff.retailSales)}</div>
+                                  </div>
+                                  <div className="bg-muted/40 rounded-lg p-3">
+                                    <div className="text-[10px] text-muted-foreground mb-1">客単価</div>
+                                    <div className="font-mono-data text-sm font-bold">{formatCurrency(staff.unitPrice)}</div>
+                                  </div>
+                                  <div className="bg-muted/40 rounded-lg p-3">
+                                    <div className="text-[10px] text-muted-foreground mb-1">新規客数</div>
+                                    <div className="font-mono-data text-sm font-bold">{staff.newCustomers}名</div>
+                                  </div>
+                                  <div className="bg-muted/40 rounded-lg p-3">
+                                    <div className="text-[10px] text-muted-foreground mb-1">再来客数</div>
+                                    <div className="font-mono-data text-sm font-bold">{staff.returnCustomers}名</div>
+                                  </div>
+                                  <div className="bg-muted/40 rounded-lg p-3">
+                                    <div className="text-[10px] text-muted-foreground mb-1">次回予約数</div>
+                                    <div className="font-mono-data text-sm font-bold">{staff.nextReservation}件</div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* NPS情報 */}
+                              <div>
+                                <h4 className="text-xs font-bold text-muted-foreground mb-3 flex items-center gap-1.5">
+                                  <BarChart3 className="w-3.5 h-3.5" />
+                                  NPS情報
+                                </h4>
+                                {npsLoading ? (
+                                  <div className="text-xs text-muted-foreground">NPSデータ読み込み中...</div>
+                                ) : npsInfo ? (
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                    <div className="bg-muted/40 rounded-lg p-3">
+                                      <div className="text-[10px] text-muted-foreground mb-1">NPSスコア</div>
+                                      <div className={`font-mono-data text-lg font-bold ${
+                                        npsInfo.npsScore >= 50 ? "text-[#2D9C8F]" :
+                                        npsInfo.npsScore >= 0 ? "text-[#E5B85C]" :
+                                        "text-[#C75C5C]"
+                                      }`}>
+                                        {npsInfo.npsScore >= 0 ? "+" : ""}{npsInfo.npsScore}
+                                      </div>
+                                    </div>
+                                    <div className="bg-muted/40 rounded-lg p-3">
+                                      <div className="text-[10px] text-muted-foreground mb-1">平均スコア</div>
+                                      <div className="font-mono-data text-lg font-bold">{npsInfo.avgScore}</div>
+                                    </div>
+                                    <div className="bg-muted/40 rounded-lg p-3">
+                                      <div className="text-[10px] text-muted-foreground mb-1">回答数</div>
+                                      <div className="font-mono-data text-lg font-bold">{npsInfo.totalResponses}件</div>
+                                    </div>
+                                    <div className="bg-muted/40 rounded-lg p-3">
+                                      <div className="text-[10px] text-muted-foreground mb-1">内訳</div>
+                                      <div className="flex items-center gap-1.5 mt-1">
+                                        <div className="flex items-center gap-1">
+                                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: NPS_COLORS.promoter }} />
+                                          <span className="text-[10px] font-mono-data">{npsInfo.promoters}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: NPS_COLORS.passive }} />
+                                          <span className="text-[10px] font-mono-data">{npsInfo.passives}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: NPS_COLORS.detractor }} />
+                                          <span className="text-[10px] font-mono-data">{npsInfo.detractors}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="bg-muted/30 rounded-lg p-3 text-xs text-muted-foreground">
+                                    この期間のNPSデータはありません
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              );
+            })}
           </div>
         </>
       )}
