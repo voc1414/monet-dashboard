@@ -9,6 +9,7 @@ import { MapPin, Users, TrendingUp, BarChart3, ArrowRight, Sparkles } from "luci
 import { Card, CardContent } from "@/components/ui/card";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useNpsData, calculateStoreStats } from "@/hooks/useNpsData";
+import { getNpsClass, NPS_INDUSTRY_AVERAGE, getAllNpsClasses } from "@/lib/npsClass";
 
 const HERO_IMAGE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663489426081/aLPZvLfFDC4rFYToBquZNR/hero-salon-NicxdYrLg92ifUSevm3mos.webp";
 
@@ -23,17 +24,22 @@ const SAMPLE_STORE_DATA: Record<string, { revenue: string; unitPrice: string; st
 };
 
 function NpsScoreBadge({ score }: { score: number }) {
-  const color =
-    score >= 50
-      ? "bg-[#2D9C8F]/10 text-[#2D9C8F] border-[#2D9C8F]/20"
-      : score >= 0
-      ? "bg-[#E5B85C]/10 text-[#B8922A] border-[#E5B85C]/20"
-      : "bg-[#C75C5C]/10 text-[#C75C5C] border-[#C75C5C]/20";
-
+  const npsClass = getNpsClass(score);
   return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-mono-data font-semibold border ${color}`}>
-      NPS {score > 0 ? "+" : ""}{score}
-    </span>
+    <div className="flex flex-col items-end gap-1">
+      <span
+        className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-mono-data font-semibold border"
+        style={{ backgroundColor: npsClass.bgColor, color: npsClass.color, borderColor: npsClass.borderColor }}
+      >
+        NPS {score > 0 ? "+" : ""}{score}
+      </span>
+      <span
+        className="text-[10px] font-medium px-1.5 py-0.5 rounded"
+        style={{ color: npsClass.color }}
+      >
+        {npsClass.label}
+      </span>
+    </div>
   );
 }
 
@@ -77,12 +83,13 @@ export default function Home() {
       </div>
 
       {/* Overall Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
         {[
-          { label: "全店舗NPS", value: `${overallNps > 0 ? "+" : ""}${overallNps}`, icon: TrendingUp, color: "text-[#2D9C8F]" },
-          { label: "平均スコア", value: `${overallAvg}`, icon: Sparkles, color: "text-[#9B8579]" },
-          { label: "総回答数", value: `${totalResponses}`, icon: BarChart3, color: "text-[#7D8B75]" },
-          { label: "店舗数", value: `${storeStats.length}`, icon: MapPin, color: "text-[#9B8579]" },
+          { label: "全店舗NPS", value: `${overallNps > 0 ? "+" : ""}${overallNps}`, icon: TrendingUp, color: "text-[#2D9C8F]", extra: loading ? undefined : getNpsClass(overallNps) },
+        { label: "業界平均NPS", value: `${NPS_INDUSTRY_AVERAGE}`, icon: BarChart3, color: "text-muted-foreground", extra: undefined },
+          { label: "平均スコア", value: `${overallAvg}`, icon: Sparkles, color: "text-[#9B8579]", extra: undefined },
+          { label: "総回答数", value: `${totalResponses}`, icon: BarChart3, color: "text-[#7D8B75]", extra: undefined },
+          { label: "店舗数", value: `${storeStats.length}`, icon: MapPin, color: "text-[#9B8579]", extra: undefined },
         ].map((stat, i) => (
           <motion.div
             key={stat.label}
@@ -99,6 +106,11 @@ export default function Home() {
                   {loading ? "..." : stat.value}
                 </div>
                 <div className="text-xs text-muted-foreground">{stat.label}</div>
+                {stat.extra && (
+                  <div className="mt-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded inline-block" style={{ color: stat.extra.color, backgroundColor: stat.extra.bgColor }}>
+                    {stat.extra.label}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </motion.div>

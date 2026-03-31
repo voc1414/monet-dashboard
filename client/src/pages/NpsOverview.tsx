@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useNpsData, calculateStoreStats, filterByMonth, getAvailableMonths } from "@/hooks/useNpsData";
 import type { NpsRecord } from "@/hooks/useNpsData";
+import { getNpsClass, NPS_INDUSTRY_AVERAGE, getAllNpsClasses } from "@/lib/npsClass";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line, AreaChart, Area
@@ -28,16 +29,69 @@ const NPS_COLORS = {
 };
 
 function NpsGaugeLarge({ score }: { score: number }) {
-  const color = score >= 50 ? NPS_COLORS.promoter : score >= 0 ? NPS_COLORS.passive : NPS_COLORS.detractor;
+  const npsClass = getNpsClass(score);
   return (
-    <div className="w-36 h-36 rounded-full border-[6px] flex items-center justify-center" style={{ borderColor: color }}>
-      <div className="text-center">
-        <div className="font-mono-data text-4xl font-bold" style={{ color }}>
-          {score > 0 ? "+" : ""}{score}
+    <div className="flex flex-col items-center">
+      <div className="w-36 h-36 rounded-full border-[6px] flex items-center justify-center" style={{ borderColor: npsClass.color }}>
+        <div className="text-center">
+          <div className="font-mono-data text-4xl font-bold" style={{ color: npsClass.color }}>
+            {score > 0 ? "+" : ""}{score}
+          </div>
+          <div className="text-xs text-muted-foreground uppercase tracking-widest mt-1">NPS Score</div>
         </div>
-        <div className="text-xs text-muted-foreground uppercase tracking-widest mt-1">NPS Score</div>
+      </div>
+      <div className="mt-3 flex flex-col items-center gap-1.5">
+        <span
+          className="text-sm font-semibold px-3 py-1 rounded-full"
+          style={{ color: npsClass.color, backgroundColor: npsClass.bgColor, border: `1px solid ${npsClass.borderColor}` }}
+        >
+          {npsClass.label}
+        </span>
+        <span className="text-[11px] text-muted-foreground">{npsClass.description}</span>
+        <span className="text-[10px] text-muted-foreground/70">
+          美容室業界平均: {NPS_INDUSTRY_AVERAGE}
+        </span>
       </div>
     </div>
+  );
+}
+
+function NpsClassLegend() {
+  const classes = getAllNpsClasses();
+  const labels = [
+    { range: "70以上", ...classes[0].npsClass },
+    { range: "50〜69", ...classes[1].npsClass },
+    { range: "20〜49", ...classes[2].npsClass },
+    { range: "0〜19", ...classes[3].npsClass },
+    { range: "0未満", ...classes[4].npsClass },
+  ];
+  return (
+    <Card className="border-border/50 shadow-sm">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium text-foreground">クラス分類基準</CardTitle>
+      </CardHeader>
+      <CardContent className="p-4 pt-0">
+        <div className="space-y-2">
+          {labels.map((item) => (
+            <div key={item.label} className="flex items-center gap-2.5">
+              <span
+                className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 w-[90px] text-center"
+                style={{ color: item.color, backgroundColor: item.bgColor, border: `1px solid ${item.borderColor}` }}
+              >
+                {item.label}
+              </span>
+              <span className="text-[10px] font-mono-data text-muted-foreground w-[50px] shrink-0">{item.range}</span>
+              <span className="text-[10px] text-muted-foreground truncate">{item.description}</span>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 pt-3 border-t border-border/50">
+          <p className="text-[10px] text-muted-foreground leading-relaxed">
+            美容室業界平均NPS: <span className="font-mono-data font-semibold">{NPS_INDUSTRY_AVERAGE}</span>（推定値）。日本ではNPSがマイナスになりやすい傾向があります。
+          </p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -272,7 +326,7 @@ export default function NpsOverview() {
         <>
           {/* KPI Cards */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="col-span-2 md:col-span-1">
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="col-span-2 md:col-span-1 md:row-span-2">
               <Card className="border-border/50 shadow-sm h-full">
                 <CardContent className="p-5 flex flex-col items-center justify-center h-full">
                   <NpsGaugeLarge score={storeStats.npsScore} />
@@ -291,6 +345,11 @@ export default function NpsOverview() {
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
               <StatCard label="批判者率" value={`${storeStats.detractorPct}%`} subtext={`${storeStats.detractors}件`} icon={ThumbsDown} color={NPS_COLORS.detractor} />
             </motion.div>
+          </div>
+
+          {/* NPS Class Legend */}
+          <div className="mb-8">
+            <NpsClassLegend />
           </div>
 
           {/* Charts Section */}

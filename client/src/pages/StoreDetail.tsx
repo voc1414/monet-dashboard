@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import DashboardLayout from "@/components/DashboardLayout";
 import { useNpsData, calculateStoreStats, filterByMonth, getAvailableMonths } from "@/hooks/useNpsData";
 import type { NpsRecord, StoreStats } from "@/hooks/useNpsData";
+import { getNpsClass, NPS_INDUSTRY_AVERAGE } from "@/lib/npsClass";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
@@ -75,18 +76,33 @@ const NPS_COLORS = {
 };
 
 function NpsGauge({ score, size = "lg" }: { score: number; size?: "sm" | "lg" }) {
-  const color = score >= 50 ? NPS_COLORS.promoter : score >= 0 ? NPS_COLORS.passive : NPS_COLORS.detractor;
+  const npsClass = getNpsClass(score);
   const sizeClass = size === "lg" ? "w-28 h-28" : "w-16 h-16";
   const textClass = size === "lg" ? "text-3xl" : "text-lg";
 
   return (
-    <div className={`${sizeClass} rounded-full border-4 flex items-center justify-center`} style={{ borderColor: color }}>
-      <div className="text-center">
-        <div className={`font-mono-data ${textClass} font-bold`} style={{ color }}>
-          {score > 0 ? "+" : ""}{score}
+    <div className="flex flex-col items-center">
+      <div className={`${sizeClass} rounded-full border-4 flex items-center justify-center`} style={{ borderColor: npsClass.color }}>
+        <div className="text-center">
+          <div className={`font-mono-data ${textClass} font-bold`} style={{ color: npsClass.color }}>
+            {score > 0 ? "+" : ""}{score}
+          </div>
+          {size === "lg" && <div className="text-[10px] text-muted-foreground uppercase tracking-wider">NPS</div>}
         </div>
-        {size === "lg" && <div className="text-[10px] text-muted-foreground uppercase tracking-wider">NPS</div>}
       </div>
+      {size === "lg" && (
+        <div className="mt-2 flex flex-col items-center gap-1">
+          <span
+            className="text-xs font-semibold px-2 py-0.5 rounded-full"
+            style={{ color: npsClass.color, backgroundColor: npsClass.bgColor, border: `1px solid ${npsClass.borderColor}` }}
+          >
+            {npsClass.label}
+          </span>
+          <span className="text-[10px] text-muted-foreground">
+            業界平均: {NPS_INDUSTRY_AVERAGE}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
