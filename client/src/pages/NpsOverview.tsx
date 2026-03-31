@@ -675,7 +675,7 @@ export default function NpsOverview() {
       )}
       {/* Score Detail Modal */}
       <Dialog open={selectedScore !== null} onOpenChange={(open) => { if (!open) setSelectedScore(null); }}>
-        <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle className="font-display flex items-center gap-2">
               <div

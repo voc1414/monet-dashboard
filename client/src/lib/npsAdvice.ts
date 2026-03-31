@@ -331,7 +331,7 @@ export function generateStoreAdvice(
   // --- 具体的アクション（monetのマニュアルに基づく） ---
   if (stats.npsScore >= 70) {
     actionItems.push(
-      "高評価のお客様はVIP客候補です。紹介特典（モネオリジナルシャンプー＋トリートメント＋お香）を案内し、口コミでの集客を強化しましょう"
+      "高評価のお客様はVIP客候補です。次回予約の確実な獲得と、来店周期を安定させるカウンセリングを通じて、VIP客へと育成していきましょう。リピートが定着したお客様には紹介のお声がけも効果的です"
     );
     if (stats.totalResponses < 50) {
       actionItems.push(
