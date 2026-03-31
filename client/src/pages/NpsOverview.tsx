@@ -15,6 +15,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useNpsData, calculateStoreStats, filterByMonth, getAvailableMonths } from "@/hooks/useNpsData";
 import type { NpsRecord, StoreStats } from "@/hooks/useNpsData";
@@ -274,6 +276,7 @@ export default function NpsOverview() {
   const { records, loading, error, lastUpdated, refresh } = useNpsData();
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
   const [reviewFilter, setReviewFilter] = useState<string>("all");
+  const [selectedScore, setSelectedScore] = useState<number | null>(null);
 
   const allMonths = useMemo(() => getAvailableMonths(records), [records]);
 
@@ -353,6 +356,11 @@ export default function NpsOverview() {
       finish: analyze("finishComment"),
     };
   }, [storeRecords]);
+
+  const selectedScoreRecords = useMemo(() => {
+    if (selectedScore === null) return [];
+    return storeRecords.filter((r) => r.npsScore === selectedScore);
+  }, [storeRecords, selectedScore]);
 
   // Filtered reviews
   const filteredReviews = useMemo(() => {
@@ -490,7 +498,7 @@ export default function NpsOverview() {
               </CardHeader>
               <CardContent className="p-4">
                 <ResponsiveContainer width="100%" height={240}>
-                  <BarChart data={scoreDistribution} margin={{ top: 10, right: 10, bottom: 5, left: -10 }}>
+                  <BarChart data={scoreDistribution} margin={{ top: 10, right: 10, bottom: 5, left: -10 }} style={{ cursor: "pointer" }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
                     <XAxis dataKey="score" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} />
@@ -498,13 +506,14 @@ export default function NpsOverview() {
                       contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e5e5" }}
                       formatter={(value: number) => [`${value}件`, "回答数"]}
                     />
-                    <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                    <Bar dataKey="count" radius={[4, 4, 0, 0]} onClick={(data: any) => { if (data && data.count > 0) setSelectedScore(data.score); }} className="cursor-pointer">
                       {scoreDistribution.map((entry, idx) => (
-                        <Cell key={idx} fill={entry.fill} />
+                        <Cell key={idx} fill={entry.fill} className="hover:opacity-80 transition-opacity" />
                       ))}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
+                <p className="text-[10px] text-muted-foreground text-center mt-1">棒グラフをタップで該当アンケートを表示</p>
               </CardContent>
             </Card>
 
@@ -664,6 +673,82 @@ export default function NpsOverview() {
           </CardContent>
         </Card>
       )}
+      {/* Score Detail Modal */}
+      <Dialog open={selectedScore !== null} onOpenChange={(open) => { if (!open) setSelectedScore(null); }}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="font-display flex items-center gap-2">
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-mono-data font-bold"
+                style={{
+                  backgroundColor:
+                    selectedScore !== null
+                      ? selectedScore >= 9 ? NPS_COLORS.promoter : selectedScore >= 7 ? NPS_COLORS.passive : NPS_COLORS.detractor
+                      : "#999",
+                }}
+              >
+                {selectedScore}
+              </div>
+              スコア {selectedScore} の回答一覧
+            </DialogTitle>
+            <DialogDescription>
+              {selectedScoreRecords.length}件の回答
+              {selectedScore !== null && (
+                <span className="ml-2">
+                  （{selectedScore >= 9 ? "推奨者" : selectedScore >= 7 ? "中立者" : "批判者"}）
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="flex-1 -mx-6 px-6">
+            <div className="space-y-3 pb-4">
+              {selectedScoreRecords.length > 0 ? (
+                selectedScoreRecords.map((r, i) => (
+                  <Card key={r.no + "-" + i} className="border-border/50 shadow-sm">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-muted-foreground">{r.menu}</span>
+                        <span className="text-[10px] text-muted-foreground">{r.date.split(" ")[0]}</span>
+                      </div>
+                      {r.review ? (
+                        <p className="text-sm text-foreground/80 leading-relaxed mb-2">{r.review}</p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground/50 italic mb-2">レビューなし</p>
+                      )}
+                      <div className="flex flex-wrap gap-1.5">
+                        {r.priceComment && (
+                          <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground">
+                            金額: {r.priceComment.split(",")[0].trim()}
+                          </span>
+                        )}
+                        {r.spaceComment && (
+                          <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground">
+                            空間: {r.spaceComment.split(",")[0].trim()}
+                          </span>
+                        )}
+                        {r.staffComment && (
+                          <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground">
+                            スタッフ: {r.staffComment.split(",")[0].trim()}
+                          </span>
+                        )}
+                        {r.finishComment && (
+                          <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground">
+                            仕上がり: {r.finishComment.split(",")[0].trim()}
+                          </span>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              ) : (
+                <div className="py-8 text-center text-muted-foreground text-sm">
+                  該当する回答はありません
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
