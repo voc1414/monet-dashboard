@@ -1,8 +1,17 @@
 // ============================================================
 // NPS 総合アドバイスコメント生成ロジック
 // ============================================================
-// 各店舗のNPSスコア・推奨者率・批判者率・カテゴリ別評価・
-// レビュー内容を総合的に分析し、具体的な改善アドバイスを生成する。
+// monetマニュアルの価値観・行動指標・接客基準に基づき、
+// 各店舗のNPSデータを総合分析してアドバイスを生成する。
+//
+// 【monetの核心的価値観】
+// - 「五感を満たす唯一無二の美容室」
+// - ハイエンド層がターゲット
+// - NPS = 「感動したかどうか」を評価する指標
+// - 5つの行動指標（ブランドマインド/monetとしての視点/ハイエンド対応/チームの気遣い/空間創り）
+// - 4段階の価値提供（基本的→期待的→願望的→予想外価値）
+// - VIP客重視（売上の80%はVIP客20%から）
+// ============================================================
 
 import type { NpsRecord, StoreStats } from "@/hooks/useNpsData";
 
@@ -53,15 +62,18 @@ function analyzeCategoryData(records: NpsRecord[]): {
 }
 
 // ポジティブ/ネガティブのキーワード判定
+// monetの価値観に沿った「感動」「五感」「予想外価値」関連のキーワードを重視
 const POSITIVE_KEYWORDS = [
-  "満足", "良い", "良かった", "素敵", "丁寧", "最高", "嬉しい", "綺麗",
-  "リラックス", "居心地", "安心", "信頼", "気持ち良", "おすすめ", "また来",
-  "癒", "清潔", "快適", "上手", "感動", "完璧", "理想", "気に入",
+  "感動", "満足", "癒", "リラックス", "居心地", "安心", "信頼",
+  "気持ち良", "清潔", "快適", "丁寧", "素敵", "最高", "嬉しい",
+  "綺麗", "おすすめ", "また来", "上手", "完璧", "理想", "気に入",
+  "香り", "空間", "雰囲気", "特別", "贅沢",
 ];
 
 const NEGATIVE_KEYWORDS = [
   "残念", "不満", "改善", "高い", "待ち時間", "長い", "微妙", "期待外れ",
   "雑", "不安", "痛", "ムラ", "合わな", "違う", "もう少し", "気になる",
+  "狭", "汚", "臭",
 ];
 
 function analyzeReviewSentiment(records: NpsRecord[]): {
@@ -109,12 +121,42 @@ function analyzeReviewSentiment(records: NpsRecord[]): {
   };
 }
 
+// monetの「4段階の価値提供」に基づいた分析
+function analyzeValueDelivery(stats: StoreStats, records: NpsRecord[]): {
+  level: 1 | 2 | 3 | 4;
+  description: string;
+} {
+  // 推奨者率と平均スコアから、どの段階の価値提供ができているか判定
+  if (stats.npsScore >= 70 && stats.avgScore >= 9.0) {
+    return {
+      level: 4,
+      description: "「予想外価値」の提供に成功しています。お客様が想像していなかった感動体験を届けられています",
+    };
+  } else if (stats.npsScore >= 50 && stats.avgScore >= 8.5) {
+    return {
+      level: 3,
+      description: "「願望的価値」まで安定して提供できています。ブランケット確認やドリンク提供など、きめ細かな配慮が伝わっています",
+    };
+  } else if (stats.npsScore >= 20) {
+    return {
+      level: 2,
+      description: "「期待的価値」は満たせていますが、「願望的価値」の提供にばらつきがあります。お客様への声かけ（空調・お手洗い確認など）を徹底しましょう",
+    };
+  } else {
+    return {
+      level: 1,
+      description: "「基本的価値」の見直しが必要です。敬語・挨拶・笑顔など、接客の基本を全スタッフで再確認しましょう",
+    };
+  }
+}
+
 export function generateStoreAdvice(
   stats: StoreStats,
   records: NpsRecord[]
 ): NpsAdvice {
   const categories = analyzeCategoryData(records);
   const sentiment = analyzeReviewSentiment(records);
+  const valueDelivery = analyzeValueDelivery(stats, records);
 
   const strengths: string[] = [];
   const improvements: string[] = [];
@@ -122,120 +164,205 @@ export function generateStoreAdvice(
   let summary = "";
   let icon: NpsAdvice["icon"] = "target";
 
-  // --- 総合評価サマリー ---
+  // --- 総合評価サマリー（monetの価値観に基づく） ---
   if (stats.npsScore >= 70) {
-    summary = `NPS +${stats.npsScore}は業界トップクラスの水準です。推奨者率${stats.promoterPct}%と非常に高く、顧客ロイヤルティが確立されています。この水準を維持しながら、さらなる差別化を図りましょう。`;
+    summary = `NPS +${stats.npsScore}。monetが目指す「五感を満たす感動体験」が高い水準で実現できています。推奨者率${stats.promoterPct}%は、お客様がmonetのブランド価値を深く実感している証です。この水準を全店の基準として共有し、さらなる「予想外価値」の創出を目指しましょう。`;
     icon = "trophy";
   } else if (stats.npsScore >= 50) {
-    summary = `NPS +${stats.npsScore}は非常に高い水準です。推奨者率${stats.promoterPct}%で多くのお客様から支持されています。中立者を推奨者に転換することで、さらなる成長が見込めます。`;
+    summary = `NPS +${stats.npsScore}。多くのお客様に満足いただけていますが、monetが掲げる「感動」にはあと一歩です。中立者（7-8点）のお客様は「満足はしたが感動には至らなかった」層です。monetの4段階の価値提供のうち「予想外価値」を意識し、一人ひとりに合わせた特別な体験を届けましょう。`;
     icon = "thumbsUp";
   } else if (stats.npsScore >= 20) {
-    summary = `NPS +${stats.npsScore}は業界平均を上回る良好な水準です。推奨者率${stats.promoterPct}%を維持しつつ、批判者率${stats.detractorPct}%の低減に注力することで大きな改善が期待できます。`;
+    summary = `NPS +${stats.npsScore}。業界平均は上回っていますが、monetのブランド基準からすると改善の余地があります。「monetとしての正解は何か？」という行動指標に立ち返り、接客・空間・仕上がりの各面でコンセプトに沿ったサービスを再確認しましょう。`;
     icon = "target";
   } else if (stats.npsScore >= 0) {
-    summary = `NPS +${stats.npsScore}は業界平均付近の水準です。批判者率${stats.detractorPct}%の改善が最優先課題です。顧客体験の見直しにより、大幅なスコア向上が可能です。`;
+    summary = `NPS +${stats.npsScore}。monetの目指す顧客体験との間にギャップがあります。批判者率${stats.detractorPct}%の改善が急務です。マニュアルの「基本的価値」「期待的価値」が確実に提供できているか、チーム全体で振り返りを行いましょう。`;
     icon = "alertTriangle";
   } else {
-    summary = `NPS ${stats.npsScore}は改善が必要な水準です。批判者率${stats.detractorPct}%が高く、顧客体験の根本的な見直しが急務です。まずは批判者の声に耳を傾け、優先的に対応しましょう。`;
+    summary = `NPS ${stats.npsScore}。monetのブランド基準を大きく下回っており、早急な対応が必要です。まずはマニュアルに立ち返り、5つの行動指標（ブランドマインド・monetとしての視点・ハイエンド対応・チームの気遣い・空間創り）を全スタッフで再確認してください。`;
     icon = "alertCircle";
   }
 
-  // --- 強みの分析 ---
+  // --- 強みの分析（monetの価値観に紐づけ） ---
   if (stats.promoterPct >= 80) {
-    strengths.push(`推奨者率${stats.promoterPct}%と圧倒的に高く、口コミによる集客力が期待できます`);
+    strengths.push(
+      `推奨者率${stats.promoterPct}%。お客様の大多数が「感動した」と回答しており、monetの「予想外価値」の提供が定着しています。VIP客の育成にも好影響が期待できます`
+    );
   } else if (stats.promoterPct >= 60) {
-    strengths.push(`推奨者率${stats.promoterPct}%と高水準で、多くのお客様が満足しています`);
+    strengths.push(
+      `推奨者率${stats.promoterPct}%。多くのお客様がmonetの体験に満足しています。紹介特典を活用した口コミ集客の基盤が整っています`
+    );
   }
 
   if (stats.detractorPct === 0) {
-    strengths.push("批判者がゼロで、全てのお客様が一定以上の満足を感じています");
+    strengths.push(
+      "批判者がゼロです。全てのお客様に「基本的価値」「期待的価値」が確実に届いており、マニュアルの徹底度が高い状態です"
+    );
   } else if (stats.detractorPct <= 5) {
-    strengths.push(`批判者率${stats.detractorPct}%と非常に低く、安定したサービス品質を維持しています`);
+    strengths.push(
+      `批判者率${stats.detractorPct}%と低水準。ハイエンド層のお客様にも安定したサービス品質を提供できています`
+    );
   }
 
   if (stats.avgScore >= 9.0) {
-    strengths.push(`平均スコア${stats.avgScore}と極めて高く、一貫した高品質サービスが提供されています`);
+    strengths.push(
+      `平均スコア${stats.avgScore}。一貫して高い満足度を維持しており、monetの「五感を満たす」コンセプトが体現されています`
+    );
   } else if (stats.avgScore >= 8.5) {
-    strengths.push(`平均スコア${stats.avgScore}と高水準で、安定したサービス品質です`);
+    strengths.push(
+      `平均スコア${stats.avgScore}。安定したサービス品質で、お客様の期待に応えられています`
+    );
   }
 
-  // カテゴリ別の強み
-  const categoryStrengths: string[] = [];
-  [categories.space, categories.staff, categories.finish, categories.price].forEach((cat) => {
-    if (cat.topItems.length > 0 && cat.topItems[0].pct >= 50) {
-      categoryStrengths.push(`${cat.label}面で「${cat.topItems[0].name}」が${cat.topItems[0].pct}%と高評価`);
-    }
-  });
-  if (categoryStrengths.length > 0 && strengths.length < 3) {
-    strengths.push(categoryStrengths.slice(0, 3 - strengths.length).join("、"));
-  }
-
-  // レビューの強み
-  if (sentiment.positiveThemes.length > 0 && strengths.length < 3) {
-    strengths.push(`レビューでは「${sentiment.positiveThemes.join("」「")}」などのポジティブな声が多数`);
-  }
-
-  // --- 改善提案 ---
-  if (stats.passivePct >= 30) {
-    improvements.push(`中立者（7-8点）が${stats.passivePct}%を占めています。「あと一歩」の感動体験を加えることで推奨者への転換が期待できます`);
-  } else if (stats.passivePct >= 15) {
-    improvements.push(`中立者が${stats.passivePct}%います。パーソナライズされた接客やサプライズ要素で推奨者への転換を狙いましょう`);
-  }
-
-  if (stats.detractorPct >= 10) {
-    improvements.push(`批判者率${stats.detractorPct}%の低減が最重要課題です。低評価のお客様への個別フォローアップを検討してください`);
-  } else if (stats.detractorPct >= 3) {
-    improvements.push(`批判者率${stats.detractorPct}%をゼロに近づけることで、NPSの大幅な向上が見込めます`);
-  }
-
-  // カテゴリ別の改善点（ネガティブ寄りの回答が多いカテゴリ）
-  const negativeCategories = [categories.price, categories.space, categories.staff, categories.finish]
-    .filter((cat) => {
-      return cat.topItems.some((item) =>
-        item.name.includes("高い") || item.name.includes("不満") || item.name.includes("改善") ||
-        item.name.includes("普通") || item.name.includes("微妙") || item.name.includes("狭")
-      );
-    });
-
-  if (negativeCategories.length > 0 && improvements.length < 3) {
-    negativeCategories.slice(0, 3 - improvements.length).forEach((cat) => {
-      const negItem = cat.topItems.find((item) =>
-        item.name.includes("高い") || item.name.includes("不満") || item.name.includes("改善") ||
-        item.name.includes("普通") || item.name.includes("微妙") || item.name.includes("狭")
-      );
-      if (negItem) {
-        improvements.push(`${cat.label}面で「${negItem.name}」という声が${negItem.pct}%あります。対策の検討をお勧めします`);
+  // カテゴリ別の強み（monetの5つの行動指標に紐づけ）
+  if (categories.space.topItems.length > 0 && categories.space.topItems[0].pct >= 40) {
+    const spaceTop = categories.space.topItems[0];
+    if (!spaceTop.name.includes("普通") && !spaceTop.name.includes("狭") && !spaceTop.name.includes("汚")) {
+      if (strengths.length < 3) {
+        strengths.push(
+          `空間面で「${spaceTop.name}」が${spaceTop.pct}%。行動指標5「ブランドに適した空間創り・クリンネス」が実践されています`
+        );
       }
-    });
+    }
+  }
+
+  if (categories.staff.topItems.length > 0 && categories.staff.topItems[0].pct >= 40) {
+    const staffTop = categories.staff.topItems[0];
+    if (!staffTop.name.includes("普通") && !staffTop.name.includes("不満")) {
+      if (strengths.length < 3) {
+        strengths.push(
+          `スタッフ面で「${staffTop.name}」が${staffTop.pct}%。行動指標3「ハイエンド層への言葉遣い・立ち振る舞い」が高く評価されています`
+        );
+      }
+    }
+  }
+
+  if (categories.finish.topItems.length > 0 && categories.finish.topItems[0].pct >= 40) {
+    const finishTop = categories.finish.topItems[0];
+    if (!finishTop.name.includes("普通") && !finishTop.name.includes("不満")) {
+      if (strengths.length < 3) {
+        strengths.push(
+          `仕上がり面で「${finishTop.name}」が${finishTop.pct}%。髪質改善の技術力がお客様に伝わっています`
+        );
+      }
+    }
+  }
+
+  // レビューの強み（monetの「感動」キーワードを重視）
+  if (sentiment.positiveThemes.length > 0 && strengths.length < 3) {
+    const hasKando = sentiment.positiveThemes.includes("感動");
+    const hasIyashi = sentiment.positiveThemes.some((t) => ["癒", "リラックス", "気持ち良"].includes(t));
+    if (hasKando) {
+      strengths.push(
+        `レビューに「感動」の声が多数。NPSが測る「感動したかどうか」において、お客様の心に響くサービスが提供できています`
+      );
+    } else if (hasIyashi) {
+      strengths.push(
+        `レビューで「${sentiment.positiveThemes.join("」「")}」など五感に響く体験への評価が高く、monetのコンセプトが伝わっています`
+      );
+    } else {
+      strengths.push(
+        `レビューでは「${sentiment.positiveThemes.join("」「")}」などポジティブな声が多く、サービスの方向性は正しいと言えます`
+      );
+    }
+  }
+
+  // --- 改善提案（monetの価値提供フレームワークに基づく） ---
+
+  // 価値提供レベルに基づく改善
+  if (valueDelivery.level <= 2) {
+    improvements.push(valueDelivery.description);
+  }
+
+  // 中立者対策（monetの「予想外価値」で転換）
+  if (stats.passivePct >= 30) {
+    improvements.push(
+      `中立者（7-8点）が${stats.passivePct}%。「満足」と「感動」の差は紙一重です。カウンセリングで半年〜1年後の未来を想像しながらお話しし、施術中の技術説明や仕上がり時の感動演出で「予想外価値」を届けましょう`
+    );
+  } else if (stats.passivePct >= 15) {
+    improvements.push(
+      `中立者が${stats.passivePct}%。感動タイミングでの技術おさらいや、次回メニューの具体的な提案など、カウンセリングの質を高めることで推奨者への転換が期待できます`
+    );
+  }
+
+  // 批判者対策
+  if (stats.detractorPct >= 10) {
+    improvements.push(
+      `批判者率${stats.detractorPct}%は、monetの基準では看過できない水準です。低評価のお客様の声を一件ずつ確認し、「基本的価値」「期待的価値」の提供に漏れがないか検証してください`
+    );
+  } else if (stats.detractorPct >= 3) {
+    improvements.push(
+      `批判者率${stats.detractorPct}%。ゼロを目指すために、低評価の原因を特定しましょう。マニュアルの接客基準（笑顔・傾聴・提案）が全スタッフに浸透しているか確認が必要です`
+    );
+  }
+
+  // カテゴリ別の改善（monetの行動指標に紐づけ）
+  const spaceLowItems = categories.space.topItems.filter((item) =>
+    item.name.includes("普通") || item.name.includes("狭") || item.name.includes("汚") || item.name.includes("気になる")
+  );
+  if (spaceLowItems.length > 0 && improvements.length < 3) {
+    improvements.push(
+      `空間面で「${spaceLowItems[0].name}」の声が${spaceLowItems[0].pct}%。ハイエンド層は空間の細部でお店のこだわりを見抜きます。クリンネスの徹底（セット面・入り口・通路・トイレ）を再確認しましょう`
+    );
+  }
+
+  const priceLowItems = categories.price.topItems.filter((item) =>
+    item.name.includes("高い") || item.name.includes("不満") || item.name.includes("微妙")
+  );
+  if (priceLowItems.length > 0 && improvements.length < 3) {
+    improvements.push(
+      `金額面で「${priceLowItems[0].name}」の声が${priceLowItems[0].pct}%。monetのターゲット層は「お得感より総合的な価値で判断する」方々です。価格以上の価値を感じていただけるよう、施術中の技術説明やアフターケアの充実を図りましょう`
+    );
   }
 
   // レビューのネガティブテーマ
   if (sentiment.negativeThemes.length > 0 && improvements.length < 3) {
-    improvements.push(`レビューで「${sentiment.negativeThemes.join("」「")}」などの声が見られます。優先的に対応を検討してください`);
+    improvements.push(
+      `レビューで「${sentiment.negativeThemes.join("」「")}」の声があります。monetでは「どうすれば解決できるか？」を考える姿勢が大切です。チームで具体的な改善策を話し合いましょう`
+    );
   }
 
   // 改善がない場合の補足
   if (improvements.length === 0) {
-    improvements.push("現在の高い水準を維持するため、スタッフ間でのベストプラクティス共有を継続してください");
+    improvements.push(
+      "現在の高い水準を維持するため、マニュアルの定期的な振り返りとスタッフ間でのベストプラクティス共有を継続しましょう。「monetとしての正解は何か？」を常に意識することが大切です"
+    );
   }
 
-  // --- 具体的アクション ---
+  // --- 具体的アクション（monetのマニュアルに基づく） ---
   if (stats.npsScore >= 70) {
-    actionItems.push("高評価のお客様の声をSNSやホームページで紹介し、新規集客に活用しましょう");
+    actionItems.push(
+      "高評価のお客様はVIP客候補です。紹介特典（モネオリジナルシャンプー＋トリートメント＋お香）を案内し、口コミでの集客を強化しましょう"
+    );
     if (stats.totalResponses < 50) {
-      actionItems.push(`回答数${stats.totalResponses}件をさらに増やすことで、より正確なデータ分析が可能になります`);
+      actionItems.push(
+        `回答数${stats.totalResponses}件。より正確な分析のため、来店されたお客様全員へのNPSアンケート送信を徹底しましょう`
+      );
     } else {
-      actionItems.push("推奨者のお客様に紹介プログラムを案内し、口コミでの集客を強化しましょう");
+      actionItems.push(
+        "この水準を全店の目標として共有し、成功しているカウンセリング手法や接客パターンを他店舗にも展開しましょう"
+      );
     }
   } else if (stats.npsScore >= 50) {
-    actionItems.push("中立者（7-8点）のお客様に対し、次回来店時にパーソナライズされた提案を行いましょう");
-    actionItems.push("スタッフミーティングで高評価レビューを共有し、成功パターンを全員で実践しましょう");
+    actionItems.push(
+      "中立者のお客様に対し、次回来店時のカウンセリングで「1番目と2番目の悩み」を丁寧に引き出し、半年後の理想の姿を一緒にイメージしましょう"
+    );
+    actionItems.push(
+      "スタッフミーティングで高評価レビューを共有し、「どの瞬間にお客様が感動したか」を分析して全員で実践しましょう"
+    );
   } else if (stats.npsScore >= 20) {
-    actionItems.push("批判者のお客様には来店後のフォローアップ連絡を実施し、不満点を直接ヒアリングしましょう");
-    actionItems.push("カテゴリ別評価の低い項目について、具体的な改善アクションプランを策定しましょう");
+    actionItems.push(
+      "マニュアルの接客基準を全スタッフで再確認しましょう。特に「笑顔で警戒心を下げる」「目を見て傾聴する」「感情を込めて提案する」の3ステップの徹底が重要です"
+    );
+    actionItems.push(
+      "批判者のお客様には来店後のフォローアップを実施し、「monetとして」何が足りなかったかを具体的にヒアリングしましょう"
+    );
   } else {
-    actionItems.push("全スタッフで低評価レビューを分析し、共通する問題点の洗い出しと対策を実施しましょう");
-    actionItems.push("お客様アンケートの回収率を上げ、サイレントな不満を可視化しましょう");
+    actionItems.push(
+      "5つの行動指標（ブランドマインド・monetとしての視点・ハイエンド対応・チームの気遣い・空間創り）を全スタッフで再確認し、各自の課題を明確にしましょう"
+    );
+    actionItems.push(
+      "低評価レビューを一件ずつチームで分析し、4段階の価値提供（基本的→期待的→願望的→予想外）のどこに問題があるかを特定しましょう"
+    );
   }
 
   return {
