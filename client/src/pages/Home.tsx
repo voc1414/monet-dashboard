@@ -1,7 +1,7 @@
 /*
- * Design: Atelier Blanc — クリーンアトリエ
+ * Design: monet Brand Identity — 水彩ブルー × コンクリートモダン
  * Page: 店舗一覧（実データ連携 — 月末報告書 + NPS概要）
- * Colors: Warm white base, rose taupe accent
+ * Colors: Warm white base, monet water-blue accent
  */
 import { Link } from "wouter";
 import { useState, useMemo, useEffect } from "react";
@@ -14,7 +14,8 @@ import { useNpsData, calculateStoreStats, filterByMonth, getAvailableMonths } fr
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { getNpsClass, NPS_INDUSTRY_AVERAGE } from "@/lib/npsClass";
 
-const HERO_IMAGE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663489426081/aLPZvLfFDC4rFYToBquZNR/hero-salon-NicxdYrLg92ifUSevm3mos.webp";
+const HERO_IMAGE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663489426081/aLPZvLfFDC4rFYToBquZNR/monet-salon_83a99286.jpg";
+const MONET_LOGO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663489426081/aLPZvLfFDC4rFYToBquZNR/monet-logo_cd6a82da.png";
 
 const formatMonth = (ym: string) => {
   const [y, m] = ym.split("-");
@@ -55,13 +56,11 @@ export default function Home() {
 
   const allNpsMonths = useMemo(() => getAvailableMonths(records), [records]);
 
-  // NPS月と報告書月を統合して利用可能な月一覧を作成
   const allMonths = useMemo(() => {
     const set = new Set([...allNpsMonths, ...reportMonths]);
     return Array.from(set).sort().reverse();
   }, [allNpsMonths, reportMonths]);
 
-  // デフォルトを先月に設定
   const defaultMonth = useMemo(() => {
     const now = new Date();
     const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -77,7 +76,6 @@ export default function Home() {
     }
   }, [allMonths, defaultMonth, selectedMonth]);
 
-  // NPS期間フィルタリング
   const filteredRecords = useMemo(() => {
     if (selectedMonth === "all" || selectedMonth === "__init__") return records;
     return filterByMonth(records, selectedMonth);
@@ -85,7 +83,6 @@ export default function Home() {
 
   const filteredStoreStats = calculateStoreStats(filteredRecords);
 
-  // 全店舗を常に表示
   const ALL_STORES = ["堀江院", "堀江院2nd", "福島院", "高槻院", "姪浜院", "楽々園院"];
   const storeStats = ALL_STORES.map((name) => {
     const nps = filteredStoreStats.find((s) => s.shortName === name);
@@ -94,7 +91,6 @@ export default function Home() {
 
     return {
       shortName: name,
-      // NPS
       totalResponses: nps?.totalResponses || 0,
       avgScore: nps?.avgScore || 0,
       npsScore: nps?.npsScore || 0,
@@ -104,7 +100,6 @@ export default function Home() {
       promoterPct: nps?.promoterPct || 0,
       passivePct: nps?.passivePct || 0,
       detractorPct: nps?.detractorPct || 0,
-      // 月末報告書
       totalSales: report?.totalSales || 0,
       totalTechSales: report?.totalTechSales || 0,
       totalRetailSales: report?.totalRetailSales || 0,
@@ -119,7 +114,6 @@ export default function Home() {
     };
   });
 
-  // 全店舗合計（NPSデータがある店舗のみ集計）
   const storesWithNps = storeStats.filter((s) => s.totalResponses > 0);
   const totalResponses = storesWithNps.reduce((s, st) => s + st.totalResponses, 0);
   const totalPromoters = storesWithNps.reduce((s, st) => s + st.promoters, 0);
@@ -127,7 +121,6 @@ export default function Home() {
   const overallNps = totalResponses > 0 ? Math.round(((totalPromoters - totalDetractors) / totalResponses) * 100) : 0;
   const overallAvg = totalResponses > 0 ? Math.round((filteredRecords.reduce((s, r) => s + r.npsScore, 0) / totalResponses) * 10) / 10 : 0;
 
-  // 全店舗合計（報告書データ）
   const storesWithReport = storeStats.filter((s) => s.hasReportData);
   const totalAllSales = storesWithReport.reduce((s, st) => s + st.totalSales, 0);
   const totalAllCustomers = storesWithReport.reduce((s, st) => s + st.totalCustomers, 0);
@@ -143,9 +136,9 @@ export default function Home() {
             alt="monet salon"
             className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/40 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#1a2a3a]/70 via-[#1a2a3a]/45 to-transparent" />
         </div>
-        <div className="relative px-8 py-10 md:py-14">
+        <div className="relative px-6 md:px-8 py-8 md:py-12">
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -190,8 +183,8 @@ export default function Home() {
         {[
           { label: "全店舗NPS", value: `${overallNps > 0 ? "+" : ""}${overallNps}`, icon: TrendingUp, color: "text-[#2D9C8F]", extra: loading ? undefined : getNpsClass(overallNps) },
           { label: "業界平均NPS", value: `${NPS_INDUSTRY_AVERAGE}`, icon: BarChart3, color: "text-muted-foreground", extra: undefined },
-          { label: "平均スコア", value: `${overallAvg}`, icon: Sparkles, color: "text-[#9B8579]", extra: undefined },
-          { label: "総回答数", value: `${totalResponses}`, icon: BarChart3, color: "text-[#7D8B75]", extra: undefined },
+          { label: "平均スコア", value: `${overallAvg}`, icon: Sparkles, color: "text-primary", extra: undefined },
+          { label: "総回答数", value: `${totalResponses}`, icon: BarChart3, color: "text-sage", extra: undefined },
         ].map((stat, i) => (
           <motion.div
             key={stat.label}
@@ -223,8 +216,8 @@ export default function Home() {
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
         {[
           { label: "全店舗総売上", value: formatCurrency(totalAllSales), icon: TrendingUp, color: "text-[#2D9C8F]" },
-          { label: "全店舗客単価", value: formatCurrency(overallUnitPrice), icon: BarChart3, color: "text-[#9B8579]" },
-          { label: "店舗数", value: `${storesWithNps.length > 0 ? storesWithNps.length : storesWithReport.length}`, icon: MapPin, color: "text-[#9B8579]" },
+          { label: "全店舗客単価", value: formatCurrency(overallUnitPrice), icon: BarChart3, color: "text-primary" },
+          { label: "店舗数", value: `${storesWithNps.length > 0 ? storesWithNps.length : storesWithReport.length}`, icon: MapPin, color: "text-primary" },
         ].map((stat, i) => (
           <motion.div
             key={stat.label}
@@ -289,30 +282,30 @@ export default function Home() {
               transition={{ delay: 0.1 + i * 0.04 }}
             >
               <Link href={`/store/${encodeURIComponent(st.shortName)}`}>
-                <Card className="border-border/50 shadow-sm hover:shadow-lg hover:border-[#9B8579]/30 transition-all cursor-pointer group">
+                <Card className="border-border/50 shadow-sm hover:shadow-lg hover:border-primary/30 transition-all cursor-pointer group">
                   <CardContent className="p-0">
                     <div className="flex flex-col md:flex-row md:items-center">
                       {/* Store Info */}
                       <div className="flex-1 p-5 md:p-6">
                         <div className="flex items-center gap-3 mb-3">
-                          <div className="w-10 h-10 rounded-xl bg-[#9B8579]/10 flex items-center justify-center">
-                            <MapPin className="w-5 h-5 text-[#9B8579]" />
+                          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                            <MapPin className="w-5 h-5 text-primary" />
                           </div>
                           <div>
-                            <h3 className="font-bold text-foreground text-base group-hover:text-[#9B8579] transition-colors">
+                            <h3 className="font-bold text-foreground text-base group-hover:text-primary transition-colors">
                               {st.shortName}
                             </h3>
                             <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                               <Users className="w-3 h-3" />
                               <span>{st.staffCount > 0 ? `${st.staffCount}名` : "—"}</span>
                               {st.reportMonthLabel && (
-                                <span className="text-[#9B8579]">（{st.reportMonthLabel}分）</span>
+                                <span className="text-primary">（{st.reportMonthLabel}分）</span>
                               )}
                             </div>
                           </div>
                         </div>
 
-                        {/* Stats Row - 実データ */}
+                        {/* Stats Row */}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 mt-4">
                           <div>
                             <div className="text-[11px] text-muted-foreground mb-1">総売上</div>
@@ -376,7 +369,7 @@ export default function Home() {
                             </span>
                           </div>
                         )}
-                        <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-[#9B8579] transition-colors group-hover:translate-x-0.5 transition-transform" />
+                        <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors group-hover:translate-x-0.5 transition-transform" />
                       </div>
                     </div>
                   </CardContent>

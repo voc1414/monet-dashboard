@@ -39,9 +39,9 @@ const NPS_CLASSES: { min: number; npsClass: NpsClass }[] = [
     min: 20,
     npsClass: {
       label: "スタンダード",
-      color: "#7D8B75",
-      bgColor: "rgba(125,139,117,0.08)",
-      borderColor: "rgba(125,139,117,0.25)",
+      color: "#4A90B8",
+      bgColor: "rgba(74,144,184,0.08)",
+      borderColor: "rgba(74,144,184,0.25)",
       description: "業界平均を上回る良好な水準",
     },
   },

@@ -1,7 +1,7 @@
 /*
  * Design: Atelier Blanc — クリーンアトリエ
  * Page: 店舗詳細（売上情報・在籍スタッフ・ファンくる調査・NPS調査結果）
- * Colors: Warm white base, rose taupe accent, sage green secondary
+ * Colors: Warm white base, monet water-blue accent, sage green secondary
  */
 import { useParams, Link } from "wouter";
 import { useState, useMemo, useEffect } from "react";
@@ -110,7 +110,7 @@ function CategoryAnalysis({ records, field, label }: { records: NpsRecord[]; fie
               </div>
               <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-[#9B8579]/60 transition-all duration-500"
+                  className="h-full rounded-full bg-primary/60 transition-all duration-500"
                   style={{ width: `${item.pct}%` }}
                 />
               </div>
@@ -187,13 +187,13 @@ function AdviceSection({ stats, records }: { stats: StoreStats; records: NpsReco
             {/* Action Items */}
             <div>
               <div className="flex items-center gap-1.5 mb-3">
-                <ArrowUpRight className="w-4 h-4 text-[#9B8579]" />
+                <ArrowUpRight className="w-4 h-4 text-primary" />
                 <h4 className="text-sm font-semibold text-foreground">アクションプラン</h4>
               </div>
               <ul className="space-y-2">
                 {advice.actionItems.map((s, i) => (
                   <li key={i} className="text-xs text-muted-foreground leading-relaxed flex gap-2">
-                    <span className="w-1 h-1 rounded-full bg-[#9B8579] mt-1.5 shrink-0" />
+                    <span className="w-1 h-1 rounded-full bg-primary mt-1.5 shrink-0" />
                     {s}
                   </li>
                 ))}
@@ -291,8 +291,8 @@ export default function StoreDetail() {
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-12 h-12 rounded-xl bg-[#9B8579]/10 flex items-center justify-center">
-              <MapPin className="w-6 h-6 text-[#9B8579]" />
+            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+              <MapPin className="w-6 h-6 text-primary" />
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-foreground">
@@ -321,9 +321,9 @@ export default function StoreDetail() {
       </div>
 
       {/* スタッフ個人実績 */}
-      <section className="mb-8 pt-6 border-t-2 border-[#9B8579]/20">
+      <section className="mb-8 pt-6 border-t-2 border-primary/20">
         <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-          <Users className="w-5 h-5 text-[#9B8579]" />
+          <Users className="w-5 h-5 text-primary" />
           スタッフ個人実績
           {reportStats && (
             <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2">{reportStats.staffCount}名</span>
@@ -337,8 +337,8 @@ export default function StoreDetail() {
                   <CardContent className="p-4">
                     <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                       <div className="flex items-center gap-3 sm:w-48 shrink-0">
-                        <div className="w-10 h-10 rounded-full bg-[#9B8579]/10 flex items-center justify-center shrink-0">
-                          <span className="text-[#9B8579] font-bold text-sm">{sr.name.charAt(0)}</span>
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                          <span className="text-primary font-bold text-sm">{sr.name.charAt(0)}</span>
                         </div>
                         <div>
                           <div className="font-bold text-sm text-foreground">{sr.name}</div>
@@ -395,7 +395,7 @@ export default function StoreDetail() {
             )}
           </h2>
           <Link href={`/store/${encodeURIComponent(storeId)}/nps`}>
-            <span className="flex items-center gap-1 text-sm text-[#9B8579] hover:text-[#7D6B61] transition-colors cursor-pointer">
+            <span className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 transition-colors cursor-pointer">
               詳細を見る
               <ArrowRight className="w-3.5 h-3.5" />
             </span>
@@ -514,7 +514,7 @@ export default function StoreDetail() {
       {storeRecords.length > 0 && (
         <section className="mb-8">
           <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-            <MessageSquare className="w-5 h-5 text-[#9B8579]" />
+            <MessageSquare className="w-5 h-5 text-primary" />
             カテゴリ別評価
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -594,9 +594,9 @@ export default function StoreDetail() {
       />
 
       {/* ファンくる調査結果 */}
-      <section className="mb-8 pt-6 border-t-2 border-[#7D8B75]/20">
+      <section className="mb-8 pt-6 border-t-2 border-sage/20">
         <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-          <FolderOpen className="w-5 h-5 text-[#7D8B75]" />
+          <FolderOpen className="w-5 h-5 text-sage" />
           ファンくる調査結果
           {fankuruPdfs.length > 0 && (
             <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2">{fankuruPdfs.length}件</span>
@@ -638,17 +638,17 @@ export default function StoreDetail() {
                 >
                   <Card
                     className={`border-border/50 shadow-sm hover:shadow-md transition-all cursor-pointer group ${
-                      selectedPdf?.id === pdf.id ? "ring-2 ring-[#7D8B75]/40 border-[#7D8B75]/30" : ""
+                      selectedPdf?.id === pdf.id ? "ring-2 ring-sage/40 border-sage/30" : ""
                     }`}
                     onClick={() => setSelectedPdf(selectedPdf?.id === pdf.id ? null : pdf)}
                   >
                     <CardContent className="p-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-[#7D8B75]/10 flex items-center justify-center shrink-0">
-                          <FileText className="w-5 h-5 text-[#7D8B75]" />
+                        <div className="w-10 h-10 rounded-lg bg-sage/10 flex items-center justify-center shrink-0">
+                          <FileText className="w-5 h-5 text-sage" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm text-foreground group-hover:text-[#7D8B75] transition-colors">
+                          <div className="font-medium text-sm text-foreground group-hover:text-sage transition-colors">
                             {pdf.displayName}
                             {pdf.stylist && (
                               <span className="ml-2 text-xs font-normal text-muted-foreground">
@@ -663,8 +663,8 @@ export default function StoreDetail() {
                         <div className="flex items-center gap-2 shrink-0">
                           <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                             selectedPdf?.id === pdf.id
-                              ? "bg-[#7D8B75] text-white"
-                              : "bg-[#7D8B75]/10 text-[#7D8B75] group-hover:bg-[#7D8B75]/20"
+                              ? "bg-sage text-white"
+                              : "bg-sage/10 text-sage group-hover:bg-sage/20"
                           }`}>
                             <Eye className="w-3 h-3" />
                             {selectedPdf?.id === pdf.id ? "閉じる" : "詳細を見る"}
@@ -695,16 +695,16 @@ export default function StoreDetail() {
                 className="mt-4"
               >
                 <Card className="border-border/50 shadow-sm overflow-hidden">
-                  <div className="px-4 py-3 border-b border-border/40 flex items-center justify-between bg-[#7D8B75]/5">
+                  <div className="px-4 py-3 border-b border-border/40 flex items-center justify-between bg-sage/5">
                     <div className="flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-[#7D8B75]" />
+                      <FileText className="w-4 h-4 text-sage" />
                       <span className="text-sm font-medium text-foreground">{selectedPdf.displayName}</span>
                     </div>
                     <a
                       href={selectedPdf.viewUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-xs text-[#7D8B75] hover:text-[#5A6B53] transition-colors"
+                      className="flex items-center gap-1 text-xs text-sage hover:text-sage/80 transition-colors"
                     >
                       Google Driveで開く
                       <ExternalLink className="w-3 h-3" />
@@ -726,9 +726,9 @@ export default function StoreDetail() {
       </section>
 
       {/* 店舗売上サマリ */}
-      <section className="mb-8 pt-6 border-t-2 border-[#9B8579]/20">
+      <section className="mb-8 pt-6 border-t-2 border-primary/20">
         <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-          <DollarSign className="w-5 h-5 text-[#9B8579]" />
+          <DollarSign className="w-5 h-5 text-primary" />
           店舗売上サマリ
           {reportStats && reportStats.monthLabel && (
             <span className="text-xs font-normal text-muted-foreground">— {reportStats.monthLabel}分</span>
@@ -745,7 +745,7 @@ export default function StoreDetail() {
               <motion.div key={item.label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.04 }}>
                 <Card className="border-border/50 shadow-sm">
                   <CardContent className="p-4">
-                    <item.icon className="w-4 h-4 text-[#9B8579] mb-2" />
+                    <item.icon className="w-4 h-4 text-primary mb-2" />
                     <div className="font-mono-data text-lg md:text-xl font-bold">{item.value}</div>
                     <div className="text-[10px] text-muted-foreground mt-1">{item.label}</div>
                     <div className="text-[9px] text-muted-foreground/70 mt-0.5">{item.sub}</div>

@@ -1,7 +1,7 @@
 /*
  * Design: Atelier Blanc — クリーンアトリエ
  * Page: NPS調査結果詳細（店舗単位の集計ページ）
- * Colors: Warm white base, teal green for NPS, rose taupe accent
+ * Colors: Warm white base, teal green for NPS, monet water-blue accent
  */
 import { useParams } from "wouter";
 import { useState, useMemo, useEffect } from "react";
@@ -165,13 +165,13 @@ function NpsAdvicePanel({ stats, records }: { stats: StoreStats; records: NpsRec
             {/* Action Items */}
             <div>
               <div className="flex items-center gap-1.5 mb-3">
-                <ArrowUpRight className="w-4 h-4 text-[#9B8579]" />
+                <ArrowUpRight className="w-4 h-4 text-primary" />
                 <h4 className="text-sm font-semibold text-foreground">アクションプラン</h4>
               </div>
               <ul className="space-y-2">
                 {advice.actionItems.map((s, i) => (
                   <li key={i} className="text-xs text-muted-foreground leading-relaxed flex gap-2">
-                    <span className="w-1 h-1 rounded-full bg-[#9B8579] mt-1.5 shrink-0" />
+                    <span className="w-1 h-1 rounded-full bg-primary mt-1.5 shrink-0" />
                     {s}
                   </li>
                 ))}
@@ -228,7 +228,7 @@ function ReviewCard({ record }: { record: NpsRecord }) {
                 {record.review.length > 100 && (
                   <button
                     onClick={() => setExpanded(!expanded)}
-                    className="text-xs text-[#9B8579] hover:text-[#7D6B61] mt-1 flex items-center gap-0.5"
+                    className="text-xs text-primary hover:text-primary/80 mt-1 flex items-center gap-0.5"
                   >
                     {expanded ? (
                       <>閉じる <ChevronUp className="w-3 h-3" /></>
@@ -436,10 +436,10 @@ export default function NpsOverview() {
               </Card>
             </motion.div>
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-              <StatCard label="回答数" value={`${storeStats.totalResponses}`} icon={Users} color="#9B8579" />
+              <StatCard label="回答数" value={`${storeStats.totalResponses}`} icon={Users} color="oklch(0.58 0.1 230)" />
             </motion.div>
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-              <StatCard label="平均スコア" value={`${storeStats.avgScore}`} subtext="/ 10" icon={BarChart3} color="#7D8B75" />
+              <StatCard label="平均スコア" value={`${storeStats.avgScore}`} subtext="/ 10" icon={BarChart3} color="oklch(0.58 0.04 145)" />
             </motion.div>
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
               <StatCard label="推奨者率" value={`${storeStats.promoterPct}%`} subtext={`${storeStats.promoters}件`} icon={ThumbsUp} color={NPS_COLORS.promoter} />
@@ -498,7 +498,7 @@ export default function NpsOverview() {
             <Card className="border-border/50 shadow-sm">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-foreground flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4 text-[#9B8579]" />
+                  <BarChart3 className="w-4 h-4 text-primary" />
                   スコア分布
                 </CardTitle>
               </CardHeader>
@@ -561,7 +561,7 @@ export default function NpsOverview() {
               <Card className="border-border/50 shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-foreground flex items-center gap-2">
-                    <Users className="w-4 h-4 text-[#7D8B75]" />
+                    <Users className="w-4 h-4 text-sage" />
                     月別回答数
                   </CardTitle>
                 </CardHeader>
@@ -575,7 +575,7 @@ export default function NpsOverview() {
                         contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e5e5" }}
                         formatter={(value: number) => [`${value}件`, "回答数"]}
                       />
-                      <Bar dataKey="count" fill="#9B8579" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="count" fill="oklch(0.58 0.1 230)" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -586,13 +586,13 @@ export default function NpsOverview() {
           {/* Category Analysis */}
           <section className="mb-8">
             <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-[#9B8579]" />
+              <MessageSquare className="w-5 h-5 text-primary" />
               カテゴリ別評価分析
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[
-                { label: "金額について", data: categoryAnalysis.price, color: "#9B8579" },
-                { label: "空間について", data: categoryAnalysis.space, color: "#7D8B75" },
+                { label: "金額について", data: categoryAnalysis.price, color: "#4A90B8" },
+                { label: "空間について", data: categoryAnalysis.space, color: "#4A90B8" },
                 { label: "スタッフについて", data: categoryAnalysis.staff, color: "#2D9C8F" },
                 { label: "仕上がりについて", data: categoryAnalysis.finish, color: "#E5B85C" },
               ].map((cat) => (

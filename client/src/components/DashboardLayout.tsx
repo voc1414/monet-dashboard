@@ -1,13 +1,15 @@
 /*
- * Design: Atelier Blanc — クリーンアトリエ
+ * Design: monet Brand Identity — 水彩ブルー × コンクリートモダン
  * Layout: Top navigation + content area with breadcrumb hierarchy
- * Colors: Warm white base, rose taupe accent, sage green secondary
- * Typography: Cormorant Garamond (headings), Noto Sans JP (body), JetBrains Mono (data)
+ * Colors: Warm white base, monet water-blue accent, concrete grey secondary
+ * Typography: Noto Sans JP (body), Inter (data)
  */
 import { Link, useLocation } from "wouter";
-import { ChevronRight, RefreshCw, Home, BarChart3, Users } from "lucide-react";
+import { ChevronRight, RefreshCw, Home, Users } from "lucide-react";
 import { motion } from "framer-motion";
 import type { ReactNode } from "react";
+
+const MONET_LOGO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663489426081/aLPZvLfFDC4rFYToBquZNR/monet-logo_cd6a82da.png";
 
 interface Breadcrumb {
   label: string;
@@ -34,13 +36,15 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen bg-background">
       {/* Top Navigation */}
-      <header className="sticky top-0 z-50 border-b border-border/60 bg-white/80 backdrop-blur-md">
+      <header className="sticky top-0 z-50 border-b border-border/60 bg-white/85 backdrop-blur-md">
         <div className="container flex items-center justify-between h-16">
           <Link href="/">
             <div className="flex items-center gap-3 group cursor-pointer">
-              <div className="w-8 h-8 rounded-full bg-[#9B8579] flex items-center justify-center">
-                <span className="text-white text-sm font-bold">m</span>
-              </div>
+              <img
+                src={MONET_LOGO}
+                alt="monet"
+                className="h-9 w-auto object-contain"
+              />
               <div className="flex flex-col">
                 <span className="text-base font-bold text-foreground leading-tight">
                   monet
@@ -55,7 +59,7 @@ export default function DashboardLayout({
           <nav className="hidden md:flex items-center gap-6">
             <Link href="/">
               <span
-                className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-foreground ${
+                className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary ${
                   location === "/" ? "text-foreground" : "text-muted-foreground"
                 }`}
               >
@@ -65,7 +69,7 @@ export default function DashboardLayout({
             </Link>
             <Link href="/staff">
               <span
-                className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-foreground ${
+                className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary ${
                   location === "/staff" ? "text-foreground" : "text-muted-foreground"
                 }`}
               >
@@ -101,7 +105,7 @@ export default function DashboardLayout({
           <div className="container py-3">
             <nav className="flex items-center gap-1.5 text-sm">
               <Link href="/">
-                <span className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+                <span className="text-muted-foreground hover:text-primary transition-colors cursor-pointer">
                   ホーム
                 </span>
               </Link>
@@ -110,7 +114,7 @@ export default function DashboardLayout({
                   <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50" />
                   {crumb.href ? (
                     <Link href={crumb.href}>
-                      <span className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+                      <span className="text-muted-foreground hover:text-primary transition-colors cursor-pointer">
                         {crumb.label}
                       </span>
                     </Link>

@@ -1,5 +1,5 @@
 /**
- * Design: Atelier Blanc — クリーンアトリエ
+ * Design: monet Brand Identity — 水彩ブルー × コンクリートモダン
  * Page: スタッフ一覧（全店舗横断・総売上順）
  * Columns: 氏名、総売上、配属店舗、雇用形態、次回予約率
  * Feature: 名前タップで詳細展開（売上内訳・NPS情報）
@@ -136,7 +136,7 @@ export default function StaffList() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <Users className="w-5 h-5 text-[#9B8579]" />
+            <Users className="w-5 h-5 text-primary" />
             スタッフ一覧
           </h1>
           <p className="text-xs text-muted-foreground mt-1">
@@ -147,7 +147,7 @@ export default function StaffList() {
 
         <div className="flex items-center gap-3">
           <Link href="/">
-            <span className="flex items-center gap-1 text-sm text-[#9B8579] hover:text-[#7D6B61] transition-colors cursor-pointer">
+            <span className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 transition-colors cursor-pointer">
               <Building2 className="w-4 h-4" />
               店舗一覧へ
             </span>
@@ -226,7 +226,7 @@ export default function StaffList() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.02 * i }}
                 >
-                  <Card className={`border-border/50 shadow-sm transition-all ${isExpanded ? "ring-2 ring-[#9B8579]/30 shadow-md" : "hover:shadow-md"}`}>
+                  <Card className={`border-border/50 shadow-sm transition-all ${isExpanded ? "ring-2 ring-primary/30 shadow-md" : "hover:shadow-md"}`}>
                     <CardContent className="p-0">
                       {/* Clickable Row */}
                       <div
@@ -236,10 +236,10 @@ export default function StaffList() {
                         {/* Desktop Layout */}
                         <div className="hidden md:grid grid-cols-12 gap-4 items-center">
                           <div className="col-span-3 flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-full bg-[#9B8579]/10 flex items-center justify-center shrink-0">
-                              <span className="text-[#9B8579] font-bold text-sm">{staff.name.charAt(0)}</span>
+                            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                              <span className="text-primary font-bold text-sm">{staff.name.charAt(0)}</span>
                             </div>
-                            <span className="font-bold text-sm text-foreground hover:text-[#9B8579] transition-colors">{staff.name}</span>
+                            <span className="font-bold text-sm text-foreground hover:text-primary transition-colors">{staff.name}</span>
                             {isExpanded ? (
                               <ChevronUp className="w-4 h-4 text-muted-foreground" />
                             ) : (
@@ -251,7 +251,7 @@ export default function StaffList() {
                           </div>
                           <div className="col-span-2">
                             <Link href={`/store/${encodeURIComponent(staff.storeNormalized)}`}>
-                              <span className="text-sm text-[#9B8579] hover:text-[#7D6B61] transition-colors cursor-pointer flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                              <span className="text-sm text-primary hover:text-primary/80 transition-colors cursor-pointer flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                                 {staff.storeNormalized}
                                 <ArrowRight className="w-3 h-3" />
                               </span>
@@ -275,8 +275,8 @@ export default function StaffList() {
                         <div className="md:hidden">
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-full bg-[#9B8579]/10 flex items-center justify-center shrink-0">
-                                <span className="text-[#9B8579] font-bold text-sm">{staff.name.charAt(0)}</span>
+                              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                <span className="text-primary font-bold text-sm">{staff.name.charAt(0)}</span>
                               </div>
                               <div>
                                 <div className="font-bold text-sm text-foreground flex items-center gap-1">
@@ -292,7 +292,7 @@ export default function StaffList() {
                           </div>
                           <div className="flex items-center justify-between text-xs">
                             <Link href={`/store/${encodeURIComponent(staff.storeNormalized)}`}>
-                              <span className="text-[#9B8579] hover:text-[#7D6B61] transition-colors cursor-pointer flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                              <span className="text-primary hover:text-primary/80 transition-colors cursor-pointer flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                                 <Building2 className="w-3 h-3" />
                                 {staff.storeNormalized}
                               </span>
