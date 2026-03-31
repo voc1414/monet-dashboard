@@ -4,7 +4,7 @@
  * Colors: Warm white base, rose taupe accent, sage green secondary
  */
 import { useParams, Link } from "wouter";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   MapPin, Users, TrendingUp, BarChart3, ArrowRight, Calendar,
@@ -246,10 +246,21 @@ export default function StoreDetail() {
   const params = useParams<{ storeId: string }>();
   const storeId = decodeURIComponent(params.storeId || "");
   const { records, loading, error, lastUpdated, refresh } = useNpsData();
-  const [selectedMonth, setSelectedMonth] = useState<string>("all");
+  const allMonths = useMemo(() => getAvailableMonths(records), [records]);
+  const currentMonth = useMemo(() => {
+    const now = new Date();
+    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    return allMonths.includes(ym) ? ym : allMonths[0] || "all";
+  }, [allMonths]);
+  const [selectedMonth, setSelectedMonth] = useState<string>("__init__");
   const [selectedScore, setSelectedScore] = useState<number | null>(null);
 
-  const allMonths = useMemo(() => getAvailableMonths(records), [records]);
+  // デフォルトを今月に設定（データ読み込み後）
+  useEffect(() => {
+    if (selectedMonth === "__init__" && allMonths.length > 0) {
+      setSelectedMonth(currentMonth);
+    }
+  }, [allMonths, currentMonth, selectedMonth]);
 
   const storeRecords = useMemo(() => {
     const filtered = records.filter((r) => r.storeShort === storeId);
