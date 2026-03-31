@@ -444,7 +444,7 @@ export default function StoreDetail() {
               </CardHeader>
               <CardContent className="p-4">
                 <ResponsiveContainer width="100%" height={180}>
-                  <BarChart data={scoreDistribution} margin={{ top: 5, right: 5, bottom: 5, left: -20 }} style={{ cursor: "pointer" }}>
+                  <BarChart data={scoreDistribution} margin={{ top: 5, right: 5, bottom: 5, left: -20 }} style={{ cursor: "pointer" }} onClick={(state: any) => { if (state && state.activePayload && state.activePayload[0]) { const d = state.activePayload[0].payload; if (d.count > 0) setSelectedScore(d.score); } }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
                     <XAxis dataKey="score" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} />
@@ -452,7 +452,7 @@ export default function StoreDetail() {
                       contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e5e5" }}
                       formatter={(value: number) => [`${value}件`, "回答数"]}
                     />
-                    <Bar dataKey="count" radius={[4, 4, 0, 0]} onClick={(data: any) => { if (data && data.count > 0) setSelectedScore(data.score); }} className="cursor-pointer">
+                    <Bar dataKey="count" radius={[4, 4, 0, 0]} cursor="pointer">
                       {scoreDistribution.map((entry, idx) => (
                         <Cell key={idx} fill={entry.fill} className="hover:opacity-80 transition-opacity" />
                       ))}
