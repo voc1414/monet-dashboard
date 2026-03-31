@@ -77,12 +77,33 @@ export default function Home() {
     return filterByMonth(records, selectedMonth);
   }, [records, selectedMonth]);
 
-  const storeStats = calculateStoreStats(filteredRecords);
+  const filteredStoreStats = calculateStoreStats(filteredRecords);
 
-  // 全店舗合計
-  const totalResponses = storeStats.reduce((s, st) => s + st.totalResponses, 0);
-  const totalPromoters = storeStats.reduce((s, st) => s + st.promoters, 0);
-  const totalDetractors = storeStats.reduce((s, st) => s + st.detractors, 0);
+  // 全店舗を常に表示（NPSデータがない月でも表示する）
+  const ALL_STORES = ["堀江院", "堀江院2nd", "福島院", "高槻院", "姪浜院", "楽々園院"];
+  const storeStats = ALL_STORES.map((name) => {
+    const found = filteredStoreStats.find((s) => s.shortName === name);
+    if (found) return found;
+    return {
+      name: `monet ${name}`,
+      shortName: name,
+      totalResponses: 0,
+      avgScore: 0,
+      npsScore: 0,
+      promoters: 0,
+      passives: 0,
+      detractors: 0,
+      promoterPct: 0,
+      passivePct: 0,
+      detractorPct: 0,
+    };
+  });
+
+  // 全店舗合計（NPSデータがある店舗のみ集計）
+  const storesWithData = storeStats.filter((s) => s.totalResponses > 0);
+  const totalResponses = storesWithData.reduce((s, st) => s + st.totalResponses, 0);
+  const totalPromoters = storesWithData.reduce((s, st) => s + st.promoters, 0);
+  const totalDetractors = storesWithData.reduce((s, st) => s + st.detractors, 0);
   const overallNps = totalResponses > 0 ? Math.round(((totalPromoters - totalDetractors) / totalResponses) * 100) : 0;
   const overallAvg = totalResponses > 0 ? Math.round((filteredRecords.reduce((s, r) => s + r.npsScore, 0) / totalResponses) * 10) / 10 : 0;
 
@@ -144,7 +165,7 @@ export default function Home() {
           { label: "業界平均NPS", value: `${NPS_INDUSTRY_AVERAGE}`, icon: BarChart3, color: "text-muted-foreground", extra: undefined },
           { label: "平均スコア", value: `${overallAvg}`, icon: Sparkles, color: "text-[#9B8579]", extra: undefined },
           { label: "総回答数", value: `${totalResponses}`, icon: BarChart3, color: "text-[#7D8B75]", extra: undefined },
-          { label: "店舗数", value: `${storeStats.length}`, icon: MapPin, color: "text-[#9B8579]", extra: undefined },
+          { label: "店舗数", value: `${storesWithData.length}`, icon: MapPin, color: "text-[#9B8579]", extra: undefined },
         ].map((stat, i) => (
           <motion.div
             key={stat.label}
@@ -244,25 +265,33 @@ export default function Home() {
                           </div>
                           <div>
                             <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">NPS回答数</div>
-                            <div className="font-mono-data text-sm font-semibold">{st.totalResponses}件</div>
+                            <div className="font-mono-data text-sm font-semibold">{st.totalResponses > 0 ? `${st.totalResponses}件` : "—"}</div>
                           </div>
                           <div>
                             <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">平均スコア</div>
-                            <div className="font-mono-data text-sm font-semibold">{st.avgScore}</div>
+                            <div className="font-mono-data text-sm font-semibold">{st.totalResponses > 0 ? st.avgScore : "—"}</div>
                           </div>
                         </div>
                       </div>
 
                       {/* NPS Score */}
                       <div className="flex items-center gap-4 px-5 pb-5 md:px-6 md:py-6 md:border-l border-border/40">
-                        <div className="text-center">
-                          <NpsScoreBadge score={st.npsScore} />
-                          <div className="mt-2 flex gap-1">
-                            <div className="h-1.5 rounded-full bg-[#2D9C8F]" style={{ width: `${Math.max(st.promoterPct * 0.6, 4)}px` }} />
-                            <div className="h-1.5 rounded-full bg-[#E5B85C]" style={{ width: `${Math.max(st.passivePct * 0.6, 4)}px` }} />
-                            <div className="h-1.5 rounded-full bg-[#C75C5C]" style={{ width: `${Math.max(st.detractorPct * 0.6, 4)}px` }} />
+                        {st.totalResponses > 0 ? (
+                          <div className="text-center">
+                            <NpsScoreBadge score={st.npsScore} />
+                            <div className="mt-2 flex gap-1">
+                              <div className="h-1.5 rounded-full bg-[#2D9C8F]" style={{ width: `${Math.max(st.promoterPct * 0.6, 4)}px` }} />
+                              <div className="h-1.5 rounded-full bg-[#E5B85C]" style={{ width: `${Math.max(st.passivePct * 0.6, 4)}px` }} />
+                              <div className="h-1.5 rounded-full bg-[#C75C5C]" style={{ width: `${Math.max(st.detractorPct * 0.6, 4)}px` }} />
+                            </div>
                           </div>
-                        </div>
+                        ) : (
+                          <div className="text-center">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium text-muted-foreground bg-muted/50 border border-border/50">
+                              データなし
+                            </span>
+                          </div>
+                        )}
                         <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-[#9B8579] transition-colors group-hover:translate-x-0.5 transition-transform" />
                       </div>
                     </div>

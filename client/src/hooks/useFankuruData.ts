@@ -14,6 +14,7 @@ export interface FankuruPdf {
   folder: string;       // e.g. "2025/10"
   yearMonth: string;    // e.g. "2025-10"
   date: string;         // e.g. "2025/10/16"
+  stylist: string;      // 担当スタイリスト名
   driveFileId: string;  // Google Drive file ID
   previewUrl: string;   // Google Drive preview URL (for iframe embed)
   viewUrl: string;      // Google Drive view URL (for opening in new tab)
@@ -28,6 +29,7 @@ const FANKURU_DATA: Record<string, FankuruPdf[]> = {
       id: "meinohama_20251016",
       name: "モネ-monet- 白髪染めと髪質改善のサロン 福岡姪浜院_20251016_23572111.pdf",
       displayName: "2025/10/16 調査レポート #23572111",
+      stylist: "山口純奈",
       folder: "2025/10",
       yearMonth: "2025-10",
       date: "2025/10/16",
@@ -40,6 +42,7 @@ const FANKURU_DATA: Record<string, FankuruPdf[]> = {
       id: "meinohama_20251023",
       name: "モネ-monet- 白髪染めと髪質改善のサロン 福岡姪浜院_20251023_23580257.pdf",
       displayName: "2025/10/23 調査レポート #23580257",
+      stylist: "金田",
       folder: "2025/10",
       yearMonth: "2025-10",
       date: "2025/10/23",
@@ -52,6 +55,7 @@ const FANKURU_DATA: Record<string, FankuruPdf[]> = {
       id: "meinohama_20251027",
       name: "モネ-monet- 白髪染めと髪質改善のサロン 福岡姪浜院_20251027_23569805.pdf",
       displayName: "2025/10/27 調査レポート #23569805",
+      stylist: "藤田",
       folder: "2025/10",
       yearMonth: "2025-10",
       date: "2025/10/27",
@@ -64,6 +68,7 @@ const FANKURU_DATA: Record<string, FankuruPdf[]> = {
       id: "meinohama_20251028",
       name: "モネ-monet- 白髪染めと髪質改善のサロン 福岡姪浜院_20251028_23577141.pdf",
       displayName: "2025/10/28 調査レポート #23577141",
+      stylist: "石橋",
       folder: "2025/10",
       yearMonth: "2025-10",
       date: "2025/10/28",

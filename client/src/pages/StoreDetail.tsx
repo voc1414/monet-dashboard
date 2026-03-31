@@ -11,7 +11,7 @@ import {
   DollarSign, Scissors, Star, MessageSquare, ChevronDown,
   Trophy, ThumbsUp, Target, AlertTriangle, AlertCircle,
   Lightbulb, CheckCircle2, ArrowUpRight,
-  FileText, ExternalLink, Loader2, FolderOpen
+  FileText, ExternalLink, Loader2, FolderOpen, Eye
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -667,23 +667,38 @@ export default function StoreDetail() {
                           <FileText className="w-5 h-5 text-[#7D8B75]" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm text-foreground group-hover:text-[#7D8B75] transition-colors truncate">
+                          <div className="font-medium text-sm text-foreground group-hover:text-[#7D8B75] transition-colors">
                             {pdf.displayName}
+                            {pdf.stylist && (
+                              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                担当: {pdf.stylist}
+                              </span>
+                            )}
                           </div>
                           <div className="text-[10px] text-muted-foreground mt-0.5">
                             フォルダ: {pdf.folder || "ルート"}
                           </div>
                         </div>
-                        <a
-                          href={pdf.viewUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground shrink-0"
-                          onClick={(e) => e.stopPropagation()}
-                          title="Google Driveで開く"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                        </a>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                            selectedPdf?.id === pdf.id
+                              ? "bg-[#7D8B75] text-white"
+                              : "bg-[#7D8B75]/10 text-[#7D8B75] group-hover:bg-[#7D8B75]/20"
+                          }`}>
+                            <Eye className="w-3 h-3" />
+                            {selectedPdf?.id === pdf.id ? "閉じる" : "詳細を見る"}
+                          </span>
+                          <a
+                            href={pdf.viewUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+                            onClick={(e) => e.stopPropagation()}
+                            title="Google Driveで開く"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
