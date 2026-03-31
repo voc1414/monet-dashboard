@@ -10,7 +10,8 @@ import {
   MapPin, Users, TrendingUp, BarChart3, ArrowRight, Calendar,
   DollarSign, Scissors, Star, MessageSquare, ChevronDown,
   Trophy, ThumbsUp, Target, AlertTriangle, AlertCircle,
-  Lightbulb, CheckCircle2, ArrowUpRight
+  Lightbulb, CheckCircle2, ArrowUpRight,
+  FileText, ExternalLink, Loader2, FolderOpen
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -25,6 +26,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
 } from "recharts";
+import { useFankuruData } from "@/hooks/useFankuruData";
+import type { FankuruPdf } from "@/hooks/useFankuruData";
 
 const NPS_HEADER_IMAGE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663489426081/aLPZvLfFDC4rFYToBquZNR/nps-header-6cTohzoTSmSjrDCLc4VzHg.webp";
 
@@ -247,20 +250,23 @@ export default function StoreDetail() {
   const storeId = decodeURIComponent(params.storeId || "");
   const { records, loading, error, lastUpdated, refresh } = useNpsData();
   const allMonths = useMemo(() => getAvailableMonths(records), [records]);
-  const currentMonth = useMemo(() => {
+  const defaultMonth = useMemo(() => {
     const now = new Date();
-    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const ym = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, "0")}`;
     return allMonths.includes(ym) ? ym : allMonths[0] || "all";
   }, [allMonths]);
   const [selectedMonth, setSelectedMonth] = useState<string>("__init__");
   const [selectedScore, setSelectedScore] = useState<number | null>(null);
+  const [selectedPdf, setSelectedPdf] = useState<FankuruPdf | null>(null);
+  const { pdfs: fankuruPdfs, loading: fankuruLoading, hasFolderMapping } = useFankuruData(storeId);
 
-  // デフォルトを今月に設定（データ読み込み後）
+  // デフォルトを先月に設定（データ読み込み後）
   useEffect(() => {
     if (selectedMonth === "__init__" && allMonths.length > 0) {
-      setSelectedMonth(currentMonth);
+      setSelectedMonth(defaultMonth);
     }
-  }, [allMonths, currentMonth, selectedMonth]);
+  }, [allMonths, defaultMonth, selectedMonth]);
 
   const storeRecords = useMemo(() => {
     const filtered = records.filter((r) => r.storeShort === storeId);
@@ -606,18 +612,121 @@ export default function StoreDetail() {
         records={storeRecords}
       />
 
-      {/* ファンくる調査結果プレースホルダー */}
+      {/* ファンくる調査結果 */}
       <section className="mt-8">
         <h2 className="font-display text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-          <Star className="w-5 h-5 text-[#7D8B75]" />
+          <FolderOpen className="w-5 h-5 text-[#7D8B75]" />
           ファンくる調査結果
-          <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2">準備中</span>
+          {fankuruPdfs.length > 0 && (
+            <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2">{fankuruPdfs.length}件</span>
+          )}
         </h2>
-        <Card className="border-border/50 border-dashed">
-          <CardContent className="p-8 text-center text-muted-foreground">
-            <p className="text-sm">ファンくる調査結果は今後追加予定です</p>
-          </CardContent>
-        </Card>
+
+        {!hasFolderMapping ? (
+          <Card className="border-border/50 border-dashed">
+            <CardContent className="p-8 text-center text-muted-foreground">
+              <FolderOpen className="w-8 h-8 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">この店舗のファンくるフォルダはまだ設定されていません</p>
+            </CardContent>
+          </Card>
+        ) : fankuruLoading ? (
+          <Card className="border-border/50">
+            <CardContent className="p-8 text-center text-muted-foreground">
+              <Loader2 className="w-6 h-6 mx-auto mb-2 animate-spin opacity-50" />
+              <p className="text-sm">ファンくるデータを読み込み中...</p>
+            </CardContent>
+          </Card>
+        ) : fankuruPdfs.length === 0 ? (
+          <Card className="border-border/50 border-dashed">
+            <CardContent className="p-8 text-center text-muted-foreground">
+              <FileText className="w-8 h-8 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">調査結果PDFはまだアップロードされていません</p>
+              <p className="text-xs mt-1 opacity-70">Google Driveにファイルが追加されると自動的に表示されます</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            {/* PDF List */}
+            <div className="grid gap-3">
+              {fankuruPdfs.map((pdf, i) => (
+                <motion.div
+                  key={pdf.id}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.05 * i }}
+                >
+                  <Card
+                    className={`border-border/50 shadow-sm hover:shadow-md transition-all cursor-pointer group ${
+                      selectedPdf?.id === pdf.id ? "ring-2 ring-[#7D8B75]/40 border-[#7D8B75]/30" : ""
+                    }`}
+                    onClick={() => setSelectedPdf(selectedPdf?.id === pdf.id ? null : pdf)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-[#7D8B75]/10 flex items-center justify-center shrink-0">
+                          <FileText className="w-5 h-5 text-[#7D8B75]" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm text-foreground group-hover:text-[#7D8B75] transition-colors truncate">
+                            {pdf.displayName}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground mt-0.5">
+                            フォルダ: {pdf.folder || "ルート"}
+                          </div>
+                        </div>
+                        <a
+                          href={pdf.viewUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                          title="Google Driveで開く"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+
+            {/* PDF Preview */}
+            {selectedPdf && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-4"
+              >
+                <Card className="border-border/50 shadow-sm overflow-hidden">
+                  <div className="px-4 py-3 border-b border-border/40 flex items-center justify-between bg-[#7D8B75]/5">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-[#7D8B75]" />
+                      <span className="text-sm font-medium text-foreground">{selectedPdf.displayName}</span>
+                    </div>
+                    <a
+                      href={selectedPdf.viewUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs text-[#7D8B75] hover:text-[#5A6B53] transition-colors"
+                    >
+                      Google Driveで開く
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                  <div className="w-full" style={{ height: "80vh", minHeight: "500px" }}>
+                    <iframe
+                      src={selectedPdf.previewUrl}
+                      className="w-full h-full border-0"
+                      title={selectedPdf.displayName}
+                      allow="autoplay"
+                    />
+                  </div>
+                </Card>
+              </motion.div>
+            )}
+          </>
+        )}
       </section>
     </DashboardLayout>
   );

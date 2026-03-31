@@ -4,12 +4,14 @@
  * Colors: Warm white base, rose taupe accent
  */
 import { Link } from "wouter";
+import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
-import { MapPin, Users, TrendingUp, BarChart3, ArrowRight, Sparkles } from "lucide-react";
+import { MapPin, Users, TrendingUp, BarChart3, ArrowRight, Sparkles, Calendar } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import DashboardLayout from "@/components/DashboardLayout";
-import { useNpsData, calculateStoreStats } from "@/hooks/useNpsData";
-import { getNpsClass, NPS_INDUSTRY_AVERAGE, getAllNpsClasses } from "@/lib/npsClass";
+import { useNpsData, calculateStoreStats, filterByMonth, getAvailableMonths } from "@/hooks/useNpsData";
+import { getNpsClass, NPS_INDUSTRY_AVERAGE } from "@/lib/npsClass";
 
 const HERO_IMAGE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663489426081/aLPZvLfFDC4rFYToBquZNR/hero-salon-NicxdYrLg92ifUSevm3mos.webp";
 
@@ -21,6 +23,11 @@ const SAMPLE_STORE_DATA: Record<string, { revenue: string; unitPrice: string; st
   "高槻院": { revenue: "¥3,580,000", unitPrice: "¥11,500", staffCount: 3 },
   "姪浜院": { revenue: "¥2,150,000", unitPrice: "¥10,800", staffCount: 3 },
   "楽々園院": { revenue: "¥1,780,000", unitPrice: "¥10,500", staffCount: 2 },
+};
+
+const formatMonth = (ym: string) => {
+  const [y, m] = ym.split("-");
+  return `${y}年${parseInt(m)}月`;
 };
 
 function NpsScoreBadge({ score }: { score: number }) {
@@ -45,14 +52,39 @@ function NpsScoreBadge({ score }: { score: number }) {
 
 export default function Home() {
   const { records, loading, error, lastUpdated, refresh } = useNpsData();
-  const storeStats = calculateStoreStats(records);
+  const allMonths = useMemo(() => getAvailableMonths(records), [records]);
+
+  // デフォルトを先月に設定
+  const defaultMonth = useMemo(() => {
+    const now = new Date();
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const ym = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, "0")}`;
+    return allMonths.includes(ym) ? ym : allMonths[0] || "all";
+  }, [allMonths]);
+
+  const [selectedMonth, setSelectedMonth] = useState<string>("__init__");
+
+  // データ読み込み後にデフォルト値を設定
+  useEffect(() => {
+    if (selectedMonth === "__init__" && allMonths.length > 0) {
+      setSelectedMonth(defaultMonth);
+    }
+  }, [allMonths, defaultMonth, selectedMonth]);
+
+  // 期間でフィルタリングされたレコード
+  const filteredRecords = useMemo(() => {
+    if (selectedMonth === "all" || selectedMonth === "__init__") return records;
+    return filterByMonth(records, selectedMonth);
+  }, [records, selectedMonth]);
+
+  const storeStats = calculateStoreStats(filteredRecords);
 
   // 全店舗合計
   const totalResponses = storeStats.reduce((s, st) => s + st.totalResponses, 0);
   const totalPromoters = storeStats.reduce((s, st) => s + st.promoters, 0);
   const totalDetractors = storeStats.reduce((s, st) => s + st.detractors, 0);
   const overallNps = totalResponses > 0 ? Math.round(((totalPromoters - totalDetractors) / totalResponses) * 100) : 0;
-  const overallAvg = totalResponses > 0 ? Math.round((records.reduce((s, r) => s + r.npsScore, 0) / totalResponses) * 10) / 10 : 0;
+  const overallAvg = totalResponses > 0 ? Math.round((filteredRecords.reduce((s, r) => s + r.npsScore, 0) / totalResponses) * 10) / 10 : 0;
 
   return (
     <DashboardLayout lastUpdated={lastUpdated} onRefresh={refresh} loading={loading}>
@@ -82,11 +114,34 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Overall Stats */}
+      {/* Period Selector + Overall Stats */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <h2 className="font-display text-xl font-semibold text-foreground tracking-wide">
+          全店舗サマリー
+          {selectedMonth !== "all" && selectedMonth !== "__init__" && (
+            <span className="text-sm font-normal text-muted-foreground ml-2">— {formatMonth(selectedMonth)}</span>
+          )}
+        </h2>
+        <div className="flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-muted-foreground" />
+          <Select value={selectedMonth === "__init__" ? "all" : selectedMonth} onValueChange={setSelectedMonth}>
+            <SelectTrigger className="w-[180px] bg-white">
+              <SelectValue placeholder="期間を選択" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">全期間</SelectItem>
+              {allMonths.map((m) => (
+                <SelectItem key={m} value={m}>{formatMonth(m)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
         {[
           { label: "全店舗NPS", value: `${overallNps > 0 ? "+" : ""}${overallNps}`, icon: TrendingUp, color: "text-[#2D9C8F]", extra: loading ? undefined : getNpsClass(overallNps) },
-        { label: "業界平均NPS", value: `${NPS_INDUSTRY_AVERAGE}`, icon: BarChart3, color: "text-muted-foreground", extra: undefined },
+          { label: "業界平均NPS", value: `${NPS_INDUSTRY_AVERAGE}`, icon: BarChart3, color: "text-muted-foreground", extra: undefined },
           { label: "平均スコア", value: `${overallAvg}`, icon: Sparkles, color: "text-[#9B8579]", extra: undefined },
           { label: "総回答数", value: `${totalResponses}`, icon: BarChart3, color: "text-[#7D8B75]", extra: undefined },
           { label: "店舗数", value: `${storeStats.length}`, icon: MapPin, color: "text-[#9B8579]", extra: undefined },
@@ -217,6 +272,14 @@ export default function Home() {
             </motion.div>
           );
         })}
+
+        {!loading && storeStats.length === 0 && selectedMonth !== "all" && (
+          <Card className="border-border/50">
+            <CardContent className="p-8 text-center text-muted-foreground">
+              この期間のデータはありません
+            </CardContent>
+          </Card>
+        )}
       </div>
     </DashboardLayout>
   );

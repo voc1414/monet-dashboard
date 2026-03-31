@@ -274,9 +274,10 @@ export default function NpsOverview() {
   const storeId = decodeURIComponent(params.storeId || "");
   const { records, loading, error, lastUpdated, refresh } = useNpsData();
   const allMonths = useMemo(() => getAvailableMonths(records), [records]);
-  const currentMonth = useMemo(() => {
+  const defaultMonth = useMemo(() => {
     const now = new Date();
-    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const ym = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, "0")}`;
     return allMonths.includes(ym) ? ym : allMonths[0] || "all";
   }, [allMonths]);
   const [selectedMonth, setSelectedMonth] = useState<string>("__init__");
@@ -285,9 +286,9 @@ export default function NpsOverview() {
 
   useEffect(() => {
     if (selectedMonth === "__init__" && allMonths.length > 0) {
-      setSelectedMonth(currentMonth);
+      setSelectedMonth(defaultMonth);
     }
-  }, [allMonths, currentMonth, selectedMonth]);
+  }, [allMonths, defaultMonth, selectedMonth]);
 
   const storeRecords = useMemo(() => {
     const filtered = records.filter((r) => r.storeShort === storeId);
