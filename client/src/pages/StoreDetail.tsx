@@ -8,7 +8,9 @@ import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   MapPin, Users, TrendingUp, BarChart3, ArrowRight, Calendar,
-  DollarSign, Scissors, Star, MessageSquare, ChevronDown
+  DollarSign, Scissors, Star, MessageSquare, ChevronDown,
+  Trophy, ThumbsUp, Target, AlertTriangle, AlertCircle,
+  Lightbulb, CheckCircle2, ArrowUpRight
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -16,6 +18,8 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { useNpsData, calculateStoreStats, filterByMonth, getAvailableMonths } from "@/hooks/useNpsData";
 import type { NpsRecord, StoreStats } from "@/hooks/useNpsData";
 import { getNpsClass, NPS_INDUSTRY_AVERAGE } from "@/lib/npsClass";
+import { generateStoreAdvice } from "@/lib/npsAdvice";
+import type { NpsAdvice } from "@/lib/npsAdvice";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
@@ -150,6 +154,90 @@ function CategoryAnalysis({ records, field, label }: { records: NpsRecord[]; fie
         ))}
       </div>
     </div>
+  );
+}
+
+const ADVICE_ICONS = {
+  trophy: Trophy,
+  thumbsUp: ThumbsUp,
+  target: Target,
+  alertTriangle: AlertTriangle,
+  alertCircle: AlertCircle,
+};
+
+function AdviceSection({ stats, records }: { stats: StoreStats; records: NpsRecord[] }) {
+  const advice = useMemo(() => generateStoreAdvice(stats, records), [stats, records]);
+  const npsClass = getNpsClass(stats.npsScore);
+  const IconComponent = ADVICE_ICONS[advice.icon];
+
+  return (
+    <section className="mb-8">
+      <h2 className="font-display text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+        <Lightbulb className="w-5 h-5 text-[#E5B85C]" />
+        総合アドバイス
+      </h2>
+      <Card className="border-border/50 shadow-sm overflow-hidden">
+        {/* Summary Banner */}
+        <div className="px-5 py-4 flex items-start gap-3" style={{ backgroundColor: npsClass.bgColor }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: npsClass.color + "18" }}>
+            <IconComponent className="w-5 h-5" style={{ color: npsClass.color }} />
+          </div>
+          <p className="text-sm text-foreground/90 leading-relaxed">{advice.summary}</p>
+        </div>
+
+        <CardContent className="p-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {/* Strengths */}
+            <div>
+              <div className="flex items-center gap-1.5 mb-3">
+                <CheckCircle2 className="w-4 h-4 text-[#2D9C8F]" />
+                <h4 className="text-sm font-semibold text-foreground">強み</h4>
+              </div>
+              <ul className="space-y-2">
+                {advice.strengths.map((s, i) => (
+                  <li key={i} className="text-xs text-muted-foreground leading-relaxed flex gap-2">
+                    <span className="w-1 h-1 rounded-full bg-[#2D9C8F] mt-1.5 shrink-0" />
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Improvements */}
+            <div>
+              <div className="flex items-center gap-1.5 mb-3">
+                <Target className="w-4 h-4 text-[#E5B85C]" />
+                <h4 className="text-sm font-semibold text-foreground">改善ポイント</h4>
+              </div>
+              <ul className="space-y-2">
+                {advice.improvements.map((s, i) => (
+                  <li key={i} className="text-xs text-muted-foreground leading-relaxed flex gap-2">
+                    <span className="w-1 h-1 rounded-full bg-[#E5B85C] mt-1.5 shrink-0" />
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Action Items */}
+            <div>
+              <div className="flex items-center gap-1.5 mb-3">
+                <ArrowUpRight className="w-4 h-4 text-[#9B8579]" />
+                <h4 className="text-sm font-semibold text-foreground">アクションプラン</h4>
+              </div>
+              <ul className="space-y-2">
+                {advice.actionItems.map((s, i) => (
+                  <li key={i} className="text-xs text-muted-foreground leading-relaxed flex gap-2">
+                    <span className="w-1 h-1 rounded-full bg-[#9B8579] mt-1.5 shrink-0" />
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </section>
   );
 }
 
@@ -414,6 +502,11 @@ export default function StoreDetail() {
           </Card>
         )}
       </section>
+
+      {/* NPS Advice Section */}
+      {storeStats && storeRecords.length > 0 && (
+        <AdviceSection stats={storeStats} records={storeRecords} />
+      )}
 
       {/* Category Analysis */}
       {storeRecords.length > 0 && (
