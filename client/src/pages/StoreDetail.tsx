@@ -28,53 +28,14 @@ import {
 } from "recharts";
 import { useFankuruData } from "@/hooks/useFankuruData";
 import type { FankuruPdf } from "@/hooks/useFankuruData";
+import { useMonthlyReport } from "@/hooks/useMonthlyReport";
+import type { StaffReport } from "@/hooks/useMonthlyReport";
 
 const NPS_HEADER_IMAGE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663489426081/aLPZvLfFDC4rFYToBquZNR/nps-header-6cTohzoTSmSjrDCLc4VzHg.webp";
 
-// サンプルスタッフデータ
-const SAMPLE_STAFF: Record<string, Array<{ name: string; role: string }>> = {
-  "堀江院": [
-    { name: "田中 美咲", role: "店長 / スタイリスト" },
-    { name: "佐藤 健太", role: "スタイリスト" },
-    { name: "山田 花子", role: "スタイリスト" },
-    { name: "鈴木 一郎", role: "アシスタント" },
-    { name: "高橋 真由", role: "アシスタント" },
-  ],
-  "堀江院2nd": [
-    { name: "中村 優子", role: "店長 / スタイリスト" },
-    { name: "小林 大輔", role: "スタイリスト" },
-    { name: "加藤 理恵", role: "スタイリスト" },
-    { name: "渡辺 翔太", role: "アシスタント" },
-  ],
-  "福島院": [
-    { name: "伊藤 さくら", role: "店長 / スタイリスト" },
-    { name: "松本 拓也", role: "スタイリスト" },
-    { name: "井上 美月", role: "スタイリスト" },
-    { name: "木村 陽介", role: "アシスタント" },
-  ],
-  "高槻院": [
-    { name: "林 由美子", role: "店長 / スタイリスト" },
-    { name: "清水 大地", role: "スタイリスト" },
-    { name: "森田 愛", role: "アシスタント" },
-  ],
-  "姪浜院": [
-    { name: "岡田 真理", role: "店長 / スタイリスト" },
-    { name: "藤井 健", role: "スタイリスト" },
-    { name: "西村 恵", role: "アシスタント" },
-  ],
-  "楽々園院": [
-    { name: "石田 裕子", role: "店長 / スタイリスト" },
-    { name: "前田 翼", role: "スタイリスト" },
-  ],
-};
-
-const SAMPLE_REVENUE: Record<string, { revenue: string; unitPrice: string; customers: string; returnRate: string }> = {
-  "堀江院": { revenue: "¥4,850,000", unitPrice: "¥12,500", customers: "388", returnRate: "78%" },
-  "堀江院2nd": { revenue: "¥3,920,000", unitPrice: "¥11,800", customers: "332", returnRate: "75%" },
-  "福島院": { revenue: "¥4,210,000", unitPrice: "¥12,200", customers: "345", returnRate: "76%" },
-  "高槻院": { revenue: "¥3,580,000", unitPrice: "¥11,500", customers: "311", returnRate: "72%" },
-  "姪浜院": { revenue: "¥2,150,000", unitPrice: "¥10,800", customers: "199", returnRate: "70%" },
-  "楽々園院": { revenue: "¥1,780,000", unitPrice: "¥10,500", customers: "169", returnRate: "68%" },
+const formatCurrency = (n: number) => {
+  if (n === 0) return "—";
+  return `¥${n.toLocaleString()}`;
 };
 
 const NPS_COLORS = {
@@ -248,8 +209,15 @@ function AdviceSection({ stats, records }: { stats: StoreStats; records: NpsReco
 export default function StoreDetail() {
   const params = useParams<{ storeId: string }>();
   const storeId = decodeURIComponent(params.storeId || "");
-  const { records, loading, error, lastUpdated, refresh } = useNpsData();
-  const allMonths = useMemo(() => getAvailableMonths(records), [records]);
+  const { records, loading: npsLoading, error: npsError, lastUpdated, refresh } = useNpsData();
+  const { loading: reportLoading, error: reportError, getStoreMonthlyStats, availableMonths: reportMonths } = useMonthlyReport();
+  const loading = npsLoading || reportLoading;
+  const error = npsError || reportError;
+  const allNpsMonths = useMemo(() => getAvailableMonths(records), [records]);
+  const allMonths = useMemo(() => {
+    const set = new Set([...allNpsMonths, ...reportMonths]);
+    return Array.from(set).sort().reverse();
+  }, [allNpsMonths, reportMonths]);
   const defaultMonth = useMemo(() => {
     const now = new Date();
     const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -303,8 +271,9 @@ export default function StoreDetail() {
     ];
   }, [storeStats]);
 
-  const revenue = SAMPLE_REVENUE[storeId] || { revenue: "—", unitPrice: "—", customers: "—", returnRate: "—" };
-  const staff = SAMPLE_STAFF[storeId] || [];
+  // 月末報告書の実データ
+  const activeMonth = selectedMonth === "all" || selectedMonth === "__init__" ? undefined : selectedMonth;
+  const reportStats = useMemo(() => getStoreMonthlyStats(storeId, activeMonth), [getStoreMonthlyStats, storeId, activeMonth]);
 
   const formatMonth = (ym: string) => {
     const [y, m] = ym.split("-");
@@ -351,55 +320,132 @@ export default function StoreDetail() {
         </div>
       </div>
 
-      {/* Revenue Section (Sample) */}
+      {/* Revenue Section (実データ) */}
       <section className="mb-8">
         <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
           <DollarSign className="w-5 h-5 text-[#9B8579]" />
           売上情報
-          <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2">サンプル</span>
+          {reportStats && reportStats.monthLabel && (
+            <span className="text-xs font-normal text-muted-foreground">— {reportStats.monthLabel}分</span>
+          )}
         </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[
-            { label: "総売上", value: revenue.revenue, icon: DollarSign },
-            { label: "技術単価", value: revenue.unitPrice, icon: Scissors },
-            { label: "総客数", value: revenue.customers + "名", icon: Users },
-            { label: "リピート率", value: revenue.returnRate, icon: TrendingUp },
-          ].map((item, i) => (
-            <motion.div key={item.label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.04 }}>
-              <Card className="border-border/50 shadow-sm">
-                <CardContent className="p-4">
-                  <item.icon className="w-4 h-4 text-[#9B8579] mb-2" />
-                  <div className="font-mono-data text-lg md:text-xl font-bold">{item.value}</div>
-                  <div className="text-[10px] text-muted-foreground mt-1">{item.label}</div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
+        {reportStats ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            {[
+              { label: "総売上", value: formatCurrency(reportStats.totalSales), sub: `技術: ${formatCurrency(reportStats.totalTechSales)} / 店販: ${formatCurrency(reportStats.totalRetailSales)}`, icon: DollarSign },
+              { label: "客単価", value: formatCurrency(reportStats.avgUnitPrice), sub: `総売上 ÷ 総客数`, icon: Scissors },
+              { label: "総客数", value: `${reportStats.totalCustomers}名`, sub: `新規: ${reportStats.totalNewCustomers} / 再来: ${reportStats.totalReturnCustomers}`, icon: Users },
+              { label: "次回予約率", value: `${reportStats.nextReservationRate}%`, sub: `予約: ${reportStats.totalNextReservation} / 総客: ${reportStats.totalCustomers}`, icon: TrendingUp },
+            ].map((item, i) => (
+              <motion.div key={item.label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.04 }}>
+                <Card className="border-border/50 shadow-sm">
+                  <CardContent className="p-4">
+                    <item.icon className="w-4 h-4 text-[#9B8579] mb-2" />
+                    <div className="font-mono-data text-lg md:text-xl font-bold">{item.value}</div>
+                    <div className="text-[10px] text-muted-foreground mt-1">{item.label}</div>
+                    <div className="text-[9px] text-muted-foreground/70 mt-0.5">{item.sub}</div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        ) : (
+          <Card className="border-border/50 border-dashed mb-4">
+            <CardContent className="p-6 text-center text-muted-foreground">
+              <DollarSign className="w-6 h-6 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">この期間の売上データはまだありません</p>
+            </CardContent>
+          </Card>
+        )}
       </section>
 
-      {/* Staff Section (Sample) */}
+      {/* Staff Section (実データ) */}
       <section className="mb-8">
         <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
           <Users className="w-5 h-5 text-[#7D8B75]" />
-          在籍スタッフ
-          <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2">サンプル</span>
+          スタッフ個人実績
+          {reportStats && (
+            <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2">{reportStats.staffCount}名</span>
+          )}
         </h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-          {staff.map((s, i) => (
-            <motion.div key={s.name} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 + i * 0.03 }}>
-              <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
-                <CardContent className="p-4 text-center">
-                  <div className="w-12 h-12 rounded-full bg-[#9B8579]/10 mx-auto mb-2 flex items-center justify-center">
-                    <span className="text-[#9B8579] font-medium text-sm">{s.name.charAt(0)}</span>
-                  </div>
-                  <div className="font-medium text-sm text-foreground">{s.name}</div>
-                  <div className="text-[10px] text-muted-foreground mt-0.5">{s.role}</div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
+        {reportStats && reportStats.staffReports.length > 0 ? (
+          <div className="grid gap-3">
+            {reportStats.staffReports.map((sr: StaffReport, i: number) => (
+              <motion.div key={sr.answerId || i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.03 }}>
+                <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                      {/* Staff Name */}
+                      <div className="flex items-center gap-3 sm:w-48 shrink-0">
+                        <div className="w-10 h-10 rounded-full bg-[#9B8579]/10 flex items-center justify-center shrink-0">
+                          <span className="text-[#9B8579] font-bold text-sm">{sr.name.charAt(0)}</span>
+                        </div>
+                        <div>
+                          <div className="font-bold text-sm text-foreground">{sr.name}</div>
+                          <div className="text-[10px] text-muted-foreground">{sr.employmentType}</div>
+                        </div>
+                      </div>
+                      {/* Staff Stats */}
+                      <div className="flex-1 grid grid-cols-2 sm:grid-cols-5 gap-3">
+                        <div>
+                          <div className="text-[10px] text-muted-foreground">総売上</div>
+                          <div className="font-mono-data text-sm font-bold">{formatCurrency(sr.totalSales)}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-muted-foreground">客単価</div>
+                          <div className="font-mono-data text-sm font-bold">{formatCurrency(sr.unitPrice)}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-muted-foreground">総客数</div>
+                          <div className="font-mono-data text-sm font-bold">{sr.totalCustomers}名</div>
+                          <div className="text-[9px] text-muted-foreground/70">新規{sr.newCustomers} / 再来{sr.returnCustomers}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-muted-foreground">次回予約率</div>
+                          <div className="font-mono-data text-sm font-bold">{sr.nextReservationRate}%</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-muted-foreground">店販売上</div>
+                          <div className="font-mono-data text-sm font-bold">{formatCurrency(sr.retailSales)}</div>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Comments */}
+                    {(sr.reviewComment || sr.npsComment || sr.fankuruComment) && (
+                      <div className="mt-3 pt-3 border-t border-border/30 space-y-2">
+                        {sr.reviewComment && (
+                          <div>
+                            <span className="text-[10px] font-medium text-[#9B8579]">振り返り:</span>
+                            <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{sr.reviewComment}</p>
+                          </div>
+                        )}
+                        {sr.npsComment && (
+                          <div>
+                            <span className="text-[10px] font-medium text-[#2D9C8F]">NPS向上施策:</span>
+                            <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{sr.npsComment}</p>
+                          </div>
+                        )}
+                        {sr.fankuruComment && (
+                          <div>
+                            <span className="text-[10px] font-medium text-[#7D8B75]">ファンくる対策:</span>
+                            <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{sr.fankuruComment}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        ) : (
+          <Card className="border-border/50 border-dashed">
+            <CardContent className="p-6 text-center text-muted-foreground">
+              <Users className="w-6 h-6 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">この期間のスタッフ実績データはまだありません</p>
+            </CardContent>
+          </Card>
+        )}
       </section>
 
       {/* NPS Survey Results */}

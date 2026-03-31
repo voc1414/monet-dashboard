@@ -1,6 +1,6 @@
 /*
  * Design: Atelier Blanc — クリーンアトリエ
- * Page: 店舗一覧（総売上・技術単価のサンプル + NPS概要）
+ * Page: 店舗一覧（実データ連携 — 月末報告書 + NPS概要）
  * Colors: Warm white base, rose taupe accent
  */
 import { Link } from "wouter";
@@ -11,23 +11,19 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useNpsData, calculateStoreStats, filterByMonth, getAvailableMonths } from "@/hooks/useNpsData";
+import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { getNpsClass, NPS_INDUSTRY_AVERAGE } from "@/lib/npsClass";
 
 const HERO_IMAGE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663489426081/aLPZvLfFDC4rFYToBquZNR/hero-salon-NicxdYrLg92ifUSevm3mos.webp";
 
-// サンプルデータ（売上・技術単価は今後実データに置き換え）
-const SAMPLE_STORE_DATA: Record<string, { revenue: string; unitPrice: string; staffCount: number }> = {
-  "堀江院": { revenue: "¥4,850,000", unitPrice: "¥12,500", staffCount: 5 },
-  "堀江院2nd": { revenue: "¥3,920,000", unitPrice: "¥11,800", staffCount: 4 },
-  "福島院": { revenue: "¥4,210,000", unitPrice: "¥12,200", staffCount: 4 },
-  "高槻院": { revenue: "¥3,580,000", unitPrice: "¥11,500", staffCount: 3 },
-  "姪浜院": { revenue: "¥2,150,000", unitPrice: "¥10,800", staffCount: 3 },
-  "楽々園院": { revenue: "¥1,780,000", unitPrice: "¥10,500", staffCount: 2 },
-};
-
 const formatMonth = (ym: string) => {
   const [y, m] = ym.split("-");
   return `${y}年${parseInt(m)}月`;
+};
+
+const formatCurrency = (n: number) => {
+  if (n === 0) return "—";
+  return `¥${n.toLocaleString()}`;
 };
 
 function NpsScoreBadge({ score }: { score: number }) {
@@ -51,8 +47,19 @@ function NpsScoreBadge({ score }: { score: number }) {
 }
 
 export default function Home() {
-  const { records, loading, error, lastUpdated, refresh } = useNpsData();
-  const allMonths = useMemo(() => getAvailableMonths(records), [records]);
+  const { records, loading: npsLoading, error: npsError, lastUpdated, refresh } = useNpsData();
+  const { loading: reportLoading, error: reportError, getStoreMonthlyStats, availableMonths: reportMonths } = useMonthlyReport();
+
+  const loading = npsLoading || reportLoading;
+  const error = npsError || reportError;
+
+  const allNpsMonths = useMemo(() => getAvailableMonths(records), [records]);
+
+  // NPS月と報告書月を統合して利用可能な月一覧を作成
+  const allMonths = useMemo(() => {
+    const set = new Set([...allNpsMonths, ...reportMonths]);
+    return Array.from(set).sort().reverse();
+  }, [allNpsMonths, reportMonths]);
 
   // デフォルトを先月に設定
   const defaultMonth = useMemo(() => {
@@ -64,14 +71,13 @@ export default function Home() {
 
   const [selectedMonth, setSelectedMonth] = useState<string>("__init__");
 
-  // データ読み込み後にデフォルト値を設定
   useEffect(() => {
     if (selectedMonth === "__init__" && allMonths.length > 0) {
       setSelectedMonth(defaultMonth);
     }
   }, [allMonths, defaultMonth, selectedMonth]);
 
-  // 期間でフィルタリングされたレコード
+  // NPS期間フィルタリング
   const filteredRecords = useMemo(() => {
     if (selectedMonth === "all" || selectedMonth === "__init__") return records;
     return filterByMonth(records, selectedMonth);
@@ -79,33 +85,53 @@ export default function Home() {
 
   const filteredStoreStats = calculateStoreStats(filteredRecords);
 
-  // 全店舗を常に表示（NPSデータがない月でも表示する）
+  // 全店舗を常に表示
   const ALL_STORES = ["堀江院", "堀江院2nd", "福島院", "高槻院", "姪浜院", "楽々園院"];
   const storeStats = ALL_STORES.map((name) => {
-    const found = filteredStoreStats.find((s) => s.shortName === name);
-    if (found) return found;
+    const nps = filteredStoreStats.find((s) => s.shortName === name);
+    const activeMonth = selectedMonth === "all" || selectedMonth === "__init__" ? undefined : selectedMonth;
+    const report = getStoreMonthlyStats(name, activeMonth);
+
     return {
-      name: `monet ${name}`,
       shortName: name,
-      totalResponses: 0,
-      avgScore: 0,
-      npsScore: 0,
-      promoters: 0,
-      passives: 0,
-      detractors: 0,
-      promoterPct: 0,
-      passivePct: 0,
-      detractorPct: 0,
+      // NPS
+      totalResponses: nps?.totalResponses || 0,
+      avgScore: nps?.avgScore || 0,
+      npsScore: nps?.npsScore || 0,
+      promoters: nps?.promoters || 0,
+      passives: nps?.passives || 0,
+      detractors: nps?.detractors || 0,
+      promoterPct: nps?.promoterPct || 0,
+      passivePct: nps?.passivePct || 0,
+      detractorPct: nps?.detractorPct || 0,
+      // 月末報告書
+      totalSales: report?.totalSales || 0,
+      totalTechSales: report?.totalTechSales || 0,
+      totalRetailSales: report?.totalRetailSales || 0,
+      totalCustomers: report?.totalCustomers || 0,
+      totalNewCustomers: report?.totalNewCustomers || 0,
+      totalReturnCustomers: report?.totalReturnCustomers || 0,
+      avgUnitPrice: report?.avgUnitPrice || 0,
+      nextReservationRate: report?.nextReservationRate || 0,
+      staffCount: report?.staffCount || 0,
+      hasReportData: !!report,
+      reportMonthLabel: report?.monthLabel || "",
     };
   });
 
   // 全店舗合計（NPSデータがある店舗のみ集計）
-  const storesWithData = storeStats.filter((s) => s.totalResponses > 0);
-  const totalResponses = storesWithData.reduce((s, st) => s + st.totalResponses, 0);
-  const totalPromoters = storesWithData.reduce((s, st) => s + st.promoters, 0);
-  const totalDetractors = storesWithData.reduce((s, st) => s + st.detractors, 0);
+  const storesWithNps = storeStats.filter((s) => s.totalResponses > 0);
+  const totalResponses = storesWithNps.reduce((s, st) => s + st.totalResponses, 0);
+  const totalPromoters = storesWithNps.reduce((s, st) => s + st.promoters, 0);
+  const totalDetractors = storesWithNps.reduce((s, st) => s + st.detractors, 0);
   const overallNps = totalResponses > 0 ? Math.round(((totalPromoters - totalDetractors) / totalResponses) * 100) : 0;
   const overallAvg = totalResponses > 0 ? Math.round((filteredRecords.reduce((s, r) => s + r.npsScore, 0) / totalResponses) * 10) / 10 : 0;
+
+  // 全店舗合計（報告書データ）
+  const storesWithReport = storeStats.filter((s) => s.hasReportData);
+  const totalAllSales = storesWithReport.reduce((s, st) => s + st.totalSales, 0);
+  const totalAllCustomers = storesWithReport.reduce((s, st) => s + st.totalCustomers, 0);
+  const overallUnitPrice = totalAllCustomers > 0 ? Math.round(totalAllSales / totalAllCustomers) : 0;
 
   return (
     <DashboardLayout lastUpdated={lastUpdated} onRefresh={refresh} loading={loading}>
@@ -159,13 +185,15 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
         {[
           { label: "全店舗NPS", value: `${overallNps > 0 ? "+" : ""}${overallNps}`, icon: TrendingUp, color: "text-[#2D9C8F]", extra: loading ? undefined : getNpsClass(overallNps) },
           { label: "業界平均NPS", value: `${NPS_INDUSTRY_AVERAGE}`, icon: BarChart3, color: "text-muted-foreground", extra: undefined },
           { label: "平均スコア", value: `${overallAvg}`, icon: Sparkles, color: "text-[#9B8579]", extra: undefined },
           { label: "総回答数", value: `${totalResponses}`, icon: BarChart3, color: "text-[#7D8B75]", extra: undefined },
-          { label: "店舗数", value: `${storesWithData.length}`, icon: MapPin, color: "text-[#9B8579]", extra: undefined },
+          { label: "全店舗総売上", value: formatCurrency(totalAllSales), icon: TrendingUp, color: "text-[#2D9C8F]", extra: undefined },
+          { label: "全店舗客単価", value: formatCurrency(overallUnitPrice), icon: BarChart3, color: "text-[#9B8579]", extra: undefined },
+          { label: "店舗数", value: `${storesWithNps.length > 0 ? storesWithNps.length : storesWithReport.length}`, icon: MapPin, color: "text-[#9B8579]", extra: undefined },
         ].map((stat, i) => (
           <motion.div
             key={stat.label}
@@ -174,14 +202,14 @@ export default function Home() {
             transition={{ delay: 0.15 + i * 0.05 }}
           >
             <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between mb-3">
-                  <stat.icon className={`w-5 h-5 ${stat.color}`} />
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between mb-2">
+                  <stat.icon className={`w-4 h-4 ${stat.color}`} />
                 </div>
-                <div className="font-mono-data text-2xl md:text-3xl font-bold text-foreground mb-1">
+                <div className="font-mono-data text-xl md:text-2xl font-bold text-foreground mb-1 truncate">
                   {loading ? "..." : stat.value}
                 </div>
-                <div className="text-xs text-muted-foreground">{stat.label}</div>
+                <div className="text-[10px] text-muted-foreground">{stat.label}</div>
                 {stat.extra && (
                   <div className="mt-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded inline-block" style={{ color: stat.extra.color, backgroundColor: stat.extra.bgColor }}>
                     {stat.extra.label}
@@ -199,7 +227,10 @@ export default function Home() {
           店舗一覧
         </h2>
         <p className="text-xs text-muted-foreground mt-1">
-          各店舗の売上・NPS概要（売上データはサンプル）
+          各店舗の売上・NPS概要
+          {selectedMonth !== "all" && selectedMonth !== "__init__" && (
+            <span>（{formatMonth(selectedMonth)}）</span>
+          )}
         </p>
       </div>
 
@@ -223,7 +254,6 @@ export default function Home() {
           }
 
           const st = store as NonNullable<typeof storeStats>[number];
-          const sample = SAMPLE_STORE_DATA[st.shortName] || { revenue: "—", unitPrice: "—", staffCount: 0 };
 
           return (
             <motion.div
@@ -248,29 +278,57 @@ export default function Home() {
                             </h3>
                             <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                               <Users className="w-3 h-3" />
-                              <span>{sample.staffCount}名在籍</span>
+                              <span>{st.staffCount > 0 ? `${st.staffCount}名` : "—"}</span>
+                              {st.reportMonthLabel && (
+                                <span className="text-[#9B8579]">（{st.reportMonthLabel}分）</span>
+                              )}
                             </div>
                           </div>
                         </div>
 
-                        {/* Stats Row */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
+                        {/* Stats Row - 実データ */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 mt-4">
                           <div>
                             <div className="text-[11px] text-muted-foreground mb-1">総売上</div>
-                            <div className="font-mono-data text-sm md:text-base font-bold">{sample.revenue}</div>
+                            <div className="font-mono-data text-sm md:text-base font-bold">
+                              {st.hasReportData ? formatCurrency(st.totalSales) : "—"}
+                            </div>
                           </div>
                           <div>
-                            <div className="text-[11px] text-muted-foreground mb-1">技術単価</div>
-                            <div className="font-mono-data text-sm md:text-base font-bold">{sample.unitPrice}</div>
+                            <div className="text-[11px] text-muted-foreground mb-1">客単価</div>
+                            <div className="font-mono-data text-sm md:text-base font-bold">
+                              {st.hasReportData && st.avgUnitPrice > 0 ? formatCurrency(st.avgUnitPrice) : "—"}
+                            </div>
                           </div>
+                          <div>
+                            <div className="text-[11px] text-muted-foreground mb-1">総客数</div>
+                            <div className="font-mono-data text-sm md:text-base font-bold">
+                              {st.hasReportData ? `${st.totalCustomers}名` : "—"}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[11px] text-muted-foreground mb-1">次回予約率</div>
+                            <div className="font-mono-data text-sm md:text-base font-bold">
+                              {st.hasReportData && st.nextReservationRate > 0 ? `${st.nextReservationRate}%` : "—"}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* NPS Row */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 mt-3 pt-3 border-t border-border/30">
                           <div>
                             <div className="text-[11px] text-muted-foreground mb-1">NPS回答数</div>
-                            <div className="font-mono-data text-sm md:text-base font-bold">{st.totalResponses > 0 ? `${st.totalResponses}件` : "—"}</div>
+                            <div className="font-mono-data text-sm md:text-base font-bold">
+                              {st.totalResponses > 0 ? `${st.totalResponses}件` : "—"}
+                            </div>
                           </div>
                           <div>
                             <div className="text-[11px] text-muted-foreground mb-1">平均スコア</div>
-                            <div className="font-mono-data text-sm md:text-base font-bold">{st.totalResponses > 0 ? st.avgScore : "—"}</div>
+                            <div className="font-mono-data text-sm md:text-base font-bold">
+                              {st.totalResponses > 0 ? st.avgScore : "—"}
+                            </div>
                           </div>
+                          <div className="col-span-2 sm:col-span-2" />
                         </div>
                       </div>
 
