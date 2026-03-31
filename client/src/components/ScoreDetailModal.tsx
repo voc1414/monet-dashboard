@@ -149,7 +149,7 @@ export default function ScoreDetailModal({ selectedScore, onClose, records }: Sc
             {/* Header */}
             <div className="flex items-center justify-between px-5 sm:px-6 pt-3 md:pt-5 pb-3 border-b border-border/40 shrink-0">
               <div>
-                <h2 className="text-sm sm:text-base font-bold flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-bold flex items-center gap-2">
                   {selectedScore !== null && <ScoreBadge score={selectedScore} />}
                   スコア {selectedScore} の回答一覧
                 </h2>

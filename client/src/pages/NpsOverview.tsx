@@ -39,7 +39,7 @@ function NpsGaugeLarge({ score }: { score: number }) {
     <div className="flex flex-col items-center">
       <div className="w-36 h-36 rounded-full border-[6px] flex items-center justify-center" style={{ borderColor: npsClass.color }}>
         <div className="text-center">
-          <div className="font-mono-data text-3xl font-bold" style={{ color: npsClass.color }}>
+          <div className="font-mono-data text-4xl font-bold" style={{ color: npsClass.color }}>
             {score > 0 ? "+" : ""}{score}
           </div>
           <div className="text-[10px] text-muted-foreground mt-1">NPS Score</div>
@@ -115,7 +115,7 @@ function NpsAdvicePanel({ stats, records }: { stats: StoreStats; records: NpsRec
 
   return (
     <div className="mb-8">
-      <h2 className="text-base font-bold text-foreground mb-4 flex items-center gap-2">
+      <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
         <Lightbulb className="w-5 h-5 text-[#E5B85C]" />
         総合アドバイス
       </h2>
@@ -193,7 +193,7 @@ function StatCard({ label, value, subtext, icon: Icon, color }: {
         <div className="flex items-start justify-between mb-3">
           <Icon className="w-5 h-5" style={{ color }} />
         </div>
-        <div className="font-mono-data text-xl font-bold text-foreground">{value}</div>
+        <div className="font-mono-data text-2xl md:text-3xl font-bold text-foreground">{value}</div>
         <div className="text-xs text-muted-foreground mt-1">{label}</div>
         {subtext && <div className="text-[10px] text-muted-foreground/70 mt-0.5">{subtext}</div>}
       </CardContent>
@@ -395,7 +395,7 @@ export default function NpsOverview() {
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-foreground mb-1">
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-1">
             NPS調査結果
           </h1>
           <p className="text-sm text-muted-foreground">{storeId} — 顧客満足度調査の詳細分析</p>
@@ -585,7 +585,7 @@ export default function NpsOverview() {
 
           {/* Category Analysis */}
           <section className="mb-8">
-            <h2 className="text-base font-bold text-foreground mb-4 flex items-center gap-2">
+            <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
               <MessageSquare className="w-5 h-5 text-[#9B8579]" />
               カテゴリ別評価分析
             </h2>
@@ -607,7 +607,7 @@ export default function NpsOverview() {
                           <div key={item.name}>
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-xs text-muted-foreground truncate max-w-[70%]">{item.name}</span>
-                              <span className="text-xs font-mono-data text-foreground">{item.pct}% ({item.value}件)</span>
+                              <span className="text-sm font-mono-data text-foreground">{item.pct}% ({item.value}件)</span>
                             </div>
                             <div className="h-2 bg-muted rounded-full overflow-hidden">
                               <div
@@ -630,7 +630,7 @@ export default function NpsOverview() {
           {/* Reviews Section */}
           <section>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+              <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
                 <Star className="w-5 h-5 text-[#E5B85C]" />
                 レビュー一覧
                 <span className="text-sm font-normal text-muted-foreground">({filteredReviews.length}件)</span>

@@ -35,7 +35,7 @@ function NpsScoreBadge({ score }: { score: number }) {
   return (
     <div className="flex flex-col items-end gap-1">
       <span
-        className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-mono-data font-semibold border"
+        className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-mono-data font-bold border"
         style={{ backgroundColor: npsClass.bgColor, color: npsClass.color, borderColor: npsClass.borderColor }}
       >
         NPS {score > 0 ? "+" : ""}{score}
@@ -137,7 +137,7 @@ export default function Home() {
 
       {/* Period Selector + Overall Stats */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <h2 className="text-lg font-bold text-foreground">
+        <h2 className="text-xl font-bold text-foreground">
           全店舗サマリー
           {selectedMonth !== "all" && selectedMonth !== "__init__" && (
             <span className="text-xs font-normal text-muted-foreground ml-2">— {formatMonth(selectedMonth)}</span>
@@ -178,10 +178,10 @@ export default function Home() {
                 <div className="flex items-start justify-between mb-3">
                   <stat.icon className={`w-5 h-5 ${stat.color}`} />
                 </div>
-                <div className="font-mono-data text-xl font-bold text-foreground mb-1">
+                <div className="font-mono-data text-2xl md:text-3xl font-bold text-foreground mb-1">
                   {loading ? "..." : stat.value}
                 </div>
-                <div className="text-[11px] text-muted-foreground">{stat.label}</div>
+                <div className="text-xs text-muted-foreground">{stat.label}</div>
                 {stat.extra && (
                   <div className="mt-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded inline-block" style={{ color: stat.extra.color, backgroundColor: stat.extra.bgColor }}>
                     {stat.extra.label}
@@ -195,7 +195,7 @@ export default function Home() {
 
       {/* Store List */}
       <div className="mb-4">
-        <h2 className="text-lg font-bold text-foreground">
+        <h2 className="text-xl font-bold text-foreground">
           店舗一覧
         </h2>
         <p className="text-xs text-muted-foreground mt-1">
@@ -243,7 +243,7 @@ export default function Home() {
                             <MapPin className="w-5 h-5 text-[#9B8579]" />
                           </div>
                           <div>
-                            <h3 className="font-bold text-foreground text-sm group-hover:text-[#9B8579] transition-colors">
+                            <h3 className="font-bold text-foreground text-base group-hover:text-[#9B8579] transition-colors">
                               {st.shortName}
                             </h3>
                             <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
@@ -256,20 +256,20 @@ export default function Home() {
                         {/* Stats Row */}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
                           <div>
-                            <div className="text-[10px] text-muted-foreground mb-0.5">総売上</div>
-                            <div className="font-mono-data text-xs font-bold">{sample.revenue}</div>
+                            <div className="text-[11px] text-muted-foreground mb-1">総売上</div>
+                            <div className="font-mono-data text-sm md:text-base font-bold">{sample.revenue}</div>
                           </div>
                           <div>
-                            <div className="text-[10px] text-muted-foreground mb-0.5">技術単価</div>
-                            <div className="font-mono-data text-xs font-bold">{sample.unitPrice}</div>
+                            <div className="text-[11px] text-muted-foreground mb-1">技術単価</div>
+                            <div className="font-mono-data text-sm md:text-base font-bold">{sample.unitPrice}</div>
                           </div>
                           <div>
-                            <div className="text-[10px] text-muted-foreground mb-0.5">NPS回答数</div>
-                            <div className="font-mono-data text-xs font-bold">{st.totalResponses > 0 ? `${st.totalResponses}件` : "—"}</div>
+                            <div className="text-[11px] text-muted-foreground mb-1">NPS回答数</div>
+                            <div className="font-mono-data text-sm md:text-base font-bold">{st.totalResponses > 0 ? `${st.totalResponses}件` : "—"}</div>
                           </div>
                           <div>
-                            <div className="text-[10px] text-muted-foreground mb-0.5">平均スコア</div>
-                            <div className="font-mono-data text-xs font-bold">{st.totalResponses > 0 ? st.avgScore : "—"}</div>
+                            <div className="text-[11px] text-muted-foreground mb-1">平均スコア</div>
+                            <div className="font-mono-data text-sm md:text-base font-bold">{st.totalResponses > 0 ? st.avgScore : "—"}</div>
                           </div>
                         </div>
                       </div>
