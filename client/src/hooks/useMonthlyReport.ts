@@ -26,6 +26,8 @@ const COL = {
   REVIEW_COMMENT: 16,
   NPS_COMMENT: 17,
   FANKURU_COMMENT: 18,
+  PHOTO_URL_1: 19,
+  PHOTO_URL_2: 20,
 } as const;
 
 // 店舗名の正規化マッピング
@@ -105,6 +107,8 @@ export interface StaffReport {
   reviewComment: string;
   npsComment: string;
   fankuruComment: string;
+  photoUrl1: string;
+  photoUrl2: string;
 }
 
 export interface StoreMonthlyStats {
@@ -229,6 +233,8 @@ export function useMonthlyReport() {
             reviewComment: r[COL.REVIEW_COMMENT] || "",
             npsComment: r[COL.NPS_COMMENT] || "",
             fankuruComment: r[COL.FANKURU_COMMENT] || "",
+            photoUrl1: r[COL.PHOTO_URL_1] || "",
+            photoUrl2: r[COL.PHOTO_URL_2] || "",
           };
         });
 

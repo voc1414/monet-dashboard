@@ -236,9 +236,13 @@ export default function StaffList() {
                         {/* Desktop Layout */}
                         <div className="hidden md:grid grid-cols-12 gap-4 items-center">
                           <div className="col-span-3 flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                              <span className="text-primary font-bold text-sm">{staff.name.charAt(0)}</span>
-                            </div>
+                            {staff.photoUrl1 ? (
+                              <img src={staff.photoUrl1} alt={staff.name} className="w-9 h-9 rounded-full object-cover shrink-0" />
+                            ) : (
+                              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                <span className="text-primary font-bold text-sm">{staff.name.charAt(0)}</span>
+                              </div>
+                            )}
                             <span className="font-bold text-sm text-foreground hover:text-primary transition-colors">{staff.name}</span>
                             {isExpanded ? (
                               <ChevronUp className="w-4 h-4 text-muted-foreground" />
@@ -274,9 +278,13 @@ export default function StaffList() {
                         {/* Mobile Layout */}
                         <div className="md:hidden">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                              <span className="text-primary font-bold text-xs">{staff.name.charAt(0)}</span>
-                            </div>
+                            {staff.photoUrl1 ? (
+                              <img src={staff.photoUrl1} alt={staff.name} className="w-8 h-8 rounded-full object-cover shrink-0" />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                <span className="text-primary font-bold text-xs">{staff.name.charAt(0)}</span>
+                              </div>
+                            )}
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-1.5">
