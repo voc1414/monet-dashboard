@@ -1,637 +1,846 @@
-/**
- * Design: monet Brand Identity — 水彩ブルー × コンクリートモダン
- * Page: 店舗別アンケート詳細（ファンくる → NPS の順で同一ページに表示）
- * UI: Home.tsxの店舗一覧と統一したスタイル
- * NPSレビュー: 超高感度3件 → ワースト3件 → 「他にも詳しく見る」で全件展開
+/*
+ * Design: Atelier Blanc — クリーンアトリエ
+ * Page: 店舗別アンケート詳細（StoreDetail.tsxと同じデザインベース）
+ * セクション順: ファンくる → NPS調査結果 → 総合アドバイス → カテゴリ別評価 → トップ3レビュー → ワースト3レビュー
+ * 個人売上セクションなし
  */
-import { useState, useMemo } from "react";
-import { useParams } from "wouter";
+import { useParams, Link } from "wouter";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  BarChart3, Calendar, ThumbsUp, Minus, ThumbsDown,
-  Star, MessageSquare, Quote, FileText, ExternalLink,
-  ChevronDown, ArrowLeft, Users, Sparkles, AlertTriangle, Eye
+  MapPin, BarChart3, Calendar, Star, MessageSquare,
+  FileText, ExternalLink, Loader2, FolderOpen, Eye,
+  Lightbulb, CheckCircle2, Target, ArrowUpRight,
+  Trophy, ThumbsUp, AlertTriangle, AlertCircle,
+  Sparkles, ChevronDown, Users, Quote
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import ScoreDetailModal from "@/components/ScoreDetailModal";
 import DashboardLayout from "@/components/DashboardLayout";
-import { useMonthlyReport } from "@/hooks/useMonthlyReport";
-import { useNpsData, filterByMonth, getAvailableMonths } from "@/hooks/useNpsData";
+import { useNpsData, calculateStoreStats, filterByMonth, getAvailableMonths } from "@/hooks/useNpsData";
+import type { NpsRecord, StoreStats } from "@/hooks/useNpsData";
+import { getNpsClass, NPS_INDUSTRY_AVERAGE } from "@/lib/npsClass";
+import { generateStoreAdvice } from "@/lib/npsAdvice";
 import { useFankuruData } from "@/hooks/useFankuruData";
+import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { isNewStore } from "@/lib/newBadge";
-import type { NpsRecord } from "@/hooks/useNpsData";
-import { getNpsClass } from "@/lib/npsClass";
-import { Link } from "wouter";
+import type { FankuruPdf } from "@/hooks/useFankuruData";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend
+} from "recharts";
 
-// NPSスコアの色分け
-function getScoreColor(score: number): string {
-  if (score >= 9) return "text-emerald-600";
-  if (score >= 7) return "text-amber-500";
-  return "text-red-500";
-}
+const NPS_COLORS = {
+  promoter: "#2D9C8F",
+  passive: "#E5B85C",
+  detractor: "#C75C5C",
+};
 
-function getScoreIcon(score: number) {
-  if (score >= 9) return <ThumbsUp className="w-4 h-4 text-emerald-600" />;
-  if (score >= 7) return <Minus className="w-4 h-4 text-amber-500" />;
-  return <ThumbsDown className="w-4 h-4 text-red-500" />;
-}
+// ネガティブキーワード（辛辣レビュー選定用）
+const NEGATIVE_KEYWORDS = [
+  "残念", "不満", "改善", "高い", "待ち時間", "長い", "微妙", "期待外れ",
+  "雑", "不安", "痛", "ムラ", "合わな", "違う", "もう少し", "気になる",
+  "狭", "汚", "臭", "がっかり", "ひどい", "最悪", "二度と", "嫌",
+];
 
-function getScoreLabel(score: number): string {
-  if (score >= 9) return "推奨者";
-  if (score >= 7) return "中立者";
-  return "批判者";
-}
-
-function getScoreBg(score: number): string {
-  if (score >= 9) return "bg-emerald-50 border-emerald-200/50";
-  if (score >= 7) return "bg-amber-50 border-amber-200/50";
-  return "bg-red-50 border-red-200/50";
-}
-
-// NPS回答カード（コンパクト版）
-function NpsResponseCard({ record }: { record: NpsRecord }) {
-  const [expanded, setExpanded] = useState(false);
-  const hasComments = record.priceComment || record.spaceComment || record.staffComment || record.finishComment;
-
+// --- NPS Gauge (StoreDetail.tsxと同じ) ---
+function NpsGauge({ score }: { score: number }) {
+  const npsClass = getNpsClass(score);
   return (
-    <div className={`border rounded-xl p-4 transition-all ${getScoreBg(record.npsScore)}`}>
-      {/* ヘッダー行 */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          {getScoreIcon(record.npsScore)}
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className={`text-2xl font-mono font-bold ${getScoreColor(record.npsScore)}`}>
-                {record.npsScore}
-              </span>
-              <Badge
-                variant="outline"
-                className={`text-xs ${
-                  record.npsScore >= 9
-                    ? "border-emerald-300 text-emerald-700"
-                    : record.npsScore >= 7
-                    ? "border-amber-300 text-amber-700"
-                    : "border-red-300 text-red-700"
-                }`}
-              >
-                {getScoreLabel(record.npsScore)}
-              </Badge>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-              <span>{record.date}</span>
-              {record.staff && (
-                <>
-                  <span>·</span>
-                  <span className="flex items-center gap-1">
-                    <Users className="w-3 h-3" />
-                    {record.staff}
-                  </span>
-                </>
-              )}
-            </div>
+    <div className="flex flex-col items-center">
+      <div className="w-28 h-28 rounded-full border-4 flex items-center justify-center" style={{ borderColor: npsClass.color }}>
+        <div className="text-center">
+          <div className="font-mono-data text-3xl font-bold" style={{ color: npsClass.color }}>
+            {score > 0 ? "+" : ""}{score}
           </div>
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wider">NPS</div>
         </div>
-        {hasComments && (
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="text-muted-foreground hover:text-foreground transition-colors p-1"
-          >
-            <ChevronDown className={`w-4 h-4 transition-transform ${expanded ? "rotate-180" : ""}`} />
-          </button>
-        )}
       </div>
-
-      {/* レビューコメント（常に表示） */}
-      {record.review && (
-        <div className="mt-3 pl-7">
-          <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{record.review}</p>
-        </div>
-      )}
-
-      {/* 詳細コメント（展開時） */}
-      <AnimatePresence>
-        {expanded && hasComments && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="overflow-hidden"
-          >
-            <div className="mt-3 pl-7 grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {record.priceComment && (
-                <div className="bg-white/60 rounded-lg p-2.5">
-                  <span className="text-xs font-semibold text-muted-foreground">価格</span>
-                  <p className="text-sm text-foreground/80 mt-0.5">{record.priceComment}</p>
-                </div>
-              )}
-              {record.spaceComment && (
-                <div className="bg-white/60 rounded-lg p-2.5">
-                  <span className="text-xs font-semibold text-muted-foreground">空間</span>
-                  <p className="text-sm text-foreground/80 mt-0.5">{record.spaceComment}</p>
-                </div>
-              )}
-              {record.staffComment && (
-                <div className="bg-white/60 rounded-lg p-2.5">
-                  <span className="text-xs font-semibold text-muted-foreground">接客</span>
-                  <p className="text-sm text-foreground/80 mt-0.5">{record.staffComment}</p>
-                </div>
-              )}
-              {record.finishComment && (
-                <div className="bg-white/60 rounded-lg p-2.5">
-                  <span className="text-xs font-semibold text-muted-foreground">仕上がり</span>
-                  <p className="text-sm text-foreground/80 mt-0.5">{record.finishComment}</p>
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-// ファンくるPDFカード
-function FankuruPdfCard({ pdf }: { pdf: { displayName: string; stylist: string; date: string; viewUrl: string; cdnUrl: string } }) {
-  return (
-    <div className="bg-amber-50/60 border border-amber-200/50 rounded-xl p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
-            <FileText className="w-5 h-5 text-amber-600" />
-          </div>
-          <div>
-            <h4 className="font-semibold text-sm">{pdf.displayName}</h4>
-            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-              <span>{pdf.date}</span>
-              {pdf.stylist && (
-                <>
-                  <span>·</span>
-                  <span>担当: {pdf.stylist}</span>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-        <a
-          href={pdf.viewUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs text-amber-700 hover:text-amber-900 flex items-center gap-1 px-2 py-1 rounded-md hover:bg-amber-100 transition-colors"
+      <div className="mt-2 flex flex-col items-center gap-1">
+        <span
+          className="text-xs font-semibold px-2 py-0.5 rounded-full"
+          style={{ color: npsClass.color, backgroundColor: npsClass.bgColor, border: `1px solid ${npsClass.borderColor}` }}
         >
-          <ExternalLink className="w-3.5 h-3.5" />
-          開く
-        </a>
+          {npsClass.label}
+        </span>
+        <span className="text-[10px] text-muted-foreground">
+          業界平均: {NPS_INDUSTRY_AVERAGE}
+        </span>
       </div>
     </div>
   );
 }
 
-// ファンくるコメントカード
-function FankuruCommentCard({ staffName, comment }: { staffName: string; comment: string }) {
-  if (!comment || comment.trim() === "" || comment.trim() === "なし") return null;
+// --- Category Analysis (StoreDetail.tsxと同じ) ---
+function CategoryAnalysis({ records, field, label }: { records: NpsRecord[]; field: keyof NpsRecord; label: string }) {
+  const analysis = useMemo(() => {
+    const counts: Record<string, number> = {};
+    records.forEach((r) => {
+      const val = r[field] as string;
+      if (!val) return;
+      val.split(",").forEach((v) => {
+        const trimmed = v.trim();
+        if (trimmed) counts[trimmed] = (counts[trimmed] || 0) + 1;
+      });
+    });
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, value]) => ({ name, value, pct: Math.round((value / records.length) * 100) }));
+  }, [records, field]);
+
+  if (analysis.length === 0) return null;
+
   return (
-    <div className="bg-amber-50/60 border border-amber-200/50 rounded-xl p-4">
-      <div className="flex items-start gap-3">
-        <Quote className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-semibold text-amber-700">ファンくるコメント</span>
-            <span className="text-xs text-muted-foreground">{staffName}</span>
+    <div>
+      <h4 className="text-sm font-medium text-foreground mb-3">{label}</h4>
+      <div className="space-y-2">
+        {analysis.map((item) => (
+          <div key={item.name} className="flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-muted-foreground truncate">{item.name}</span>
+                <span className="text-xs font-mono-data text-foreground ml-2">{item.pct}%</span>
+              </div>
+              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-primary/60 transition-all duration-500"
+                  style={{ width: `${item.pct}%` }}
+                />
+              </div>
+            </div>
           </div>
-          <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{comment}</p>
-        </div>
+        ))}
       </div>
     </div>
   );
 }
 
-// NPS分布バー（Home.tsxと同じスタイル）
-function NpsDistributionBar({ promoterPct, passivePct, detractorPct }: { promoterPct: number; passivePct: number; detractorPct: number }) {
+// --- Advice Section (StoreDetail.tsxと同じ) ---
+const ADVICE_ICONS = {
+  trophy: Trophy,
+  thumbsUp: ThumbsUp,
+  target: Target,
+  alertTriangle: AlertTriangle,
+  alertCircle: AlertCircle,
+};
+
+function AdviceSection({ stats, records }: { stats: StoreStats; records: NpsRecord[] }) {
+  const advice = useMemo(() => generateStoreAdvice(stats, records), [stats, records]);
+  const npsClass = getNpsClass(stats.npsScore);
+  const IconComponent = ADVICE_ICONS[advice.icon];
+
   return (
-    <div className="flex gap-0.5 h-2 rounded-full overflow-hidden w-full">
-      <div className="bg-[#2D9C8F] rounded-l-full" style={{ width: `${Math.max(promoterPct, 2)}%` }} />
-      <div className="bg-[#E5B85C]" style={{ width: `${Math.max(passivePct, 2)}%` }} />
-      <div className="bg-[#C75C5C] rounded-r-full" style={{ width: `${Math.max(detractorPct, 2)}%` }} />
-    </div>
+    <section className="mb-8">
+      <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+        <Lightbulb className="w-5 h-5 text-[#E5B85C]" />
+        総合アドバイス
+      </h2>
+      <Card className="border-border/50 shadow-sm overflow-hidden">
+        <div className="px-5 py-4 flex items-start gap-3" style={{ backgroundColor: npsClass.bgColor }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: npsClass.color + "18" }}>
+            <IconComponent className="w-5 h-5" style={{ color: npsClass.color }} />
+          </div>
+          <p className="text-sm text-foreground/90 leading-relaxed">{advice.summary}</p>
+        </div>
+        <CardContent className="p-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div>
+              <div className="flex items-center gap-1.5 mb-3">
+                <CheckCircle2 className="w-4 h-4 text-[#2D9C8F]" />
+                <h4 className="text-sm font-semibold text-foreground">強み</h4>
+              </div>
+              <ul className="space-y-2">
+                {advice.strengths.map((s, i) => (
+                  <li key={i} className="text-xs text-muted-foreground leading-relaxed flex gap-2">
+                    <span className="w-1 h-1 rounded-full bg-[#2D9C8F] mt-1.5 shrink-0" />
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5 mb-3">
+                <Target className="w-4 h-4 text-[#E5B85C]" />
+                <h4 className="text-sm font-semibold text-foreground">改善ポイント</h4>
+              </div>
+              <ul className="space-y-2">
+                {advice.improvements.map((s, i) => (
+                  <li key={i} className="text-xs text-muted-foreground leading-relaxed flex gap-2">
+                    <span className="w-1 h-1 rounded-full bg-[#E5B85C] mt-1.5 shrink-0" />
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5 mb-3">
+                <ArrowUpRight className="w-4 h-4 text-primary" />
+                <h4 className="text-sm font-semibold text-foreground">アクションプラン</h4>
+              </div>
+              <ul className="space-y-2">
+                {advice.actionItems.map((s, i) => (
+                  <li key={i} className="text-xs text-muted-foreground leading-relaxed flex gap-2">
+                    <span className="w-1 h-1 rounded-full bg-primary mt-1.5 shrink-0" />
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
+// --- Review Card (StoreDetail.tsxスタイル) ---
+function ReviewCard({ record, index }: { record: NpsRecord; index: number }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.05 * index }}
+    >
+      <Card className="border-border/50 shadow-sm">
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <div
+                className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-mono-data font-bold"
+                style={{
+                  backgroundColor:
+                    record.npsScore >= 9 ? NPS_COLORS.promoter : record.npsScore >= 7 ? NPS_COLORS.passive : NPS_COLORS.detractor,
+                }}
+              >
+                {record.npsScore}
+              </div>
+              <span className="text-xs text-muted-foreground">{record.menu}</span>
+              {record.staff && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Users className="w-3 h-3" />
+                  {record.staff}
+                </span>
+              )}
+            </div>
+            <span className="text-[10px] text-muted-foreground">{record.date.split(" ")[0]}</span>
+          </div>
+          <p className="text-sm text-foreground/80 leading-relaxed">{record.review}</p>
+        </CardContent>
+      </Card>
+    </motion.div>
   );
 }
 
 export default function SurveyDetail() {
   const params = useParams<{ storeId: string }>();
-  const storeName = decodeURIComponent(params.storeId || "");
+  const storeId = decodeURIComponent(params.storeId || "");
+  const { records, loading: npsLoading, lastUpdated, refresh } = useNpsData();
+  const { rawData, loading: reportLoading, availableMonths: reportMonths } = useMonthlyReport();
+  const { pdfs: fankuruPdfs, loading: fankuruLoading, hasFolderMapping } = useFankuruData(storeId);
+  const loading = npsLoading || reportLoading;
 
-  const { rawData, loading: monthlyLoading } = useMonthlyReport();
-  const { records: npsRecords, loading: npsLoading, lastUpdated, refresh } = useNpsData();
-  const { pdfs: fankuruPdfs, hasFolderMapping } = useFankuruData(storeName);
-
-  const loading = monthlyLoading || npsLoading;
-
-  // NPS利用可能月
-  const npsMonths = useMemo(() => {
-    const storeRecords = npsRecords.filter(r => r.storeShort === storeName);
+  // 月の管理
+  const allNpsMonths = useMemo(() => {
+    const storeRecords = records.filter(r => r.storeShort === storeId);
     return getAvailableMonths(storeRecords);
-  }, [npsRecords, storeName]);
+  }, [records, storeId]);
 
-  // ファンくるPDF利用可能月
   const fankuruMonths = useMemo(() => {
     const months = new Set<string>();
     fankuruPdfs.forEach(p => months.add(p.yearMonth));
     return Array.from(months).sort().reverse();
   }, [fankuruPdfs]);
 
-  // 月末報告書の利用可能月
   const monthlyMonths = useMemo(() => {
     const months = new Set<string>();
-    rawData.filter(r => r.storeNormalized === storeName).forEach(r => months.add(r.reportMonth));
+    rawData.filter(r => r.storeNormalized === storeId).forEach(r => months.add(r.reportMonth));
     return Array.from(months).sort().reverse();
-  }, [rawData, storeName]);
+  }, [rawData, storeId]);
 
-  // 全利用可能月
   const allMonths = useMemo(() => {
-    const set = new Set([...npsMonths, ...fankuruMonths, ...monthlyMonths]);
+    const set = new Set([...allNpsMonths, ...fankuruMonths, ...monthlyMonths]);
     return Array.from(set).sort().reverse();
-  }, [npsMonths, fankuruMonths, monthlyMonths]);
+  }, [allNpsMonths, fankuruMonths, monthlyMonths]);
 
-  const [selectedMonth, setSelectedMonth] = useState<string>("");
-  const activeMonth = selectedMonth || allMonths[0] || "";
-  const monthLabel = activeMonth
-    ? `${activeMonth.split("-")[0]}年${parseInt(activeMonth.split("-")[1])}月`
-    : "";
+  const defaultMonth = useMemo(() => {
+    const now = new Date();
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const ym = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, "0")}`;
+    return allMonths.includes(ym) ? ym : allMonths[0] || "all";
+  }, [allMonths]);
+
+  const [selectedMonth, setSelectedMonth] = useState<string>("__init__");
+  const [selectedScore, setSelectedScore] = useState<number | null>(null);
+  const [selectedPdf, setSelectedPdf] = useState<FankuruPdf | null>(null);
+  const [showAllReviews, setShowAllReviews] = useState(false);
+
+  useEffect(() => {
+    if (selectedMonth === "__init__" && allMonths.length > 0) {
+      setSelectedMonth(defaultMonth);
+    }
+  }, [allMonths, defaultMonth, selectedMonth]);
+
+  const activeMonth = selectedMonth === "__init__" ? defaultMonth : selectedMonth;
 
   // NPS: 月+店舗でフィルタ
-  const filteredNps = useMemo(() => {
-    if (!activeMonth) return npsRecords.filter(r => r.storeShort === storeName);
-    return filterByMonth(npsRecords, activeMonth).filter(r => r.storeShort === storeName);
-  }, [npsRecords, activeMonth, storeName]);
+  const storeRecords = useMemo(() => {
+    const filtered = records.filter(r => r.storeShort === storeId);
+    if (activeMonth === "all") return filtered;
+    return filterByMonth(filtered, activeMonth);
+  }, [records, storeId, activeMonth]);
 
-  // NPS集計
-  const npsStats = useMemo(() => {
-    if (filteredNps.length === 0) return null;
-    const total = filteredNps.length;
-    const promoters = filteredNps.filter(r => r.npsScore >= 9).length;
-    const passives = filteredNps.filter(r => r.npsScore >= 7 && r.npsScore <= 8).length;
-    const detractors = filteredNps.filter(r => r.npsScore <= 6).length;
-    const npsScore = Math.round(((promoters - detractors) / total) * 100);
-    const avgScore = Math.round(filteredNps.reduce((s, r) => s + r.npsScore, 0) / total * 10) / 10;
-    const promoterPct = Math.round((promoters / total) * 100);
-    const passivePct = Math.round((passives / total) * 100);
-    const detractorPct = Math.round((detractors / total) * 100);
-    return { total, promoters, passives, detractors, npsScore, avgScore, promoterPct, passivePct, detractorPct };
-  }, [filteredNps]);
+  const storeStats = useMemo(() => {
+    if (storeRecords.length === 0) return null;
+    const stats = calculateStoreStats(storeRecords);
+    return stats.find(s => s.shortName === storeId) || null;
+  }, [storeRecords, storeId]);
+
+  // スコア分布
+  const scoreDistribution = useMemo(() => {
+    const dist: Record<number, number> = {};
+    for (let i = 0; i <= 10; i++) dist[i] = 0;
+    storeRecords.forEach(r => {
+      if (r.npsScore >= 0 && r.npsScore <= 10) dist[r.npsScore]++;
+    });
+    return Object.entries(dist).map(([score, count]) => ({
+      score: parseInt(score),
+      count,
+      fill: parseInt(score) >= 9 ? NPS_COLORS.promoter : parseInt(score) >= 7 ? NPS_COLORS.passive : NPS_COLORS.detractor,
+    }));
+  }, [storeRecords]);
+
+  // 円グラフ
+  const pieData = useMemo(() => {
+    if (!storeStats) return [];
+    return [
+      { name: "推奨者 (9-10)", value: storeStats.promoters, fill: NPS_COLORS.promoter },
+      { name: "中立者 (7-8)", value: storeStats.passives, fill: NPS_COLORS.passive },
+      { name: "批判者 (0-6)", value: storeStats.detractors, fill: NPS_COLORS.detractor },
+    ];
+  }, [storeStats]);
 
   // ファンくるPDF: 月でフィルタ
   const filteredFankuruPdfs = useMemo(() => {
-    if (!activeMonth) return fankuruPdfs;
+    if (activeMonth === "all") return fankuruPdfs;
     return fankuruPdfs.filter(p => p.yearMonth === activeMonth);
   }, [fankuruPdfs, activeMonth]);
 
   // ファンくるコメント（月末報告書から）
   const filteredFankuruComments = useMemo(() => {
     return rawData
-      .filter(r => r.storeNormalized === storeName && r.reportMonth === activeMonth)
+      .filter(r => r.storeNormalized === storeId && r.reportMonth === activeMonth)
       .filter(r => r.fankuruComment && r.fankuruComment.trim() !== "" && r.fankuruComment.trim() !== "なし")
       .map(r => ({ staffName: r.name, comment: r.fankuruComment }));
-  }, [rawData, activeMonth, storeName]);
+  }, [rawData, activeMonth, storeId]);
 
-  const npsClass = npsStats ? getNpsClass(npsStats.npsScore) : null;
   const hasFankuruData = filteredFankuruPdfs.length > 0 || filteredFankuruComments.length > 0;
 
-  // === NPSレビューのコンパクト表示ロジック ===
-  // 超高感度レビュー（スコア10のみ、レビューあり）→ スコア降順
+  // === トップ3レビュー（文章長め優先） ===
   const topReviews = useMemo(() => {
-    return filteredNps
-      .filter(r => r.npsScore >= 9 && r.review && r.review.trim() !== "")
-      .sort((a, b) => b.npsScore - a.npsScore || b.date.localeCompare(a.date))
+    return storeRecords
+      .filter(r => r.npsScore >= 9 && r.review && r.review.trim().length > 0)
+      .sort((a, b) => {
+        // 文章長め優先（長い順）、同じ長さならスコア高い順
+        const lenDiff = (b.review?.length || 0) - (a.review?.length || 0);
+        if (lenDiff !== 0) return lenDiff;
+        return b.npsScore - a.npsScore;
+      })
       .slice(0, 3);
-  }, [filteredNps]);
+  }, [storeRecords]);
 
-  // ワーストレビュー（スコア8以下、レビューあり）→ スコア昇順
+  // === ワースト3レビュー（辛辣な文章優先） ===
   const worstReviews = useMemo(() => {
-    return filteredNps
-      .filter(r => r.npsScore <= 8 && r.review && r.review.trim() !== "")
-      .sort((a, b) => a.npsScore - b.npsScore || b.date.localeCompare(a.date))
-      .slice(0, 3);
-  }, [filteredNps]);
+    const withHarshness = storeRecords
+      .filter(r => r.npsScore <= 8 && r.review && r.review.trim().length > 0)
+      .map(r => {
+        // 辛辣度スコア: ネガティブキーワード数 + 文章の長さボーナス + 低スコアボーナス
+        let harshScore = 0;
+        const reviewText = r.review || "";
+        NEGATIVE_KEYWORDS.forEach(kw => {
+          if (reviewText.includes(kw)) harshScore += 3;
+        });
+        // 長い文章ほど具体的な不満 → ボーナス
+        harshScore += Math.min(reviewText.length / 20, 5);
+        // 低スコアほど辛辣 → ボーナス
+        harshScore += (8 - r.npsScore) * 2;
+        return { record: r, harshScore };
+      })
+      .sort((a, b) => b.harshScore - a.harshScore);
+    return withHarshness.slice(0, 3).map(h => h.record);
+  }, [storeRecords]);
 
-  // 「他にも詳しく見る」展開用
-  const [showAllNps, setShowAllNps] = useState(false);
-
-  // 残りのレビュー（トップ3・ワースト3以外）
+  // 残りのレビュー
   const remainingReviews = useMemo(() => {
-    const topIds = new Set(topReviews.map((_, i) => `top-${i}`));
-    const worstIds = new Set(worstReviews.map((_, i) => `worst-${i}`));
-    const shownRecords = new Set([...topReviews, ...worstReviews]);
-    return filteredNps.filter(r => !shownRecords.has(r));
-  }, [filteredNps, topReviews, worstReviews]);
+    const shown = new Set([...topReviews, ...worstReviews]);
+    return storeRecords.filter(r => !shown.has(r) && r.review && r.review.trim().length > 0);
+  }, [storeRecords, topReviews, worstReviews]);
+
+  const formatMonth = (ym: string) => {
+    if (!ym || ym === "all" || ym === "__init__") return "";
+    const [y, m] = ym.split("-");
+    return `${y}年${parseInt(m)}月`;
+  };
 
   const breadcrumbs = [
     { label: "ホーム", href: "/" },
     { label: "アンケート一覧", href: "/survey" },
-    { label: storeName },
+    { label: storeId },
   ];
 
   return (
     <DashboardLayout
       breadcrumbs={breadcrumbs}
-      lastUpdated={lastUpdated ?? undefined}
+      lastUpdated={lastUpdated}
       onRefresh={refresh}
       loading={loading}
     >
-      <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-        {/* ヘッダー */}
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div>
-            <Link
-              href="/survey"
-              className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 mb-2"
-            >
-              <ArrowLeft className="w-3 h-3" />
-              アンケート一覧に戻る
-            </Link>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0">
-                <img
-                  src="https://d2xsxph8kpxj0f.cloudfront.net/310519663489426081/aLPZvLfFDC4rFYToBquZNR/monet-parasol_bfd1d990.jpg"
-                  alt="monet"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-foreground flex items-center gap-1.5">
-                  {storeName}
-                  {isNewStore(storeName) && (
-                    <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none">NEW</span>
-                  )}
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  顧客アンケート
-                  {monthLabel && <span className="ml-1">（{monthLabel}）</span>}
-                </p>
-              </div>
+      {/* Store Header (StoreDetail.tsxと同じスタイル) */}
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+              <MapPin className="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
+                {storeId}
+                {isNewStore(storeId) && (
+                  <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none">NEW</span>
+                )}
+              </h1>
+              <p className="text-xs text-muted-foreground">顧客アンケート — NPS・ファンくる調査結果</p>
             </div>
           </div>
+        </div>
+
+        {/* Month Selector */}
+        <div className="flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-muted-foreground" />
           <Select value={activeMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-[160px]">
-              <Calendar className="w-4 h-4 mr-2 text-muted-foreground" />
-              <SelectValue placeholder="月を選択" />
+            <SelectTrigger className="w-[180px] bg-white">
+              <SelectValue placeholder="期間を選択" />
             </SelectTrigger>
             <SelectContent>
-              {allMonths.map((m) => (
-                <SelectItem key={m} value={m}>
-                  {m.split("-")[0]}年{parseInt(m.split("-")[1])}月
-                </SelectItem>
+              <SelectItem value="all">全期間</SelectItem>
+              {allMonths.map(m => (
+                <SelectItem key={m} value={m}>{formatMonth(m)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
-
-        {/* ローディング */}
-        {loading && (
-          <div className="flex items-center justify-center py-16">
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              <span className="text-sm text-muted-foreground">データを読み込み中...</span>
-            </div>
-          </div>
-        )}
-
-        {!loading && (
-          <div className="space-y-8">
-
-            {/* ===== ファンくるセクション（一番上） ===== */}
-            <section>
-              <div className="flex items-center gap-2 mb-4">
-                <Star className="w-5 h-5 text-amber-500" />
-                <h2 className="font-bold text-base text-foreground">ファンくる</h2>
-                {(filteredFankuruPdfs.length > 0 || filteredFankuruComments.length > 0) && (
-                  <span className="text-xs text-muted-foreground">
-                    （{filteredFankuruPdfs.length + filteredFankuruComments.length}件）
-                  </span>
-                )}
-              </div>
-
-              {/* ファンくるPDFレポート */}
-              {filteredFankuruPdfs.length > 0 && (
-                <div className="mb-4">
-                  <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-amber-600" />
-                    調査レポート（{filteredFankuruPdfs.length}件）
-                  </h3>
-                  <div className="space-y-3">
-                    {filteredFankuruPdfs.map(pdf => (
-                      <FankuruPdfCard key={pdf.id} pdf={pdf} />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* ファンくるコメント（月末報告書から） */}
-              {filteredFankuruComments.length > 0 && (
-                <div className="mb-4">
-                  <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                    <Quote className="w-4 h-4 text-amber-600" />
-                    ファンくるコメント（{filteredFankuruComments.length}件）
-                  </h3>
-                  <div className="space-y-3">
-                    {filteredFankuruComments.map((f, i) => (
-                      <FankuruCommentCard key={i} staffName={f.staffName} comment={f.comment} />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* データなし */}
-              {!hasFankuruData && (
-                <div className="text-center py-8 text-muted-foreground bg-card border border-border/50 rounded-xl">
-                  <Star className="w-8 h-8 mx-auto mb-3 opacity-30" />
-                  <p className="text-sm">
-                    {hasFolderMapping
-                      ? "この月のファンくるデータはありません"
-                      : "この店舗のファンくるフォルダは未設定です"
-                    }
-                  </p>
-                </div>
-              )}
-            </section>
-
-            {/* ===== NPSセクション ===== */}
-            <section>
-              <div className="flex items-center gap-2 mb-4">
-                <BarChart3 className="w-5 h-5 text-primary" />
-                <h2 className="font-bold text-base text-foreground">NPS</h2>
-                {npsStats && (
-                  <span className="text-xs text-muted-foreground">（{npsStats.total}件）</span>
-                )}
-              </div>
-
-              {/* NPSサマリー */}
-              {npsStats && npsClass && (
-                <Card className="border-border/50 shadow-sm mb-6">
-                  <CardContent className="p-5">
-                    <div className="flex flex-col md:flex-row md:items-center gap-6">
-                      <div className="flex items-center gap-4">
-                        <div>
-                          <div className="text-xs text-muted-foreground mb-1">NPSスコア</div>
-                          <div className="font-mono text-4xl font-bold" style={{ color: npsClass.color }}>
-                            {npsStats.npsScore > 0 ? "+" : ""}{npsStats.npsScore}
-                          </div>
-                          <span
-                            className="text-xs font-semibold px-2 py-0.5 rounded-full mt-1 inline-block"
-                            style={{ backgroundColor: `${npsClass.color}15`, color: npsClass.color }}
-                          >
-                            {npsClass.label}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex-1">
-                        <div className="grid grid-cols-4 gap-4 mb-3">
-                          <div>
-                            <div className="text-[10px] text-muted-foreground mb-0.5">平均スコア</div>
-                            <div className="font-mono text-xl font-bold text-foreground">{npsStats.avgScore}</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-1">
-                              <ThumbsUp className="w-3 h-3 text-emerald-600" /> 推奨者
-                            </div>
-                            <div className="font-mono text-xl font-bold text-emerald-600">{npsStats.promoters}</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-1">
-                              <Minus className="w-3 h-3 text-amber-500" /> 中立者
-                            </div>
-                            <div className="font-mono text-xl font-bold text-amber-500">{npsStats.passives}</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-1">
-                              <ThumbsDown className="w-3 h-3 text-red-500" /> 批判者
-                            </div>
-                            <div className="font-mono text-xl font-bold text-red-500">{npsStats.detractors}</div>
-                          </div>
-                        </div>
-                        <NpsDistributionBar
-                          promoterPct={npsStats.promoterPct}
-                          passivePct={npsStats.passivePct}
-                          detractorPct={npsStats.detractorPct}
-                        />
-                        <div className="flex justify-between mt-1 text-[10px] text-muted-foreground">
-                          <span>{npsStats.promoterPct}%</span>
-                          <span>{npsStats.passivePct}%</span>
-                          <span>{npsStats.detractorPct}%</span>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* 超高感度レビュー TOP 3 */}
-              {topReviews.length > 0 && (
-                <div className="mb-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Sparkles className="w-4 h-4 text-emerald-500" />
-                    <h3 className="text-sm font-semibold text-foreground">超高感度レビュー</h3>
-                    <span className="text-xs text-muted-foreground">TOP {topReviews.length}</span>
-                  </div>
-                  <div className="space-y-3">
-                    {topReviews.map((record, i) => (
-                      <NpsResponseCard key={`top-${i}`} record={record} />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* ワーストレビュー 3 */}
-              {worstReviews.length > 0 && (
-                <div className="mb-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <AlertTriangle className="w-4 h-4 text-red-400" />
-                    <h3 className="text-sm font-semibold text-foreground">ワーストレビュー</h3>
-                    <span className="text-xs text-muted-foreground">{worstReviews.length}件</span>
-                  </div>
-                  <div className="space-y-3">
-                    {worstReviews.map((record, i) => (
-                      <NpsResponseCard key={`worst-${i}`} record={record} />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* 他にも詳しく見る */}
-              {remainingReviews.length > 0 && !showAllNps && (
-                <button
-                  onClick={() => setShowAllNps(true)}
-                  className="w-full py-3 rounded-xl border border-border/50 bg-card hover:bg-accent/30 transition-colors flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-                >
-                  <Eye className="w-4 h-4" />
-                  他にも詳しく見る（残り {remainingReviews.length}件）
-                </button>
-              )}
-
-              {/* 全件展開 */}
-              <AnimatePresence>
-                {showAllNps && remainingReviews.length > 0 && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="mb-3 mt-5">
-                      <div className="flex items-center gap-2 mb-3">
-                        <MessageSquare className="w-4 h-4 text-primary" />
-                        <h3 className="text-sm font-semibold text-foreground">全レビュー</h3>
-                        <span className="text-xs text-muted-foreground">{remainingReviews.length}件</span>
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      {remainingReviews.map((record, i) => (
-                        <NpsResponseCard key={`rest-${i}`} record={record} />
-                      ))}
-                    </div>
-                    <button
-                      onClick={() => setShowAllNps(false)}
-                      className="w-full mt-4 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      閉じる
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* NPS回答なし */}
-              {filteredNps.length === 0 && (
-                <div className="text-center py-12 text-muted-foreground">
-                  <MessageSquare className="w-8 h-8 mx-auto mb-3 opacity-30" />
-                  <p className="text-sm">この月のNPS回答はありません</p>
-                </div>
-              )}
-
-              {/* レビューなし（回答はあるがレビューテキストがない場合） */}
-              {filteredNps.length > 0 && topReviews.length === 0 && worstReviews.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground bg-card border border-border/50 rounded-xl">
-                  <MessageSquare className="w-8 h-8 mx-auto mb-3 opacity-30" />
-                  <p className="text-sm">レビューコメントのある回答はありません</p>
-                </div>
-              )}
-            </section>
-          </div>
-        )}
-
-        {/* 店舗詳細リンク */}
-        {!loading && (
-          <div className="flex justify-center pt-2 pb-4">
-            <Link
-              href={`/store/${encodeURIComponent(storeName)}`}
-              className="text-sm text-primary hover:underline flex items-center gap-1"
-            >
-              {storeName}の店舗詳細を見る <ExternalLink className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-        )}
       </div>
+
+      {/* ===== 1. ファンくる調査結果（一番上） ===== */}
+      <section className="mb-8 pt-6 border-t-2 border-sage/20">
+        <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+          <FolderOpen className="w-5 h-5 text-sage" />
+          ファンくる調査結果
+          {(filteredFankuruPdfs.length > 0 || filteredFankuruComments.length > 0) && (
+            <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2">
+              {filteredFankuruPdfs.length + filteredFankuruComments.length}件
+            </span>
+          )}
+        </h2>
+
+        {!hasFolderMapping ? (
+          <Card className="border-border/50 border-dashed">
+            <CardContent className="p-8 text-center text-muted-foreground">
+              <FolderOpen className="w-8 h-8 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">この店舗のファンくるフォルダはまだ設定されていません</p>
+            </CardContent>
+          </Card>
+        ) : fankuruLoading ? (
+          <Card className="border-border/50">
+            <CardContent className="p-8 text-center text-muted-foreground">
+              <Loader2 className="w-6 h-6 mx-auto mb-2 animate-spin opacity-50" />
+              <p className="text-sm">ファンくるデータを読み込み中...</p>
+            </CardContent>
+          </Card>
+        ) : !hasFankuruData ? (
+          <Card className="border-border/50 border-dashed">
+            <CardContent className="p-8 text-center text-muted-foreground">
+              <FileText className="w-8 h-8 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">この月のファンくるデータはありません</p>
+              <p className="text-xs mt-1 opacity-70">Google Driveにファイルが追加されると自動的に表示されます</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            {/* ファンくるPDFリスト */}
+            {filteredFankuruPdfs.length > 0 && (
+              <div className="grid gap-3 mb-4">
+                {filteredFankuruPdfs.map((pdf, i) => (
+                  <motion.div
+                    key={pdf.id}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.05 * i }}
+                  >
+                    <Card
+                      className={`border-border/50 shadow-sm hover:shadow-md transition-all cursor-pointer group ${
+                        selectedPdf?.id === pdf.id ? "ring-2 ring-sage/40 border-sage/30" : ""
+                      }`}
+                      onClick={() => setSelectedPdf(selectedPdf?.id === pdf.id ? null : pdf)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-sage/10 flex items-center justify-center shrink-0">
+                            <FileText className="w-5 h-5 text-sage" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm text-foreground group-hover:text-sage transition-colors">
+                              {pdf.displayName}
+                              {pdf.stylist && (
+                                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                  担当: {pdf.stylist}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground mt-0.5">
+                              フォルダ: {pdf.folder || "ルート"}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                              selectedPdf?.id === pdf.id
+                                ? "bg-sage text-white"
+                                : "bg-sage/10 text-sage group-hover:bg-sage/20"
+                            }`}>
+                              <Eye className="w-3 h-3" />
+                              {selectedPdf?.id === pdf.id ? "閉じる" : "詳細を見る"}
+                            </span>
+                            <a
+                              href={pdf.viewUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+                              onClick={(e) => e.stopPropagation()}
+                              title="Google Driveで開く"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+
+            {/* PDF Preview */}
+            {selectedPdf && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-4"
+              >
+                <Card className="border-border/50 shadow-sm overflow-hidden">
+                  <div className="px-4 py-3 border-b border-border/40 flex items-center justify-between bg-sage/5">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-sage" />
+                      <span className="text-sm font-medium text-foreground">{selectedPdf.displayName}</span>
+                    </div>
+                    <a
+                      href={selectedPdf.viewUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs text-sage hover:text-sage/80 transition-colors"
+                    >
+                      Google Driveで開く
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                  <div className="w-full" style={{ height: "80vh", minHeight: "500px" }}>
+                    <iframe
+                      src={selectedPdf.previewUrl}
+                      className="w-full h-full border-0"
+                      title={selectedPdf.displayName}
+                      allow="autoplay"
+                    />
+                  </div>
+                </Card>
+              </motion.div>
+            )}
+
+            {/* ファンくるコメント */}
+            {filteredFankuruComments.length > 0 && (
+              <div className="space-y-3">
+                {filteredFankuruComments.map((f, i) => (
+                  <Card key={i} className="border-border/50 shadow-sm">
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <Quote className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-semibold text-amber-700">ファンくるコメント</span>
+                            <span className="text-xs text-muted-foreground">{f.staffName}</span>
+                          </div>
+                          <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{f.comment}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
+      {/* ===== 2. NPS調査結果 ===== */}
+      <section className="mb-8 pt-6 border-t-2 border-[#2D9C8F]/20">
+        <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+          <BarChart3 className="w-5 h-5 text-[#2D9C8F]" />
+          NPS調査結果
+          {activeMonth !== "all" && activeMonth !== "__init__" && (
+            <span className="text-xs font-normal text-muted-foreground">— {formatMonth(activeMonth)}</span>
+          )}
+        </h2>
+
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[1, 2, 3].map(i => (
+              <Card key={i} className="border-border/50 animate-pulse">
+                <CardContent className="p-6"><div className="h-32 bg-muted rounded" /></CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : storeStats ? (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* NPS Score Card */}
+            <Card className="border-border/50 shadow-sm">
+              <CardContent className="p-6 flex flex-col items-center justify-center">
+                <NpsGauge score={storeStats.npsScore} />
+                <div className="mt-4 grid grid-cols-3 gap-4 w-full text-center">
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-1">推奨者</div>
+                    <div className="font-mono-data text-sm md:text-base font-bold text-[#2D9C8F]">{storeStats.promoterPct}%</div>
+                    <div className="text-[10px] text-muted-foreground">{storeStats.promoters}件</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-1">中立者</div>
+                    <div className="font-mono-data text-sm md:text-base font-bold text-[#B8922A]">{storeStats.passivePct}%</div>
+                    <div className="text-[10px] text-muted-foreground">{storeStats.passives}件</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-1">批判者</div>
+                    <div className="font-mono-data text-sm md:text-base font-bold text-[#C75C5C]">{storeStats.detractorPct}%</div>
+                    <div className="text-[10px] text-muted-foreground">{storeStats.detractors}件</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Score Distribution */}
+            <Card className="border-border/50 shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-foreground">スコア分布</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4">
+                <ResponsiveContainer width="100%" height={180}>
+                  <BarChart data={scoreDistribution} margin={{ top: 5, right: 5, bottom: 5, left: -20 }} style={{ cursor: "pointer" }} onClick={(state: any) => { if (state && state.activePayload && state.activePayload[0]) { const d = state.activePayload[0].payload; if (d.count > 0) setSelectedScore(d.score); } }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
+                    <XAxis dataKey="score" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} />
+                    <Tooltip
+                      contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e5e5" }}
+                      formatter={(value: number) => [`${value}件`, "回答数"]}
+                    />
+                    <Bar dataKey="count" radius={[4, 4, 0, 0]} cursor="pointer">
+                      {scoreDistribution.map((entry, idx) => (
+                        <Cell key={idx} fill={entry.fill} className="hover:opacity-80 transition-opacity" />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+                <p className="text-[10px] text-muted-foreground text-center mt-1">棒グラフをタップで該当アンケートを表示</p>
+              </CardContent>
+            </Card>
+
+            {/* Pie Chart */}
+            <Card className="border-border/50 shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-foreground">回答者構成</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4">
+                <ResponsiveContainer width="100%" height={180}>
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={40}
+                      outerRadius={70}
+                      paddingAngle={3}
+                      dataKey="value"
+                    >
+                      {pieData.map((entry, idx) => (
+                        <Cell key={idx} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e5e5" }}
+                      formatter={(value: number, name: string) => [`${value}件`, name]}
+                    />
+                    <Legend
+                      wrapperStyle={{ fontSize: 11 }}
+                      iconType="circle"
+                      iconSize={8}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          <Card className="border-border/50">
+            <CardContent className="p-8 text-center text-muted-foreground">
+              {activeMonth !== "all" ? "この期間のNPSデータはありません" : "NPSデータがありません"}
+            </CardContent>
+          </Card>
+        )}
+      </section>
+
+      {/* Score Detail Modal */}
+      <ScoreDetailModal
+        selectedScore={selectedScore}
+        onClose={() => setSelectedScore(null)}
+        records={storeRecords}
+      />
+
+      {/* ===== 3. 総合アドバイス ===== */}
+      {storeStats && storeRecords.length > 0 && (
+        <AdviceSection stats={storeStats} records={storeRecords} />
+      )}
+
+      {/* ===== 4. カテゴリ別評価 ===== */}
+      {storeRecords.length > 0 && (
+        <section className="mb-8">
+          <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+            <MessageSquare className="w-5 h-5 text-primary" />
+            カテゴリ別評価
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="border-border/50 shadow-sm">
+              <CardContent className="p-5">
+                <CategoryAnalysis records={storeRecords} field="priceComment" label="金額について" />
+              </CardContent>
+            </Card>
+            <Card className="border-border/50 shadow-sm">
+              <CardContent className="p-5">
+                <CategoryAnalysis records={storeRecords} field="spaceComment" label="空間について" />
+              </CardContent>
+            </Card>
+            <Card className="border-border/50 shadow-sm">
+              <CardContent className="p-5">
+                <CategoryAnalysis records={storeRecords} field="staffComment" label="スタッフについて" />
+              </CardContent>
+            </Card>
+            <Card className="border-border/50 shadow-sm">
+              <CardContent className="p-5">
+                <CategoryAnalysis records={storeRecords} field="finishComment" label="仕上がりについて" />
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+      )}
+
+      {/* ===== 5. トップ3レビュー（文章長め選定） ===== */}
+      {topReviews.length > 0 && (
+        <section className="mb-8 pt-6 border-t-2 border-[#2D9C8F]/20">
+          <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-[#2D9C8F]" />
+            超高感度レビュー
+            <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2">TOP {topReviews.length}</span>
+          </h2>
+          <div className="space-y-3">
+            {topReviews.map((record, i) => (
+              <ReviewCard key={`top-${i}`} record={record} index={i} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ===== 6. ワースト3レビュー（辛辣な文章選定） ===== */}
+      {worstReviews.length > 0 && (
+        <section className="mb-8 pt-6 border-t-2 border-[#C75C5C]/20">
+          <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-[#C75C5C]" />
+            ワーストレビュー
+            <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2">{worstReviews.length}件</span>
+          </h2>
+          <div className="space-y-3">
+            {worstReviews.map((record, i) => (
+              <ReviewCard key={`worst-${i}`} record={record} index={i} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ===== 他にも詳しく見る ===== */}
+      {remainingReviews.length > 0 && !showAllReviews && (
+        <button
+          onClick={() => setShowAllReviews(true)}
+          className="w-full py-3 rounded-xl border border-border/50 bg-card hover:bg-accent/30 transition-colors flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-8"
+        >
+          <Eye className="w-4 h-4" />
+          他にも詳しく見る（残り {remainingReviews.length}件）
+        </button>
+      )}
+
+      <AnimatePresence>
+        {showAllReviews && remainingReviews.length > 0 && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="overflow-hidden mb-8"
+          >
+            <section className="pt-6 border-t-2 border-primary/20">
+              <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+                <Star className="w-5 h-5 text-[#E5B85C]" />
+                全レビュー
+                <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2">{remainingReviews.length}件</span>
+              </h2>
+              <div className="space-y-3">
+                {remainingReviews.map((record, i) => (
+                  <ReviewCard key={`rest-${i}`} record={record} index={i} />
+                ))}
+              </div>
+              <button
+                onClick={() => setShowAllReviews(false)}
+                className="w-full mt-4 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                閉じる
+              </button>
+            </section>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* NPS回答なし */}
+      {!loading && storeRecords.length === 0 && !hasFankuruData && (
+        <div className="text-center py-12 text-muted-foreground mb-8">
+          <MessageSquare className="w-8 h-8 mx-auto mb-3 opacity-30" />
+          <p className="text-sm">この月のアンケートデータはありません</p>
+        </div>
+      )}
+
+      {/* 店舗詳細リンク */}
+      {!loading && (
+        <div className="flex justify-center pt-2 pb-4">
+          <Link
+            href={`/store/${encodeURIComponent(storeId)}`}
+            className="text-sm text-primary hover:underline flex items-center gap-1"
+          >
+            {storeId}の店舗詳細を見る <ExternalLink className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+      )}
     </DashboardLayout>
   );
 }
