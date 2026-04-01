@@ -30,6 +30,17 @@ const COL = {
   PHOTO_URL_2: 20,
 } as const;
 
+// テストデータ除外: 2026-04-01以前の回答を除外
+const DATA_START_DATE = "2026-04-01";
+
+function isAfterStartDate(answerDateStr: string): boolean {
+  if (!answerDateStr) return false;
+  // "2026-03-31 11:41:04 pm" → "2026-03-31" を抽出
+  const dateMatch = answerDateStr.trim().match(/(\d{4}-\d{2}-\d{2})/);
+  if (!dateMatch) return false;
+  return dateMatch[1] >= DATA_START_DATE;
+}
+
 // 店舗名の正規化マッピング
 const STORE_NAME_MAP: Record<string, string> = {
   "大阪堀江院": "堀江院",
@@ -196,7 +207,9 @@ export function useMonthlyReport() {
         // ヘッダー行をスキップ
         const dataRows = rows.slice(1).filter((r) => r.length >= 16 && r[COL.STORE]?.trim());
 
-        const reports: StaffReport[] = dataRows.map((r) => {
+        const reports: StaffReport[] = dataRows
+          .filter((r) => isAfterStartDate(r[COL.ANSWER_DATE] || ""))
+          .map((r) => {
           const techSales = parseNumber(r[COL.TECH_SALES] || "");
           const retailSales = parseNumber(r[COL.RETAIL_SALES] || "");
           const totalSales = techSales + retailSales;
