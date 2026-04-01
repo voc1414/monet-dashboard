@@ -1,7 +1,8 @@
 /**
  * Design: monet Brand Identity — 水彩ブルー × コンクリートモダン
- * Page: 店舗別アンケート詳細（NPS・ファンくる結果を同一ページに表示）
+ * Page: 店舗別アンケート詳細（ファンくる → NPS の順で同一ページに表示）
  * UI: Home.tsxの店舗一覧と統一したスタイル
+ * NPSレビュー: 超高感度3件 → ワースト3件 → 「他にも詳しく見る」で全件展開
  */
 import { useState, useMemo } from "react";
 import { useParams } from "wouter";
@@ -9,7 +10,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   BarChart3, Calendar, ThumbsUp, Minus, ThumbsDown,
   Star, MessageSquare, Quote, FileText, ExternalLink,
-  ChevronDown, MapPin, ArrowLeft, Users
+  ChevronDown, ArrowLeft, Users, Sparkles, AlertTriangle, Eye
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -47,17 +48,13 @@ function getScoreBg(score: number): string {
   return "bg-red-50 border-red-200/50";
 }
 
-// NPS回答カード
+// NPS回答カード（コンパクト版）
 function NpsResponseCard({ record }: { record: NpsRecord }) {
   const [expanded, setExpanded] = useState(false);
   const hasComments = record.priceComment || record.spaceComment || record.staffComment || record.finishComment;
-  const hasReview = record.review;
 
   return (
-    <motion.div
-      layout
-      className={`border rounded-xl p-4 transition-all ${getScoreBg(record.npsScore)}`}
-    >
+    <div className={`border rounded-xl p-4 transition-all ${getScoreBg(record.npsScore)}`}>
       {/* ヘッダー行 */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -94,7 +91,7 @@ function NpsResponseCard({ record }: { record: NpsRecord }) {
             </div>
           </div>
         </div>
-        {(hasComments || hasReview) && (
+        {hasComments && (
           <button
             onClick={() => setExpanded(!expanded)}
             className="text-muted-foreground hover:text-foreground transition-colors p-1"
@@ -105,7 +102,7 @@ function NpsResponseCard({ record }: { record: NpsRecord }) {
       </div>
 
       {/* レビューコメント（常に表示） */}
-      {hasReview && (
+      {record.review && (
         <div className="mt-3 pl-7">
           <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{record.review}</p>
         </div>
@@ -150,7 +147,7 @@ function NpsResponseCard({ record }: { record: NpsRecord }) {
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </div>
   );
 }
 
@@ -297,17 +294,36 @@ export default function SurveyDetail() {
       .map(r => ({ staffName: r.name, comment: r.fankuruComment }));
   }, [rawData, activeMonth, storeName]);
 
-  // NPS分類別フィルタ
-  const [npsFilter, setNpsFilter] = useState<"all" | "promoter" | "passive" | "detractor">("all");
-  const displayedNps = useMemo(() => {
-    if (npsFilter === "all") return filteredNps;
-    if (npsFilter === "promoter") return filteredNps.filter(r => r.npsScore >= 9);
-    if (npsFilter === "passive") return filteredNps.filter(r => r.npsScore >= 7 && r.npsScore <= 8);
-    return filteredNps.filter(r => r.npsScore <= 6);
-  }, [filteredNps, npsFilter]);
-
   const npsClass = npsStats ? getNpsClass(npsStats.npsScore) : null;
   const hasFankuruData = filteredFankuruPdfs.length > 0 || filteredFankuruComments.length > 0;
+
+  // === NPSレビューのコンパクト表示ロジック ===
+  // 超高感度レビュー（スコア10のみ、レビューあり）→ スコア降順
+  const topReviews = useMemo(() => {
+    return filteredNps
+      .filter(r => r.npsScore >= 9 && r.review && r.review.trim() !== "")
+      .sort((a, b) => b.npsScore - a.npsScore || b.date.localeCompare(a.date))
+      .slice(0, 3);
+  }, [filteredNps]);
+
+  // ワーストレビュー（スコア8以下、レビューあり）→ スコア昇順
+  const worstReviews = useMemo(() => {
+    return filteredNps
+      .filter(r => r.npsScore <= 8 && r.review && r.review.trim() !== "")
+      .sort((a, b) => a.npsScore - b.npsScore || b.date.localeCompare(a.date))
+      .slice(0, 3);
+  }, [filteredNps]);
+
+  // 「他にも詳しく見る」展開用
+  const [showAllNps, setShowAllNps] = useState(false);
+
+  // 残りのレビュー（トップ3・ワースト3以外）
+  const remainingReviews = useMemo(() => {
+    const topIds = new Set(topReviews.map((_, i) => `top-${i}`));
+    const worstIds = new Set(worstReviews.map((_, i) => `worst-${i}`));
+    const shownRecords = new Set([...topReviews, ...worstReviews]);
+    return filteredNps.filter(r => !shownRecords.has(r));
+  }, [filteredNps, topReviews, worstReviews]);
 
   const breadcrumbs = [
     { label: "ホーム", href: "/" },
@@ -323,7 +339,7 @@ export default function SurveyDetail() {
       loading={loading}
     >
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-        {/* ヘッダー（Home.tsxの店舗カードと同じスタイル） */}
+        {/* ヘッダー */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
             <Link
@@ -344,7 +360,7 @@ export default function SurveyDetail() {
               <div>
                 <h1 className="text-xl font-bold text-foreground">{storeName}</h1>
                 <p className="text-sm text-muted-foreground">
-                  NPS・ファンくる調査結果
+                  顧客アンケート
                   {monthLabel && <span className="ml-1">（{monthLabel}）</span>}
                 </p>
               </div>
@@ -377,121 +393,8 @@ export default function SurveyDetail() {
 
         {!loading && (
           <div className="space-y-8">
-            {/* ===== NPSセクション ===== */}
-            <section>
-              <div className="flex items-center gap-2 mb-4">
-                <BarChart3 className="w-5 h-5 text-primary" />
-                <h2 className="font-bold text-base text-foreground">NPS</h2>
-                {npsStats && (
-                  <span className="text-xs text-muted-foreground">（{npsStats.total}件）</span>
-                )}
-              </div>
 
-              {/* NPSサマリー — Home.tsxの店舗カードと同じスタイル */}
-              {npsStats && npsClass && (
-                <Card className="border-border/50 shadow-sm mb-4">
-                  <CardContent className="p-5">
-                    <div className="flex flex-col md:flex-row md:items-center gap-6">
-                      {/* NPSスコア（大きく表示） */}
-                      <div className="flex items-center gap-4">
-                        <div>
-                          <div className="text-xs text-muted-foreground mb-1">NPSスコア</div>
-                          <div className="font-mono text-4xl font-bold" style={{ color: npsClass.color }}>
-                            {npsStats.npsScore > 0 ? "+" : ""}{npsStats.npsScore}
-                          </div>
-                          <span
-                            className="text-xs font-semibold px-2 py-0.5 rounded-full mt-1 inline-block"
-                            style={{ backgroundColor: `${npsClass.color}15`, color: npsClass.color }}
-                          >
-                            {npsClass.label}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* 内訳 */}
-                      <div className="flex-1">
-                        <div className="grid grid-cols-4 gap-4 mb-3">
-                          <div>
-                            <div className="text-[10px] text-muted-foreground mb-0.5">平均スコア</div>
-                            <div className="font-mono text-xl font-bold text-foreground">{npsStats.avgScore}</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-1">
-                              <ThumbsUp className="w-3 h-3 text-emerald-600" /> 推奨者
-                            </div>
-                            <div className="font-mono text-xl font-bold text-emerald-600">{npsStats.promoters}</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-1">
-                              <Minus className="w-3 h-3 text-amber-500" /> 中立者
-                            </div>
-                            <div className="font-mono text-xl font-bold text-amber-500">{npsStats.passives}</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-1">
-                              <ThumbsDown className="w-3 h-3 text-red-500" /> 批判者
-                            </div>
-                            <div className="font-mono text-xl font-bold text-red-500">{npsStats.detractors}</div>
-                          </div>
-                        </div>
-                        {/* 分布バー */}
-                        <NpsDistributionBar
-                          promoterPct={npsStats.promoterPct}
-                          passivePct={npsStats.passivePct}
-                          detractorPct={npsStats.detractorPct}
-                        />
-                        <div className="flex justify-between mt-1 text-[10px] text-muted-foreground">
-                          <span>{npsStats.promoterPct}%</span>
-                          <span>{npsStats.passivePct}%</span>
-                          <span>{npsStats.detractorPct}%</span>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* フィルタボタン */}
-              {filteredNps.length > 0 && (
-                <div className="flex items-center gap-2 flex-wrap mb-4">
-                  <span className="text-xs text-muted-foreground">フィルタ:</span>
-                  {[
-                    { key: "all" as const, label: "すべて", count: filteredNps.length },
-                    { key: "promoter" as const, label: "推奨者", count: filteredNps.filter(r => r.npsScore >= 9).length },
-                    { key: "passive" as const, label: "中立者", count: filteredNps.filter(r => r.npsScore >= 7 && r.npsScore <= 8).length },
-                    { key: "detractor" as const, label: "批判者", count: filteredNps.filter(r => r.npsScore <= 6).length },
-                  ].map(f => (
-                    <button
-                      key={f.key}
-                      onClick={() => setNpsFilter(f.key)}
-                      className={`text-xs px-3 py-1.5 rounded-full border transition-all ${
-                        npsFilter === f.key
-                          ? "bg-primary text-white border-primary"
-                          : "bg-card border-border/50 hover:border-primary/30"
-                      }`}
-                    >
-                      {f.label} ({f.count})
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* NPS回答一覧 */}
-              <div className="space-y-3">
-                {displayedNps.map((record, i) => (
-                  <NpsResponseCard key={i} record={record} />
-                ))}
-              </div>
-
-              {filteredNps.length === 0 && (
-                <div className="text-center py-12 text-muted-foreground">
-                  <MessageSquare className="w-8 h-8 mx-auto mb-3 opacity-30" />
-                  <p className="text-sm">この月のNPS回答はありません</p>
-                </div>
-              )}
-            </section>
-
-            {/* ===== ファンくるセクション ===== */}
+            {/* ===== ファンくるセクション（一番上） ===== */}
             <section>
               <div className="flex items-center gap-2 mb-4">
                 <Star className="w-5 h-5 text-amber-500" />
@@ -543,6 +446,168 @@ export default function SurveyDetail() {
                       : "この店舗のファンくるフォルダは未設定です"
                     }
                   </p>
+                </div>
+              )}
+            </section>
+
+            {/* ===== NPSセクション ===== */}
+            <section>
+              <div className="flex items-center gap-2 mb-4">
+                <BarChart3 className="w-5 h-5 text-primary" />
+                <h2 className="font-bold text-base text-foreground">NPS</h2>
+                {npsStats && (
+                  <span className="text-xs text-muted-foreground">（{npsStats.total}件）</span>
+                )}
+              </div>
+
+              {/* NPSサマリー */}
+              {npsStats && npsClass && (
+                <Card className="border-border/50 shadow-sm mb-6">
+                  <CardContent className="p-5">
+                    <div className="flex flex-col md:flex-row md:items-center gap-6">
+                      <div className="flex items-center gap-4">
+                        <div>
+                          <div className="text-xs text-muted-foreground mb-1">NPSスコア</div>
+                          <div className="font-mono text-4xl font-bold" style={{ color: npsClass.color }}>
+                            {npsStats.npsScore > 0 ? "+" : ""}{npsStats.npsScore}
+                          </div>
+                          <span
+                            className="text-xs font-semibold px-2 py-0.5 rounded-full mt-1 inline-block"
+                            style={{ backgroundColor: `${npsClass.color}15`, color: npsClass.color }}
+                          >
+                            {npsClass.label}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <div className="grid grid-cols-4 gap-4 mb-3">
+                          <div>
+                            <div className="text-[10px] text-muted-foreground mb-0.5">平均スコア</div>
+                            <div className="font-mono text-xl font-bold text-foreground">{npsStats.avgScore}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-1">
+                              <ThumbsUp className="w-3 h-3 text-emerald-600" /> 推奨者
+                            </div>
+                            <div className="font-mono text-xl font-bold text-emerald-600">{npsStats.promoters}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-1">
+                              <Minus className="w-3 h-3 text-amber-500" /> 中立者
+                            </div>
+                            <div className="font-mono text-xl font-bold text-amber-500">{npsStats.passives}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-1">
+                              <ThumbsDown className="w-3 h-3 text-red-500" /> 批判者
+                            </div>
+                            <div className="font-mono text-xl font-bold text-red-500">{npsStats.detractors}</div>
+                          </div>
+                        </div>
+                        <NpsDistributionBar
+                          promoterPct={npsStats.promoterPct}
+                          passivePct={npsStats.passivePct}
+                          detractorPct={npsStats.detractorPct}
+                        />
+                        <div className="flex justify-between mt-1 text-[10px] text-muted-foreground">
+                          <span>{npsStats.promoterPct}%</span>
+                          <span>{npsStats.passivePct}%</span>
+                          <span>{npsStats.detractorPct}%</span>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* 超高感度レビュー TOP 3 */}
+              {topReviews.length > 0 && (
+                <div className="mb-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Sparkles className="w-4 h-4 text-emerald-500" />
+                    <h3 className="text-sm font-semibold text-foreground">超高感度レビュー</h3>
+                    <span className="text-xs text-muted-foreground">TOP {topReviews.length}</span>
+                  </div>
+                  <div className="space-y-3">
+                    {topReviews.map((record, i) => (
+                      <NpsResponseCard key={`top-${i}`} record={record} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ワーストレビュー 3 */}
+              {worstReviews.length > 0 && (
+                <div className="mb-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <AlertTriangle className="w-4 h-4 text-red-400" />
+                    <h3 className="text-sm font-semibold text-foreground">ワーストレビュー</h3>
+                    <span className="text-xs text-muted-foreground">{worstReviews.length}件</span>
+                  </div>
+                  <div className="space-y-3">
+                    {worstReviews.map((record, i) => (
+                      <NpsResponseCard key={`worst-${i}`} record={record} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 他にも詳しく見る */}
+              {remainingReviews.length > 0 && !showAllNps && (
+                <button
+                  onClick={() => setShowAllNps(true)}
+                  className="w-full py-3 rounded-xl border border-border/50 bg-card hover:bg-accent/30 transition-colors flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+                >
+                  <Eye className="w-4 h-4" />
+                  他にも詳しく見る（残り {remainingReviews.length}件）
+                </button>
+              )}
+
+              {/* 全件展開 */}
+              <AnimatePresence>
+                {showAllNps && remainingReviews.length > 0 && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="mb-3 mt-5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <MessageSquare className="w-4 h-4 text-primary" />
+                        <h3 className="text-sm font-semibold text-foreground">全レビュー</h3>
+                        <span className="text-xs text-muted-foreground">{remainingReviews.length}件</span>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      {remainingReviews.map((record, i) => (
+                        <NpsResponseCard key={`rest-${i}`} record={record} />
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => setShowAllNps(false)}
+                      className="w-full mt-4 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      閉じる
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* NPS回答なし */}
+              {filteredNps.length === 0 && (
+                <div className="text-center py-12 text-muted-foreground">
+                  <MessageSquare className="w-8 h-8 mx-auto mb-3 opacity-30" />
+                  <p className="text-sm">この月のNPS回答はありません</p>
+                </div>
+              )}
+
+              {/* レビューなし（回答はあるがレビューテキストがない場合） */}
+              {filteredNps.length > 0 && topReviews.length === 0 && worstReviews.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground bg-card border border-border/50 rounded-xl">
+                  <MessageSquare className="w-8 h-8 mx-auto mb-3 opacity-30" />
+                  <p className="text-sm">レビューコメントのある回答はありません</p>
                 </div>
               )}
             </section>
