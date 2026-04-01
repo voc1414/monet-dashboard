@@ -80,7 +80,7 @@ export default function DashboardLayout({
             <Link href="/survey">
               <span
                 className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary ${
-                  location === "/survey" ? "text-foreground" : "text-muted-foreground"
+                  location.startsWith("/survey") ? "text-foreground" : "text-muted-foreground"
                 }`}
               >
                 <ClipboardList className="w-4 h-4" />
@@ -169,7 +169,7 @@ export default function DashboardLayout({
           </Link>
           <Link href="/survey">
             <div className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-colors ${
-              location === "/survey" ? "text-primary" : "text-muted-foreground"
+              location.startsWith("/survey") ? "text-primary" : "text-muted-foreground"
             }`}>
               <ClipboardList className="w-5 h-5" />
               <span className="text-[10px] font-medium">アンケート</span>
