@@ -237,7 +237,7 @@ export default function StaffList() {
                         <div className="hidden md:grid grid-cols-12 gap-4 items-center">
                           <div className="col-span-3 flex items-center gap-3">
                             {staff.photoUrl2 ? (
-                              <img src={staff.photoUrl2} alt={staff.name} className="w-9 h-9 rounded-full object-cover object-top shrink-0" />
+                              <img src={staff.photoUrl2} alt={staff.name} className="w-9 h-9 rounded-full object-cover object-center shrink-0" />
                             ) : (
                               <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                                 <span className="text-primary font-bold text-sm">{staff.name.charAt(0)}</span>
@@ -279,7 +279,7 @@ export default function StaffList() {
                         <div className="md:hidden">
                           <div className="flex items-center gap-3">
                             {staff.photoUrl2 ? (
-                              <img src={staff.photoUrl2} alt={staff.name} className="w-8 h-8 rounded-full object-cover object-top shrink-0" />
+                              <img src={staff.photoUrl2} alt={staff.name} className="w-8 h-8 rounded-full object-cover object-center shrink-0" />
                             ) : (
                               <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                                 <span className="text-primary font-bold text-xs">{staff.name.charAt(0)}</span>
