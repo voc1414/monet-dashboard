@@ -1,7 +1,7 @@
 /**
- * Design: Atelier Blanc — クリーンアトリエ
- * Page: 店舗別アンケート詳細（NPS・ファンくる結果）
- * Colors: Warm white base, monet water-blue accent, teal for NPS
+ * Design: monet Brand Identity — 水彩ブルー × コンクリートモダン
+ * Page: 店舗別アンケート詳細（NPS・ファンくる結果を同一ページに表示）
+ * UI: Home.tsxの店舗一覧と統一したスタイル
  */
 import { useState, useMemo } from "react";
 import { useParams } from "wouter";
@@ -14,7 +14,6 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { useNpsData, filterByMonth, getAvailableMonths } from "@/hooks/useNpsData";
@@ -48,7 +47,7 @@ function getScoreBg(score: number): string {
   return "bg-red-50 border-red-200/50";
 }
 
-// NPS回答カード（大きめ、見やすく）
+// NPS回答カード
 function NpsResponseCard({ record }: { record: NpsRecord }) {
   const [expanded, setExpanded] = useState(false);
   const hasComments = record.priceComment || record.spaceComment || record.staffComment || record.finishComment;
@@ -125,25 +124,25 @@ function NpsResponseCard({ record }: { record: NpsRecord }) {
             <div className="mt-3 pl-7 grid grid-cols-1 sm:grid-cols-2 gap-2">
               {record.priceComment && (
                 <div className="bg-white/60 rounded-lg p-2.5">
-                  <span className="text-xs font-semibold text-muted-foreground">💰 価格</span>
+                  <span className="text-xs font-semibold text-muted-foreground">価格</span>
                   <p className="text-sm text-foreground/80 mt-0.5">{record.priceComment}</p>
                 </div>
               )}
               {record.spaceComment && (
                 <div className="bg-white/60 rounded-lg p-2.5">
-                  <span className="text-xs font-semibold text-muted-foreground">🏠 空間</span>
+                  <span className="text-xs font-semibold text-muted-foreground">空間</span>
                   <p className="text-sm text-foreground/80 mt-0.5">{record.spaceComment}</p>
                 </div>
               )}
               {record.staffComment && (
                 <div className="bg-white/60 rounded-lg p-2.5">
-                  <span className="text-xs font-semibold text-muted-foreground">👤 接客</span>
+                  <span className="text-xs font-semibold text-muted-foreground">接客</span>
                   <p className="text-sm text-foreground/80 mt-0.5">{record.staffComment}</p>
                 </div>
               )}
               {record.finishComment && (
                 <div className="bg-white/60 rounded-lg p-2.5">
-                  <span className="text-xs font-semibold text-muted-foreground">✨ 仕上がり</span>
+                  <span className="text-xs font-semibold text-muted-foreground">仕上がり</span>
                   <p className="text-sm text-foreground/80 mt-0.5">{record.finishComment}</p>
                 </div>
               )}
@@ -177,23 +176,21 @@ function FankuruPdfCard({ pdf }: { pdf: { displayName: string; stylist: string; 
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <a
-            href={pdf.viewUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-amber-700 hover:text-amber-900 flex items-center gap-1 px-2 py-1 rounded-md hover:bg-amber-100 transition-colors"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            開く
-          </a>
-        </div>
+        <a
+          href={pdf.viewUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-amber-700 hover:text-amber-900 flex items-center gap-1 px-2 py-1 rounded-md hover:bg-amber-100 transition-colors"
+        >
+          <ExternalLink className="w-3.5 h-3.5" />
+          開く
+        </a>
       </div>
     </div>
   );
 }
 
-// ファンくるコメントカード（月末報告書から）
+// ファンくるコメントカード
 function FankuruCommentCard({ staffName, comment }: { staffName: string; comment: string }) {
   if (!comment || comment.trim() === "" || comment.trim() === "なし") return null;
   return (
@@ -208,6 +205,17 @@ function FankuruCommentCard({ staffName, comment }: { staffName: string; comment
           <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{comment}</p>
         </div>
       </div>
+    </div>
+  );
+}
+
+// NPS分布バー（Home.tsxと同じスタイル）
+function NpsDistributionBar({ promoterPct, passivePct, detractorPct }: { promoterPct: number; passivePct: number; detractorPct: number }) {
+  return (
+    <div className="flex gap-0.5 h-2 rounded-full overflow-hidden w-full">
+      <div className="bg-[#2D9C8F] rounded-l-full" style={{ width: `${Math.max(promoterPct, 2)}%` }} />
+      <div className="bg-[#E5B85C]" style={{ width: `${Math.max(passivePct, 2)}%` }} />
+      <div className="bg-[#C75C5C] rounded-r-full" style={{ width: `${Math.max(detractorPct, 2)}%` }} />
     </div>
   );
 }
@@ -269,7 +277,10 @@ export default function SurveyDetail() {
     const detractors = filteredNps.filter(r => r.npsScore <= 6).length;
     const npsScore = Math.round(((promoters - detractors) / total) * 100);
     const avgScore = Math.round(filteredNps.reduce((s, r) => s + r.npsScore, 0) / total * 10) / 10;
-    return { total, promoters, passives, detractors, npsScore, avgScore };
+    const promoterPct = Math.round((promoters / total) * 100);
+    const passivePct = Math.round((passives / total) * 100);
+    const detractorPct = Math.round((detractors / total) * 100);
+    return { total, promoters, passives, detractors, npsScore, avgScore, promoterPct, passivePct, detractorPct };
   }, [filteredNps]);
 
   // ファンくるPDF: 月でフィルタ
@@ -278,7 +289,7 @@ export default function SurveyDetail() {
     return fankuruPdfs.filter(p => p.yearMonth === activeMonth);
   }, [fankuruPdfs, activeMonth]);
 
-  // ファンくるコメント（月末報告書から）: 月+店舗でフィルタ
+  // ファンくるコメント（月末報告書から）
   const filteredFankuruComments = useMemo(() => {
     return rawData
       .filter(r => r.storeNormalized === storeName && r.reportMonth === activeMonth)
@@ -312,7 +323,7 @@ export default function SurveyDetail() {
       loading={loading}
     >
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-        {/* ヘッダー */}
+        {/* ヘッダー（Home.tsxの店舗カードと同じスタイル） */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
             <Link
@@ -322,14 +333,22 @@ export default function SurveyDetail() {
               <ArrowLeft className="w-3 h-3" />
               アンケート一覧に戻る
             </Link>
-            <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-              <MapPin className="w-5 h-5 text-primary" />
-              {storeName}
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              NPS・ファンくる調査結果
-              {monthLabel && <span className="ml-1">（{monthLabel}）</span>}
-            </p>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0">
+                <img
+                  src="https://d2xsxph8kpxj0f.cloudfront.net/310519663489426081/aLPZvLfFDC4rFYToBquZNR/monet-parasol_bfd1d990.jpg"
+                  alt="monet"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-foreground">{storeName}</h1>
+                <p className="text-sm text-muted-foreground">
+                  NPS・ファンくる調査結果
+                  {monthLabel && <span className="ml-1">（{monthLabel}）</span>}
+                </p>
+              </div>
+            </div>
           </div>
           <Select value={activeMonth} onValueChange={setSelectedMonth}>
             <SelectTrigger className="w-[160px]">
@@ -357,68 +376,75 @@ export default function SurveyDetail() {
         )}
 
         {!loading && (
-          <Tabs defaultValue="nps" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="nps" className="flex items-center gap-2">
-                <BarChart3 className="w-4 h-4" />
-                NPS
+          <div className="space-y-8">
+            {/* ===== NPSセクション ===== */}
+            <section>
+              <div className="flex items-center gap-2 mb-4">
+                <BarChart3 className="w-5 h-5 text-primary" />
+                <h2 className="font-bold text-base text-foreground">NPS</h2>
                 {npsStats && (
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-1">
-                    {npsStats.total}件
-                  </Badge>
+                  <span className="text-xs text-muted-foreground">（{npsStats.total}件）</span>
                 )}
-              </TabsTrigger>
-              <TabsTrigger value="fankuru" className="flex items-center gap-2">
-                <Star className="w-4 h-4" />
-                ファンくる
-                {(filteredFankuruPdfs.length > 0 || filteredFankuruComments.length > 0) && (
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-1">
-                    {filteredFankuruPdfs.length + filteredFankuruComments.length}件
-                  </Badge>
-                )}
-              </TabsTrigger>
-            </TabsList>
+              </div>
 
-            {/* ===== NPS タブ ===== */}
-            <TabsContent value="nps" className="space-y-4">
-              {/* NPSサマリー */}
+              {/* NPSサマリー — Home.tsxの店舗カードと同じスタイル */}
               {npsStats && npsClass && (
-                <Card className="border-border/50 shadow-sm">
+                <Card className="border-border/50 shadow-sm mb-4">
                   <CardContent className="p-5">
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-                      <div className="col-span-2 sm:col-span-1">
-                        <div className="text-xs text-muted-foreground mb-1">NPSスコア</div>
-                        <div className="font-mono text-3xl font-bold" style={{ color: npsClass.color }}>
-                          {npsStats.npsScore > 0 ? "+" : ""}{npsStats.npsScore}
+                    <div className="flex flex-col md:flex-row md:items-center gap-6">
+                      {/* NPSスコア（大きく表示） */}
+                      <div className="flex items-center gap-4">
+                        <div>
+                          <div className="text-xs text-muted-foreground mb-1">NPSスコア</div>
+                          <div className="font-mono text-4xl font-bold" style={{ color: npsClass.color }}>
+                            {npsStats.npsScore > 0 ? "+" : ""}{npsStats.npsScore}
+                          </div>
+                          <span
+                            className="text-xs font-semibold px-2 py-0.5 rounded-full mt-1 inline-block"
+                            style={{ backgroundColor: `${npsClass.color}15`, color: npsClass.color }}
+                          >
+                            {npsClass.label}
+                          </span>
                         </div>
-                        <span
-                          className="text-xs font-semibold px-2 py-0.5 rounded-full mt-1 inline-block"
-                          style={{ backgroundColor: `${npsClass.color}15`, color: npsClass.color }}
-                        >
-                          {npsClass.label}
-                        </span>
                       </div>
-                      <div>
-                        <div className="text-xs text-muted-foreground mb-1">平均スコア</div>
-                        <div className="font-mono text-2xl font-bold text-foreground">{npsStats.avgScore}</div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                          <ThumbsUp className="w-3 h-3 text-emerald-600" /> 推奨者
+
+                      {/* 内訳 */}
+                      <div className="flex-1">
+                        <div className="grid grid-cols-4 gap-4 mb-3">
+                          <div>
+                            <div className="text-[10px] text-muted-foreground mb-0.5">平均スコア</div>
+                            <div className="font-mono text-xl font-bold text-foreground">{npsStats.avgScore}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-1">
+                              <ThumbsUp className="w-3 h-3 text-emerald-600" /> 推奨者
+                            </div>
+                            <div className="font-mono text-xl font-bold text-emerald-600">{npsStats.promoters}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-1">
+                              <Minus className="w-3 h-3 text-amber-500" /> 中立者
+                            </div>
+                            <div className="font-mono text-xl font-bold text-amber-500">{npsStats.passives}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-1">
+                              <ThumbsDown className="w-3 h-3 text-red-500" /> 批判者
+                            </div>
+                            <div className="font-mono text-xl font-bold text-red-500">{npsStats.detractors}</div>
+                          </div>
                         </div>
-                        <div className="font-mono text-2xl font-bold text-emerald-600">{npsStats.promoters}</div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                          <Minus className="w-3 h-3 text-amber-500" /> 中立者
+                        {/* 分布バー */}
+                        <NpsDistributionBar
+                          promoterPct={npsStats.promoterPct}
+                          passivePct={npsStats.passivePct}
+                          detractorPct={npsStats.detractorPct}
+                        />
+                        <div className="flex justify-between mt-1 text-[10px] text-muted-foreground">
+                          <span>{npsStats.promoterPct}%</span>
+                          <span>{npsStats.passivePct}%</span>
+                          <span>{npsStats.detractorPct}%</span>
                         </div>
-                        <div className="font-mono text-2xl font-bold text-amber-500">{npsStats.passives}</div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                          <ThumbsDown className="w-3 h-3 text-red-500" /> 批判者
-                        </div>
-                        <div className="font-mono text-2xl font-bold text-red-500">{npsStats.detractors}</div>
                       </div>
                     </div>
                   </CardContent>
@@ -427,13 +453,13 @@ export default function SurveyDetail() {
 
               {/* フィルタボタン */}
               {filteredNps.length > 0 && (
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap mb-4">
                   <span className="text-xs text-muted-foreground">フィルタ:</span>
                   {[
                     { key: "all" as const, label: "すべて", count: filteredNps.length },
-                    { key: "promoter" as const, label: "推奨者", count: filteredNps.filter(r => r.npsScore >= 9).length, color: "text-emerald-600" },
-                    { key: "passive" as const, label: "中立者", count: filteredNps.filter(r => r.npsScore >= 7 && r.npsScore <= 8).length, color: "text-amber-600" },
-                    { key: "detractor" as const, label: "批判者", count: filteredNps.filter(r => r.npsScore <= 6).length, color: "text-red-600" },
+                    { key: "promoter" as const, label: "推奨者", count: filteredNps.filter(r => r.npsScore >= 9).length },
+                    { key: "passive" as const, label: "中立者", count: filteredNps.filter(r => r.npsScore >= 7 && r.npsScore <= 8).length },
+                    { key: "detractor" as const, label: "批判者", count: filteredNps.filter(r => r.npsScore <= 6).length },
                   ].map(f => (
                     <button
                       key={f.key}
@@ -463,13 +489,23 @@ export default function SurveyDetail() {
                   <p className="text-sm">この月のNPS回答はありません</p>
                 </div>
               )}
-            </TabsContent>
+            </section>
 
-            {/* ===== ファンくる タブ ===== */}
-            <TabsContent value="fankuru" className="space-y-4">
+            {/* ===== ファンくるセクション ===== */}
+            <section>
+              <div className="flex items-center gap-2 mb-4">
+                <Star className="w-5 h-5 text-amber-500" />
+                <h2 className="font-bold text-base text-foreground">ファンくる</h2>
+                {(filteredFankuruPdfs.length > 0 || filteredFankuruComments.length > 0) && (
+                  <span className="text-xs text-muted-foreground">
+                    （{filteredFankuruPdfs.length + filteredFankuruComments.length}件）
+                  </span>
+                )}
+              </div>
+
               {/* ファンくるPDFレポート */}
               {filteredFankuruPdfs.length > 0 && (
-                <div>
+                <div className="mb-4">
                   <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                     <FileText className="w-4 h-4 text-amber-600" />
                     調査レポート（{filteredFankuruPdfs.length}件）
@@ -484,7 +520,7 @@ export default function SurveyDetail() {
 
               {/* ファンくるコメント（月末報告書から） */}
               {filteredFankuruComments.length > 0 && (
-                <div>
+                <div className="mb-4">
                   <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                     <Quote className="w-4 h-4 text-amber-600" />
                     ファンくるコメント（{filteredFankuruComments.length}件）
@@ -499,7 +535,7 @@ export default function SurveyDetail() {
 
               {/* データなし */}
               {!hasFankuruData && (
-                <div className="text-center py-12 text-muted-foreground">
+                <div className="text-center py-8 text-muted-foreground bg-card border border-border/50 rounded-xl">
                   <Star className="w-8 h-8 mx-auto mb-3 opacity-30" />
                   <p className="text-sm">
                     {hasFolderMapping
@@ -509,13 +545,13 @@ export default function SurveyDetail() {
                   </p>
                 </div>
               )}
-            </TabsContent>
-          </Tabs>
+            </section>
+          </div>
         )}
 
         {/* 店舗詳細リンク */}
         {!loading && (
-          <div className="flex justify-center pt-2">
+          <div className="flex justify-center pt-2 pb-4">
             <Link
               href={`/store/${encodeURIComponent(storeName)}`}
               className="text-sm text-primary hover:underline flex items-center gap-1"
