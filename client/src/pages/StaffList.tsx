@@ -17,6 +17,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { useNpsData, filterByMonth } from "@/hooks/useNpsData";
 import type { StaffReport } from "@/hooks/useMonthlyReport";
+import { isNewStaff, isNewStore } from "@/lib/newBadge";
 
 const formatCurrency = (n: number) => {
   if (n === 0) return "—";
@@ -244,6 +245,9 @@ export default function StaffList() {
                               </div>
                             )}
                             <span className="font-bold text-sm text-foreground hover:text-primary transition-colors">{staff.name}</span>
+                            {isNewStaff(staff.name, staff.storeNormalized) && (
+                              <span className="text-[10px] font-black text-red-500 tracking-tight leading-none">＼ NEW ／</span>
+                            )}
                             {isExpanded ? (
                               <ChevronUp className="w-4 h-4 text-muted-foreground" />
                             ) : (
@@ -289,6 +293,9 @@ export default function StaffList() {
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-1.5">
                                   <span className="font-bold text-sm text-foreground">{staff.name}</span>
+                                  {isNewStaff(staff.name, staff.storeNormalized) && (
+                                    <span className="text-[9px] font-black text-red-500 tracking-tight leading-none">＼ NEW ／</span>
+                                  )}
                                   <span className="text-[10px] text-muted-foreground">({staff.employmentType})</span>
                                   {isExpanded ? <ChevronUp className="w-3 h-3 text-muted-foreground" /> : <ChevronDown className="w-3 h-3 text-muted-foreground" />}
                                 </div>

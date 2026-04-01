@@ -22,6 +22,7 @@ import type { NpsRecord, StoreStats } from "@/hooks/useNpsData";
 import { generateStoreAdvice } from "@/lib/npsAdvice";
 import type { NpsAdvice } from "@/lib/npsAdvice";
 import { getNpsClass, NPS_INDUSTRY_AVERAGE, getAllNpsClasses } from "@/lib/npsClass";
+import { isNewStore } from "@/lib/newBadge";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line, AreaChart, Area
@@ -398,7 +399,15 @@ export default function NpsOverview() {
           <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-1">
             NPS調査結果
           </h1>
-          <p className="text-sm text-muted-foreground">{storeId} — 顧客満足度調査の詳細分析</p>
+          <p className="text-sm text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5">
+              {storeId}
+              {isNewStore(storeId) && (
+                <span className="text-[10px] font-black text-red-500 tracking-tight leading-none">＼ NEW ／</span>
+              )}
+            </span>
+            {" "}— 顧客満足度調査の詳細分析
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Calendar className="w-4 h-4 text-muted-foreground" />

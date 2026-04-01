@@ -14,6 +14,7 @@ import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { useNpsData, filterByMonth, getAvailableMonths } from "@/hooks/useNpsData";
 import { useFankuruData } from "@/hooks/useFankuruData";
 import { getNpsClass } from "@/lib/npsClass";
+import { isNewStore } from "@/lib/newBadge";
 
 // エリア定義
 const AREA_STORES: { area: string; stores: string[] }[] = [
@@ -72,7 +73,12 @@ function StoreCard({ storeName }: { storeName: string }) {
               <MapPin className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h3 className="font-semibold text-base">{storeName}</h3>
+              <h3 className="font-semibold text-base flex items-center gap-1.5">
+                {storeName}
+                {isNewStore(storeName) && (
+                  <span className="text-[10px] font-black text-red-500 tracking-tight leading-none">＼ NEW ／</span>
+                )}
+              </h3>
               <div className="flex items-center gap-3 mt-1">
                 {storeNps && (
                   <span className="text-xs text-muted-foreground flex items-center gap-1">

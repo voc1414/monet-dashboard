@@ -27,6 +27,7 @@ import {
   PieChart, Pie, Cell, Legend
 } from "recharts";
 import { useFankuruData } from "@/hooks/useFankuruData";
+import { isNewStore, isNewStaff } from "@/lib/newBadge";
 import type { FankuruPdf } from "@/hooks/useFankuruData";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import type { StaffReport } from "@/hooks/useMonthlyReport";
@@ -295,8 +296,11 @@ export default function StoreDetail() {
               <MapPin className="w-6 h-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
                 {storeId}
+                {isNewStore(storeId) && (
+                  <span className="text-xs font-black text-red-500 tracking-tight leading-none">＼ NEW ／</span>
+                )}
               </h1>
               <p className="text-xs text-muted-foreground">monet 白髪染めと髪質改善のサロン</p>
             </div>
@@ -345,7 +349,12 @@ export default function StoreDetail() {
                           </div>
                         )}
                         <div>
-                          <div className="font-bold text-sm text-foreground">{sr.name}</div>
+                          <div className="font-bold text-sm text-foreground flex items-center gap-1.5">
+                            {sr.name}
+                            {isNewStaff(sr.name, storeId) && (
+                              <span className="text-[10px] font-black text-red-500 tracking-tight leading-none">＼ NEW ／</span>
+                            )}
+                          </div>
                           <div className="text-[10px] text-muted-foreground">{sr.employmentType}</div>
                         </div>
                       </div>

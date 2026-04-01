@@ -13,6 +13,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { useNpsData, calculateStoreStats, filterByMonth, getAvailableMonths } from "@/hooks/useNpsData";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { getNpsClass, NPS_INDUSTRY_AVERAGE } from "@/lib/npsClass";
+import { isNewStore } from "@/lib/newBadge";
 
 const HERO_IMAGE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663489426081/aLPZvLfFDC4rFYToBquZNR/monet-salon_83a99286.jpg";
 
@@ -305,8 +306,11 @@ export default function Home() {
                                     <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663489426081/aLPZvLfFDC4rFYToBquZNR/monet-parasol_bfd1d990.jpg" alt="monet" className="w-full h-full object-cover" />
                                   </div>
                                   <div>
-                                    <h3 className="font-bold text-foreground text-sm group-hover:text-primary transition-colors">
+                                    <h3 className="font-bold text-foreground text-sm group-hover:text-primary transition-colors flex items-center gap-1.5">
                                       {st.shortName}
+                                      {isNewStore(st.shortName) && (
+                                        <span className="text-[10px] font-black text-red-500 tracking-tight leading-none">＼ NEW ／</span>
+                                      )}
                                     </h3>
                                     <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                                       <Users className="w-3 h-3" />

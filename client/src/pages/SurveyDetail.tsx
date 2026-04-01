@@ -19,6 +19,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { useNpsData, filterByMonth, getAvailableMonths } from "@/hooks/useNpsData";
 import { useFankuruData } from "@/hooks/useFankuruData";
+import { isNewStore } from "@/lib/newBadge";
 import type { NpsRecord } from "@/hooks/useNpsData";
 import { getNpsClass } from "@/lib/npsClass";
 import { Link } from "wouter";
@@ -358,7 +359,12 @@ export default function SurveyDetail() {
                 />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-foreground">{storeName}</h1>
+                <h1 className="text-xl font-bold text-foreground flex items-center gap-1.5">
+                  {storeName}
+                  {isNewStore(storeName) && (
+                    <span className="text-[10px] font-black text-red-500 tracking-tight leading-none">＼ NEW ／</span>
+                  )}
+                </h1>
                 <p className="text-sm text-muted-foreground">
                   顧客アンケート
                   {monthLabel && <span className="ml-1">（{monthLabel}）</span>}
