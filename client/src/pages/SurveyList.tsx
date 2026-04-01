@@ -68,11 +68,11 @@ function StoreCard({ storeName }: { storeName: string }) {
         className="bg-card border border-border/50 rounded-xl p-4 hover:border-primary/30 hover:shadow-md transition-all cursor-pointer"
       >
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
               <MapPin className="w-5 h-5 text-primary" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h3 className="font-semibold text-base flex items-center gap-1.5">
                 {storeName}
                 {isNewStore(storeName) && (
@@ -98,21 +98,18 @@ function StoreCard({ storeName }: { storeName: string }) {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 shrink-0">
             {storeNps && npsClass && (
-              <div className="text-right">
-                <span
-                  className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                  style={{ backgroundColor: `${npsClass.color}15`, color: npsClass.color }}
-                >
+              <div className="flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1" style={{ backgroundColor: `${npsClass.color}12` }}>
+                <span className="font-mono text-sm font-bold" style={{ color: npsClass.color }}>
+                  {storeNps.npsScore > 0 ? "+" : ""}{storeNps.npsScore}
+                </span>
+                <span className="text-[10px] font-semibold" style={{ color: npsClass.color }}>
                   {npsClass.label}
                 </span>
-                <div className="font-mono text-lg font-bold mt-0.5" style={{ color: npsClass.color }}>
-                  {storeNps.npsScore > 0 ? "+" : ""}{storeNps.npsScore}
-                </div>
               </div>
             )}
-            <ChevronRight className="w-5 h-5 text-muted-foreground" />
+            <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
           </div>
         </div>
       </motion.div>
