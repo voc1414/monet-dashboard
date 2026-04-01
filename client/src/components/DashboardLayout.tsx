@@ -5,7 +5,7 @@
  * Typography: Noto Sans JP (body), Inter (data)
  */
 import { Link, useLocation } from "wouter";
-import { ChevronRight, RefreshCw, Home, Users } from "lucide-react";
+import { ChevronRight, RefreshCw, Home, Users, ClipboardList } from "lucide-react";
 import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 
@@ -77,6 +77,16 @@ export default function DashboardLayout({
                 スタッフ一覧
               </span>
             </Link>
+            <Link href="/survey">
+              <span
+                className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary ${
+                  location === "/survey" ? "text-foreground" : "text-muted-foreground"
+                }`}
+              >
+                <ClipboardList className="w-4 h-4" />
+                アンケート
+              </span>
+            </Link>
           </nav>
 
           <div className="flex items-center gap-3">
@@ -143,7 +153,7 @@ export default function DashboardLayout({
         <div className="flex items-center justify-around h-14">
           <Link href="/">
             <div className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-colors ${
-              location === "/" || location.startsWith("/store") ? "text-primary" : "text-muted-foreground"
+              (location === "/" || (location.startsWith("/store") && !location.includes("/nps"))) ? "text-primary" : "text-muted-foreground"
             }`}>
               <Home className="w-5 h-5" />
               <span className="text-[10px] font-medium">店舗一覧</span>
@@ -154,7 +164,15 @@ export default function DashboardLayout({
               location === "/staff" ? "text-primary" : "text-muted-foreground"
             }`}>
               <Users className="w-5 h-5" />
-              <span className="text-[10px] font-medium">スタッフ一覧</span>
+              <span className="text-[10px] font-medium">スタッフ</span>
+            </div>
+          </Link>
+          <Link href="/survey">
+            <div className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-colors ${
+              location === "/survey" ? "text-primary" : "text-muted-foreground"
+            }`}>
+              <ClipboardList className="w-5 h-5" />
+              <span className="text-[10px] font-medium">アンケート</span>
             </div>
           </Link>
         </div>
