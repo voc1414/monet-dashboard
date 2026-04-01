@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
-import { useNpsData, filterByMonth, getAvailableMonths } from "@/hooks/useNpsData";
+import { useNpsData, filterByMonth } from "@/hooks/useNpsData";
 import { useFankuruData } from "@/hooks/useFankuruData";
 import { getNpsClass } from "@/lib/npsClass";
 import { isNewStore } from "@/lib/newBadge";
@@ -29,21 +29,22 @@ function StoreCard({ storeName }: { storeName: string }) {
   const { rawData } = useMonthlyReport();
   const { pdfs: fankuruPdfs, hasFolderMapping } = useFankuruData(storeName);
 
-  // 最新月のNPSデータ
-  const latestMonth = useMemo(() => {
-    const months = getAvailableMonths(npsRecords);
-    return months[0] || "";
-  }, [npsRecords]);
+  // 先月のNPSデータ
+  const lastMonth = useMemo(() => {
+    const now = new Date();
+    const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    return `${lm.getFullYear()}-${String(lm.getMonth() + 1).padStart(2, "0")}`;
+  }, []);
 
   const storeNps = useMemo(() => {
-    const filtered = filterByMonth(npsRecords, latestMonth).filter(r => r.storeShort === storeName);
+    const filtered = filterByMonth(npsRecords, lastMonth).filter(r => r.storeShort === storeName);
     if (filtered.length === 0) return null;
     const total = filtered.length;
     const promoters = filtered.filter(r => r.npsScore >= 9).length;
     const detractors = filtered.filter(r => r.npsScore <= 6).length;
     const npsScore = Math.round(((promoters - detractors) / total) * 100);
     return { total, npsScore };
-  }, [npsRecords, latestMonth, storeName]);
+  }, [npsRecords, lastMonth, storeName]);
 
   // ファンくるコメント件数（月末報告書から）
   const fankuruCommentCount = useMemo(() => {
