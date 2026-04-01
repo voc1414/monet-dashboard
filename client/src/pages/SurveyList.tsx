@@ -100,11 +100,12 @@ function StoreCard({ storeName }: { storeName: string }) {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {storeNps && npsClass && (
-              <div className="flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1" style={{ backgroundColor: `${npsClass.color}12` }}>
-                <span className="font-mono text-sm font-bold" style={{ color: npsClass.color }}>
+              <div className="flex flex-col items-center whitespace-nowrap rounded-xl px-3 py-1.5" style={{ backgroundColor: `${npsClass.color}10` }}>
+                <span className="text-[9px] text-muted-foreground leading-none">NPSスコア</span>
+                <span className="font-mono text-lg font-bold leading-tight" style={{ color: npsClass.color }}>
                   {storeNps.npsScore > 0 ? "+" : ""}{storeNps.npsScore}
                 </span>
-                <span className="text-[10px] font-semibold" style={{ color: npsClass.color }}>
+                <span className="text-[9px] font-semibold leading-none" style={{ color: npsClass.color }}>
                   {npsClass.label}
                 </span>
               </div>
