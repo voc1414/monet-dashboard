@@ -32,17 +32,6 @@ export interface StoreStats {
   detractorPct: number;
 }
 
-// テストデータ除外: 2026-04-01以前の回答を除外
-const NPS_DATA_START_DATE = "2026-04-01";
-
-function isAfterNpsStartDate(dateStr: string): boolean {
-  if (!dateStr) return false;
-  // "2026-03-30 18:19:11" → "2026-03-30" を抽出
-  const dateMatch = dateStr.trim().match(/(\d{4}-\d{2}-\d{2})/);
-  if (!dateMatch) return false;
-  return dateMatch[1] >= NPS_DATA_START_DATE;
-}
-
 function parseStoreName(fullName: string): string {
   if (fullName.includes("堀江院 2nd") || fullName.includes("堀江院2nd")) return "堀江院2nd";
   if (fullName.includes("堀江院")) return "堀江院";
@@ -104,9 +93,8 @@ async function fetchSheetData(): Promise<NpsRecord[]> {
 
   if (rows.length < 2) return [];
 
-  // Skip header row, then filter out test data before 2026-04-01
+  // Skip header row
   return rows.slice(1)
-    .filter((cols) => isAfterNpsStartDate(cols[1] || ""))
     .map((cols) => ({
     no: cols[0] || "",
     date: cols[1] || "",
