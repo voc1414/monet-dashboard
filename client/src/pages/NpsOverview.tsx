@@ -403,7 +403,7 @@ export default function NpsOverview() {
             <span className="inline-flex items-center gap-1.5">
               {storeId}
               {isNewStore(storeId) && (
-                <span className="text-[10px] font-black text-red-500 tracking-tight leading-none">＼ NEW ／</span>
+                <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none">NEW</span>
               )}
             </span>
             {" "}— 顧客満足度調査の詳細分析

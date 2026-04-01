@@ -76,7 +76,7 @@ function StoreCard({ storeName }: { storeName: string }) {
               <h3 className="font-semibold text-base flex items-center gap-1.5">
                 {storeName}
                 {isNewStore(storeName) && (
-                  <span className="text-[10px] font-black text-red-500 tracking-tight leading-none">＼ NEW ／</span>
+                  <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none">NEW</span>
                 )}
               </h3>
               <div className="flex items-center gap-3 mt-1">

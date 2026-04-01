@@ -246,7 +246,7 @@ export default function StaffList() {
                             )}
                             <span className="font-bold text-sm text-foreground hover:text-primary transition-colors">{staff.name}</span>
                             {isNewStaff(staff.name, staff.storeNormalized) && (
-                              <span className="text-[10px] font-black text-red-500 tracking-tight leading-none">＼ NEW ／</span>
+                              <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none">NEW</span>
                             )}
                             {isExpanded ? (
                               <ChevronUp className="w-4 h-4 text-muted-foreground" />
@@ -294,7 +294,7 @@ export default function StaffList() {
                                 <div className="flex items-center gap-1.5">
                                   <span className="font-bold text-sm text-foreground">{staff.name}</span>
                                   {isNewStaff(staff.name, staff.storeNormalized) && (
-                                    <span className="text-[9px] font-black text-red-500 tracking-tight leading-none">＼ NEW ／</span>
+                                    <span className="text-[9px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none">NEW</span>
                                   )}
                                   <span className="text-[10px] text-muted-foreground">({staff.employmentType})</span>
                                   {isExpanded ? <ChevronUp className="w-3 h-3 text-muted-foreground" /> : <ChevronDown className="w-3 h-3 text-muted-foreground" />}

@@ -362,7 +362,7 @@ export default function SurveyDetail() {
                 <h1 className="text-xl font-bold text-foreground flex items-center gap-1.5">
                   {storeName}
                   {isNewStore(storeName) && (
-                    <span className="text-[10px] font-black text-red-500 tracking-tight leading-none">＼ NEW ／</span>
+                    <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none">NEW</span>
                   )}
                 </h1>
                 <p className="text-sm text-muted-foreground">

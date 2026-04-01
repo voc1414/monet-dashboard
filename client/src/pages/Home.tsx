@@ -309,7 +309,7 @@ export default function Home() {
                                     <h3 className="font-bold text-foreground text-sm group-hover:text-primary transition-colors flex items-center gap-1.5">
                                       {st.shortName}
                                       {isNewStore(st.shortName) && (
-                                        <span className="text-[10px] font-black text-red-500 tracking-tight leading-none">＼ NEW ／</span>
+                                        <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none">NEW</span>
                                       )}
                                     </h3>
                                     <div className="flex items-center gap-2 text-[10px] text-muted-foreground">

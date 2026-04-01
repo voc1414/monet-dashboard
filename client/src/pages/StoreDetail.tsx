@@ -299,7 +299,7 @@ export default function StoreDetail() {
               <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
                 {storeId}
                 {isNewStore(storeId) && (
-                  <span className="text-xs font-black text-red-500 tracking-tight leading-none">＼ NEW ／</span>
+                  <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none">NEW</span>
                 )}
               </h1>
               <p className="text-xs text-muted-foreground">monet 白髪染めと髪質改善のサロン</p>
@@ -352,7 +352,7 @@ export default function StoreDetail() {
                           <div className="font-bold text-sm text-foreground flex items-center gap-1.5">
                             {sr.name}
                             {isNewStaff(sr.name, storeId) && (
-                              <span className="text-[10px] font-black text-red-500 tracking-tight leading-none">＼ NEW ／</span>
+                              <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none">NEW</span>
                             )}
                           </div>
                           <div className="text-[10px] text-muted-foreground">{sr.employmentType}</div>
