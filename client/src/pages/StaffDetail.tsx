@@ -30,7 +30,7 @@ import { isNewStaff } from "@/lib/newBadge";
 import type { FankuruPdf } from "@/hooks/useFankuruData";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend
+  PieChart, Pie, Cell, Legend, LineChart, Line, Area, AreaChart
 } from "recharts";
 
 const NPS_COLORS = {
@@ -240,7 +240,7 @@ export default function StaffDetail() {
   const params = useParams<{ staffId: string }>();
   const staffName = decodeURIComponent(params.staffId || "");
   const { records, loading: npsLoading, lastUpdated, refresh } = useNpsData();
-  const { rawData, loading: reportLoading, availableMonths: reportMonths } = useMonthlyReport();
+  const { rawData, loading: reportLoading, availableMonths: reportMonths, getStaffTrend } = useMonthlyReport();
   const loading = npsLoading || reportLoading;
 
   // スタッフの所属店舗を特定
@@ -577,6 +577,194 @@ export default function StaffDetail() {
           </Card>
         )}
       </section>
+
+      {/* ===== 1.5 月次トレンドグラフ ===== */}
+      {(() => {
+        // スタッフの月次トレンドデータを取得
+        const staffTrendData = staffStore ? getStaffTrend(staffStore).find(t => t.staffName === staffName) : null;
+        const trendPoints = staffTrendData?.data.filter(d => d.hasData) || [];
+        if (trendPoints.length < 2) return null;
+
+        const COLORS = {
+          sales: "#2D9C8F",
+          techSales: "#3B82F6",
+          retailSales: "#E5B85C",
+          customers: "#2D9C8F",
+          newCustomers: "#3B82F6",
+          returnCustomers: "#E5B85C",
+          unitPrice: "#8B5CF6",
+          nextReservation: "#F59E0B",
+        };
+
+        // 前月比の計算
+        const latest = trendPoints[trendPoints.length - 1];
+        const prev = trendPoints[trendPoints.length - 2];
+        const salesDiff = latest.sales - prev.sales;
+        const salesPct = prev.sales > 0 ? Math.round((salesDiff / prev.sales) * 100) : 0;
+        const custDiff = latest.customers - prev.customers;
+        const custPct = prev.customers > 0 ? Math.round((custDiff / prev.customers) * 100) : 0;
+        const unitDiff = latest.unitPrice - prev.unitPrice;
+        const unitPct = prev.unitPrice > 0 ? Math.round((unitDiff / prev.unitPrice) * 100) : 0;
+
+        const DiffBadge = ({ diff, pct, unit = "" }: { diff: number; pct: number; unit?: string }) => (
+          <span className={`inline-flex items-center gap-0.5 text-xs font-mono-data font-semibold ${
+            diff > 0 ? "text-emerald-600" : diff < 0 ? "text-red-500" : "text-muted-foreground"
+          }`}>
+            {diff > 0 ? "↑" : diff < 0 ? "↓" : "→"}
+            {unit === "¥" ? `¥${Math.abs(diff).toLocaleString()}` : `${Math.abs(diff).toLocaleString()}${unit}`}
+            <span className="text-[10px] opacity-70">({diff > 0 ? "+" : ""}{pct}%)</span>
+          </span>
+        );
+
+        return (
+          <section className="mb-8 pt-6 border-t-2 border-primary/20">
+            <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-primary" />
+              月次トレンド
+            </h2>
+
+            {/* 前月比サマリーカード */}
+            <div className="grid grid-cols-3 gap-3 mb-6">
+              <Card className="border-border/50 shadow-sm">
+                <CardContent className="p-4">
+                  <div className="text-[10px] text-muted-foreground mb-1">総売上 前月比</div>
+                  <DiffBadge diff={salesDiff} pct={salesPct} unit="¥" />
+                </CardContent>
+              </Card>
+              <Card className="border-border/50 shadow-sm">
+                <CardContent className="p-4">
+                  <div className="text-[10px] text-muted-foreground mb-1">客数 前月比</div>
+                  <DiffBadge diff={custDiff} pct={custPct} unit="名" />
+                </CardContent>
+              </Card>
+              <Card className="border-border/50 shadow-sm">
+                <CardContent className="p-4">
+                  <div className="text-[10px] text-muted-foreground mb-1">客単価 前月比</div>
+                  <DiffBadge diff={unitDiff} pct={unitPct} unit="¥" />
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* 売上推移グラフ */}
+            <Card className="border-border/50 shadow-sm mb-4">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-foreground">売上推移</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4">
+                <ResponsiveContainer width="100%" height={240}>
+                  <AreaChart data={trendPoints} margin={{ top: 5, right: 10, bottom: 5, left: 10 }}>
+                    <defs>
+                      <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={COLORS.sales} stopOpacity={0.15} />
+                        <stop offset="95%" stopColor={COLORS.sales} stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="techGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={COLORS.techSales} stopOpacity={0.1} />
+                        <stop offset="95%" stopColor={COLORS.techSales} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
+                    <XAxis dataKey="monthLabel" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => v >= 10000 ? `${(v / 10000).toFixed(0)}万` : v.toLocaleString()} />
+                    <Tooltip
+                      contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e5e5" }}
+                      formatter={(value: number, name: string) => [`¥${value.toLocaleString()}`, name]}
+                    />
+                    <Area type="monotone" dataKey="sales" name="総売上" stroke={COLORS.sales} fill="url(#salesGrad)" strokeWidth={2.5} dot={{ r: 4, fill: COLORS.sales }} activeDot={{ r: 6 }} />
+                    <Area type="monotone" dataKey="techSales" name="技術売上" stroke={COLORS.techSales} fill="url(#techGrad)" strokeWidth={1.5} strokeDasharray="5 5" dot={{ r: 3, fill: COLORS.techSales }} />
+                    <Line type="monotone" dataKey="retailSales" name="店販売上" stroke={COLORS.retailSales} strokeWidth={1.5} strokeDasharray="3 3" dot={{ r: 3, fill: COLORS.retailSales }} />
+                  </AreaChart>
+                </ResponsiveContainer>
+                <div className="flex items-center justify-center gap-4 mt-2">
+                  <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                    <span className="w-3 h-0.5 rounded" style={{ backgroundColor: COLORS.sales }} /> 総売上
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                    <span className="w-3 h-0.5 rounded border-dashed" style={{ backgroundColor: COLORS.techSales }} /> 技術売上
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                    <span className="w-3 h-0.5 rounded" style={{ backgroundColor: COLORS.retailSales }} /> 店販売上
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 客数推移グラフ */}
+            <Card className="border-border/50 shadow-sm mb-4">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-foreground">客数推移</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4">
+                <ResponsiveContainer width="100%" height={200}>
+                  <AreaChart data={trendPoints} margin={{ top: 5, right: 10, bottom: 5, left: 10 }}>
+                    <defs>
+                      <linearGradient id="custGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={COLORS.customers} stopOpacity={0.15} />
+                        <stop offset="95%" stopColor={COLORS.customers} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
+                    <XAxis dataKey="monthLabel" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 10 }} />
+                    <Tooltip
+                      contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e5e5" }}
+                      formatter={(value: number, name: string) => [`${value}名`, name]}
+                    />
+                    <Area type="monotone" dataKey="customers" name="総客数" stroke={COLORS.customers} fill="url(#custGrad)" strokeWidth={2.5} dot={{ r: 4, fill: COLORS.customers }} activeDot={{ r: 6 }} />
+                    <Line type="monotone" dataKey="newCustomers" name="新規" stroke={COLORS.newCustomers} strokeWidth={1.5} dot={{ r: 3, fill: COLORS.newCustomers }} />
+                    <Line type="monotone" dataKey="returnCustomers" name="再来" stroke={COLORS.returnCustomers} strokeWidth={1.5} dot={{ r: 3, fill: COLORS.returnCustomers }} />
+                  </AreaChart>
+                </ResponsiveContainer>
+                <div className="flex items-center justify-center gap-4 mt-2">
+                  <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                    <span className="w-3 h-0.5 rounded" style={{ backgroundColor: COLORS.customers }} /> 総客数
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                    <span className="w-3 h-0.5 rounded" style={{ backgroundColor: COLORS.newCustomers }} /> 新規
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                    <span className="w-3 h-0.5 rounded" style={{ backgroundColor: COLORS.returnCustomers }} /> 再来
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 客単価・次回予約率推移 */}
+            <Card className="border-border/50 shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-foreground">客単価・次回予約率推移</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4">
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart data={trendPoints} margin={{ top: 5, right: 40, bottom: 5, left: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
+                    <XAxis dataKey="monthLabel" tick={{ fontSize: 11 }} />
+                    <YAxis yAxisId="left" tick={{ fontSize: 10 }} tickFormatter={(v: number) => `¥${(v / 1000).toFixed(0)}k`} />
+                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${v}%`} domain={[0, 100]} />
+                    <Tooltip
+                      contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e5e5" }}
+                      formatter={(value: number, name: string) => {
+                        if (name === "客単価") return [`¥${value.toLocaleString()}`, name];
+                        return [`${value}%`, name];
+                      }}
+                    />
+                    <Line yAxisId="left" type="monotone" dataKey="unitPrice" name="客単価" stroke={COLORS.unitPrice} strokeWidth={2} dot={{ r: 4, fill: COLORS.unitPrice }} />
+                    <Line yAxisId="right" type="monotone" dataKey="nextReservationRate" name="次回予約率" stroke={COLORS.nextReservation} strokeWidth={2} dot={{ r: 4, fill: COLORS.nextReservation }} />
+                  </LineChart>
+                </ResponsiveContainer>
+                <div className="flex items-center justify-center gap-4 mt-2">
+                  <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                    <span className="w-3 h-0.5 rounded" style={{ backgroundColor: COLORS.unitPrice }} /> 客単価
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                    <span className="w-3 h-0.5 rounded" style={{ backgroundColor: COLORS.nextReservation }} /> 次回予約率
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+        );
+      })()}
 
       {/* ===== 2. 個別アドバイス ===== */}
       {staffNpsStats && (
