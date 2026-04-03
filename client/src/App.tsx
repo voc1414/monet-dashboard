@@ -12,12 +12,19 @@ import StaffList from "./pages/StaffList";
 import SurveyList from "./pages/SurveyList";
 import SurveyDetail from "./pages/SurveyDetail";
 import StaffDetail from "./pages/StaffDetail";
+import AdminLogin from "./pages/admin/AdminLogin";
+import AdminAlerts from "./pages/admin/AdminAlerts";
+import AdminStores from "./pages/admin/AdminStores";
+import AdminStaff from "./pages/admin/AdminStaff";
+import AdminSurveys from "./pages/admin/AdminSurveys";
 
 function Router() {
+  // make sure to consider if you need authentication for certain routes
   return (
     <>
       <ScrollToTop />
       <Switch>
+        {/* Public Dashboard Routes */}
         <Route path="/" component={Home} />
         <Route path="/store/:storeId" component={StoreDetail} />
         <Route path="/staff" component={StaffList} />
@@ -25,6 +32,14 @@ function Router() {
         <Route path="/survey" component={SurveyList} />
         <Route path="/survey/:storeId" component={SurveyDetail} />
         <Route path="/store/:storeId/nps" component={NpsOverview} />
+
+        {/* Admin Routes */}
+        <Route path="/admin/login" component={AdminLogin} />
+        <Route path="/admin" component={AdminAlerts} />
+        <Route path="/admin/stores" component={AdminStores} />
+        <Route path="/admin/staff" component={AdminStaff} />
+        <Route path="/admin/surveys" component={AdminSurveys} />
+
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>
