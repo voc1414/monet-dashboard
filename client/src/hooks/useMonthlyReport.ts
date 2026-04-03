@@ -89,10 +89,56 @@ function getReportMonth(answerDateStr: string): string {
   }
 }
 
+/**
+ * 数値パース（ピリオド区切り自動判定付き）
+ *
+ * 美容室の売上データでは、ピリオド「.」が桁区切りとして使われるケースがある。
+ * 例: "406.100" → 小数点ではなく桁区切りと判定 → 406100
+ *
+ * 判定ルール:
+ * 1. ピリオドの後にちょうど3桁の数字が続く場合 → 桁区切りと判定（例: 406.100, 1.234.567）
+ * 2. ピリオドが複数ある場合 → 桁区切りと判定（例: 1.234.567）
+ * 3. 結果が1000未満になる場合、ピリオドを除去した値が妥当な美容室売上範囲（5000円以上）なら桁区切りと判定
+ */
 function parseNumber(val: string): number {
   if (!val) return 0;
-  // カンマ、¥記号、スペースを除去
-  const cleaned = val.replace(/[¥,\s]/g, "");
+  // カンマ、￥記号、スペースを除去
+  const cleaned = val.replace(/[￥,\s]/g, "").trim();
+  if (!cleaned) return 0;
+
+  // ピリオドが含まれる場合の判定
+  if (cleaned.includes(".")) {
+    const dotCount = (cleaned.match(/\./g) || []).length;
+
+    // ピリオドが複数 → 確実に桁区切り（例: "1.234.567"）
+    if (dotCount > 1) {
+      const num = parseFloat(cleaned.replace(/\./g, ""));
+      return isNaN(num) ? 0 : num;
+    }
+
+    // ピリオド1つの場合
+    const parts = cleaned.split(".");
+    const afterDot = parts[1];
+
+    // ピリオド後がちょうど3桁 → 桁区切りと判定（例: "406.100" → 406100）
+    if (afterDot && afterDot.length === 3) {
+      const asThousandSep = parseFloat(cleaned.replace(".", ""));
+      const asDecimal = parseFloat(cleaned);
+
+      // 小数点として解釈すると1000未満になり、桁区切りとして解釈すると5000以上になる場合
+      // → 桁区切りと判定（美容室の売上は通常数千円以上）
+      if (asDecimal < 1000 && asThousandSep >= 5000) {
+        return isNaN(asThousandSep) ? 0 : asThousandSep;
+      }
+
+      // 桁区切りとして解釈しても小さい場合はそのまま桁区切りと判定
+      // （例: "5.000" → 5000, "10.500" → 10500）
+      if (asThousandSep >= 1000) {
+        return isNaN(asThousandSep) ? 0 : asThousandSep;
+      }
+    }
+  }
+
   const num = parseFloat(cleaned);
   return isNaN(num) ? 0 : num;
 }
