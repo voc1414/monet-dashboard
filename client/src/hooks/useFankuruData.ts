@@ -229,16 +229,122 @@ async function fetchPdfData(): Promise<Record<string, FankuruPdf[]>> {
 const FANKURU_ENABLED_STORES = new Set(["姪浜院", "堀江院", "堀江院2nd", "楽々園院"]);
 
 /**
- * ファンくるのスタイリスト名（ひらがな/カタカナ/略称）と
- * 月末報告書のスタッフ名（漢字）を紐づけるマッピングテーブル。
- * キー: ファンくるPDFに記載される名前（小文字化済み）
- * 値: 月末報告書のスタッフ名（ダッシュボード表示名）
+ * ファンくるのスタイリスト名（ひらがな/カタカナ/略称/ローマ字）と
+ * 月末報告書のスタッフ名を紐づけるマッピングテーブル。
+ * キー: ダッシュボード上のスタッフ名（正式名）
+ * 値: ファンくるPDFに記載されうる別名一覧
+ *
+ * パターン: 姓のみ、名のみ、ひらがな、カタカナ、ローマ字（ヘボン式/訓令式）、漢字違い
  */
 const STYLIST_NAME_ALIASES: Record<string, string[]> = {
-  // 金田 ↔ かねだ
-  "金田": ["かねだ", "カネダ", "kaneda"],
-  // 今後追加が必要な場合はここに追記
-  // 例: "山田太郎": ["やまだ", "ヤマダ", "yamada"],
+  // === 姪浜院 ===
+  "山口純奈": [
+    "山口", "やまぐち", "ヤマグチ", "yamaguchi", "yamaguti",
+    "純奈", "じゅんな", "ジュンナ", "junna", "jyunna",
+    "純菜", "やまぐちじゅんな", "ヤマグチジュンナ",
+  ],
+  "金田あゆみ": [
+    "金田", "かねだ", "カネダ", "kaneda",
+    "あゆみ", "アユミ", "ayumi",
+    "かねだあゆみ", "カネダアユミ",
+  ],
+  "石橋 茉": [
+    "石橋", "いしばし", "イシバシ", "ishibashi",
+    "茉", "あかね", "アカネ", "akane",
+    "いしばしあかね", "イシバシアカネ",
+  ],
+  // 藤田（過去スタッフ）
+  "藤田": ["ふじた", "フジタ", "fujita"],
+
+  // === 楽々園院 ===
+  "井上 恵子": [
+    "井上", "いのうえ", "イノウエ", "inoue",
+    "恵子", "けいこ", "ケイコ", "keiko",
+    "いのうえけいこ", "イノウエケイコ",
+  ],
+  "前田慶子": [
+    "前田", "まえだ", "マエダ", "maeda",
+    "慶子", "けいこ", "ケイコ", "keiko",
+    "まえだけいこ", "マエダケイコ",
+  ],
+  "千葉祐子": [
+    "千葉", "ちば", "チバ", "chiba",
+    "祐子", "ゆうこ", "ユウコ", "yuuko", "yuko",
+    "ちばゆうこ", "チバユウコ",
+  ],
+  "石原葉子": [
+    "石原", "いしはら", "イシハラ", "ishihara",
+    "葉子", "ようこ", "ヨウコ", "youko", "yoko",
+    "いしはらようこ", "イシハラヨウコ",
+  ],
+  // 田中 江梨子（楽々園院のファンくる担当）
+  "田中 江梨子": [
+    "田中", "たなか", "タナカ", "tanaka",
+    "江梨子", "えりこ", "エリコ", "eriko",
+    "たなかえりこ", "タナカエリコ",
+    "田中江梨子",
+  ],
+
+  // === 堀江院 ===
+  "Kaede": ["かえで", "カエデ", "kaede", "楓"],
+
+  // === 堀江院2nd ===
+  "Mimi": ["みみ", "ミミ", "mimi"],
+  "sayuri": ["さゆり", "サユリ", "sayuri", "小百合"],
+  "Aki": ["あき", "アキ", "aki"],
+  "Kazumi": ["かずみ", "カズミ", "kazumi"],
+  "Hiromi": ["ひろみ", "ヒロミ", "hiromi"],
+
+  // === 高槻院 ===
+  "Yuko": ["ゆうこ", "ユウコ", "yuko", "yuuko"],
+  "Asuka": ["あすか", "アスカ", "asuka"],
+  "Mariko": ["まりこ", "マリコ", "mariko"],
+  "Nao": ["なお", "ナオ", "nao"],
+
+  // === 福島院 ===
+  "Yu": ["ゆう", "ユウ", "yu", "yuu"],
+  "yoshie": ["よしえ", "ヨシエ", "yoshie"],
+  "Hiroko": ["ひろこ", "ヒロコ", "hiroko"],
+  "Mika": ["みか", "ミカ", "mika"],
+  "Hitomi": ["ひとみ", "ヒトミ", "hitomi"],
+};
+
+/**
+ * スタッフ名と所属店舗の紐づけテーブル。
+ * 同姓同名がある場合に、ファンくるのPDFがどの店舗のスタッフのものか判別するために使用。
+ * キー: ダッシュボード表示名, 値: 所属店舗名
+ */
+const STAFF_STORE_MAP: Record<string, string> = {
+  // 姪浜院
+  "山口純奈": "姪浜院",
+  "金田あゆみ": "姪浜院",
+  "石橋 茉": "姪浜院",
+  "藤田": "姪浜院",
+  // 楽々園院
+  "井上 恵子": "楽々園院",
+  "前田慶子": "楽々園院",
+  "千葉祐子": "楽々園院",
+  "石原葉子": "楽々園院",
+  "田中 江梨子": "楽々園院",
+  // 堀江院
+  "Kaede": "堀江院",
+  // 堀江院2nd
+  "Mimi": "堀江院2nd",
+  "sayuri": "堀江院2nd",
+  "Aki": "堀江院2nd",
+  "Kazumi": "堀江院2nd",
+  "Hiromi": "堀江院2nd",
+  // 高槻院
+  "Yuko": "高槻院",
+  "Asuka": "高槻院",
+  "Mariko": "高槻院",
+  "Nao": "高槻院",
+  // 福島院
+  "Yu": "福島院",
+  "yoshie": "福島院",
+  "Hiroko": "福島院",
+  "Mika": "福島院",
+  "Hitomi": "福島院",
 };
 
 // 逆引きマップを構築（エイリアス → 正式名）
@@ -284,7 +390,12 @@ function matchesStylist(stylistRaw: string, staffName: string): boolean {
   return false;
 }
 
-export function useFankuruDataByStaff(staffName: string) {
+/**
+ * スタッフ名でファンくるPDFをフィルタリングするフック。
+ * storeName を指定すると、その店舗のPDFのみに絞り込み（同姓同名対策）。
+ * storeName が未指定の場合は、STAFF_STORE_MAPから自動判定を試みる。
+ */
+export function useFankuruDataByStaff(staffName: string, storeName?: string) {
   const [allData, setAllData] = useState<Record<string, FankuruPdf[]>>(LEGACY_DATA);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -306,11 +417,16 @@ export function useFankuruDataByStaff(staffName: string) {
     loadData();
   }, [loadData]);
 
-  // スタッフ名で全店舗のPDFをフィルタリング（エイリアス対応）
+  // スタッフの所属店舗を特定（引数 > STAFF_STORE_MAP > 全店舗）
+  const effectiveStore = storeName || STAFF_STORE_MAP[staffName] || "";
+
+  // スタッフ名でPDFをフィルタリング（エイリアス対応 + 店舗紞り込み）
   const pdfs = useMemo(() => {
     const result: FankuruPdf[] = [];
     if (!staffName.trim()) return result;
-    for (const storePdfs of Object.values(allData)) {
+    for (const [pdfStoreName, storePdfs] of Object.entries(allData)) {
+      // 店舗名が指定されている場合、その店舗のPDFのみ対象
+      if (effectiveStore && pdfStoreName !== effectiveStore) continue;
       for (const pdf of storePdfs) {
         if (pdf.stylist && matchesStylist(pdf.stylist, staffName)) {
           result.push(pdf);
@@ -318,7 +434,7 @@ export function useFankuruDataByStaff(staffName: string) {
       }
     }
     return result.sort((a, b) => b.date.localeCompare(a.date));
-  }, [allData, staffName]);
+  }, [allData, staffName, effectiveStore]);
 
   const availableMonths = useMemo(() => {
     const months = new Set<string>();

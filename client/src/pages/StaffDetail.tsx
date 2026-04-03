@@ -241,7 +241,6 @@ export default function StaffDetail() {
   const staffName = decodeURIComponent(params.staffId || "");
   const { records, loading: npsLoading, lastUpdated, refresh } = useNpsData();
   const { rawData, loading: reportLoading, availableMonths: reportMonths } = useMonthlyReport();
-  const { pdfs: fankuruPdfs, loading: fankuruLoading } = useFankuruDataByStaff(staffName);
   const loading = npsLoading || reportLoading;
 
   // スタッフの所属店舗を特定
@@ -249,6 +248,9 @@ export default function StaffDetail() {
     const staffData = rawData.find(r => r.name === staffName);
     return staffData?.storeNormalized || "";
   }, [rawData, staffName]);
+
+  // ファンくるデータ（店舗名で絞り込み、同姓同名対策）
+  const { pdfs: fankuruPdfs, loading: fankuruLoading } = useFankuruDataByStaff(staffName, staffStore);
 
   // スタッフの写真URLを取得
   const staffPhoto = useMemo(() => {
