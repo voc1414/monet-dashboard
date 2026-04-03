@@ -11,7 +11,7 @@ import {
   TrendingUp, FileText, ExternalLink, Loader2, FolderOpen, Eye,
   Lightbulb, CheckCircle2, Target, ArrowUpRight,
   Trophy, ThumbsUp, AlertTriangle, AlertCircle,
-  ChevronDown, ChevronUp, Users, Quote, Star, MessageSquare, Building2
+  ChevronDown, ChevronUp, Users, Quote, Star, MessageSquare, Building2, ClipboardCheck
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -489,6 +489,55 @@ export default function StaffDetail() {
           </Select>
         </div>
       </div>
+
+      {/* ===== 0. 月末報告書 回答ステータス ===== */}
+      {activeMonth && activeMonth !== "all" && activeMonth !== "__init__" && (() => {
+        const hasSubmitted = !!staffReport;
+        return (
+          <section className="mb-6 pt-6 border-t-2 border-primary/20">
+            <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+              <ClipboardCheck className="w-5 h-5 text-primary" />
+              月末報告書
+              <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2">
+                {formatMonth(activeMonth)}
+              </span>
+            </h2>
+            <Card className={`border-border/50 shadow-sm ${
+              hasSubmitted ? 'border-l-4 border-l-emerald-400' : 'border-l-4 border-l-amber-400'
+            }`}>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  {hasSubmitted ? (
+                    <>
+                      <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-semibold text-emerald-700">回答済み</div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">
+                          {formatMonth(activeMonth)}の月末報告書は提出されています
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
+                        <AlertTriangle className="w-5 h-5 text-amber-600" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-semibold text-amber-700">未回答</div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">
+                          {formatMonth(activeMonth)}の月末報告書がまだ提出されていません
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+        );
+      })()}
 
       {/* ===== 1. 個人売上 ===== */}
       <section className="mb-8 pt-6 border-t-2 border-primary/20">
