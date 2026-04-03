@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { registerNewStoresFromReports } from "@/lib/newBadge";
 
 // 新モネ月末報告書 スプレッドシート
 const SPREADSHEET_ID = "1DXAaFk0aLDZwXq28krOcrDSiTOwd6BeTzV-xFXbLuKI";
@@ -186,12 +187,13 @@ function parseCSV(text: string): string[][] {
 }
 
 /**
- * 同じスタッフ名×同じ報告月の重複を排除し、回答日時が新しい方を残す
+ * 同じ店舗×同じスタッフ名×同じ報告月の重複を排除し、回答日時が新しい方を残す
+ * → 異なる店舗に同名スタッフがいる場合も正しく両方表示される
  */
 function deduplicateReports(reports: StaffReport[]): StaffReport[] {
   const map = new Map<string, StaffReport>();
   for (const r of reports) {
-    const key = `${r.name}__${r.reportMonth}`;
+    const key = `${r.storeNormalized}__${r.name}__${r.reportMonth}`;
     const existing = map.get(key);
     if (!existing) {
       map.set(key, r);
@@ -275,6 +277,10 @@ export function useMonthlyReport() {
 
         // 同じスタッフ×同月の重複排除: 回答日時が新しい方を残す
         const deduped = deduplicateReports(reports);
+
+        // 新店舗自動検出: 未知の店舗名があれば自動的にNEW登録（初回検出月から6ヶ月間）
+        const storeNames = Array.from(new Set(deduped.map(r => r.storeNormalized).filter(Boolean)));
+        registerNewStoresFromReports(storeNames);
 
         if (!cancelled) {
           setRawData(deduped);
