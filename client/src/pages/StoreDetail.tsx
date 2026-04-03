@@ -10,8 +10,8 @@ import {
   MapPin, Users, TrendingUp, BarChart3, ArrowRight, Calendar,
   DollarSign, Scissors, Star, MessageSquare, ChevronDown,
   Trophy, ThumbsUp, Target, AlertTriangle, AlertCircle,
-  Lightbulb, CheckCircle2, ArrowUpRight,
-  FileText, ExternalLink, Loader2, FolderOpen, Eye
+  Lightbulb, CheckCircle2, ArrowUpRight, ClipboardCheck,
+  FileText, ExternalLink, Loader2, FolderOpen, Eye, UserX, UserCheck
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -27,7 +27,7 @@ import {
   PieChart, Pie, Cell, Legend, LineChart, Line
 } from "recharts";
 import { useFankuruData } from "@/hooks/useFankuruData";
-import { isNewStore, isNewStaff } from "@/lib/newBadge";
+import { isNewStore, isNewStaff, isRetiredStaff } from "@/lib/newBadge";
 import type { FankuruPdf } from "@/hooks/useFankuruData";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import type { StaffReport, StaffMonthlyTrend } from "@/hooks/useMonthlyReport";
@@ -213,7 +213,7 @@ export default function StoreDetail() {
   const params = useParams<{ storeId: string }>();
   const storeId = decodeURIComponent(params.storeId || "");
   const { records, loading: npsLoading, error: npsError, lastUpdated, refresh } = useNpsData();
-  const { loading: reportLoading, error: reportError, getStoreMonthlyStats, availableMonths: reportMonths, getStaffTrend } = useMonthlyReport();
+  const { rawData, loading: reportLoading, error: reportError, getStoreMonthlyStats, availableMonths: reportMonths, getStaffTrend } = useMonthlyReport();
   const loading = npsLoading || reportLoading;
   const error = npsError || reportError;
   const allNpsMonths = useMemo(() => getAvailableMonths(records), [records]);
@@ -414,6 +414,92 @@ export default function StoreDetail() {
           )}
         </section>
       )}
+
+      {/* 月末報告書 回答率 */}
+      {activeMonth && reportStats && (() => {
+        // この店舗の全スタッフを全月から取得（退社スタッフは対象月で除外）
+        const allStoreData = rawData.filter(
+          (r: StaffReport) => r.storeNormalized === reportStats.store && !isRetiredStaff(r.name, r.storeNormalized, activeMonth)
+        );
+        // この店舗の全スタッフ名（過去に報告がある全員）
+        const allStaffNames = Array.from(new Set(allStoreData.map((r: StaffReport) => r.name).filter(Boolean))) as string[];
+        // 対象月に回答したスタッフ名
+        const answeredStaff = new Set(reportStats.staffReports.map((r: StaffReport) => r.name));
+        const expectedCount = allStaffNames.length;
+        const answeredCount = answeredStaff.size;
+        const unanswered = allStaffNames.filter((n: string) => !answeredStaff.has(n));
+        const rate = expectedCount > 0 ? Math.round((answeredCount / expectedCount) * 100) : 0;
+
+        if (expectedCount === 0) return null;
+
+        return (
+          <section className="mb-6 pt-6 border-t-2 border-primary/20">
+            <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+              <ClipboardCheck className="w-5 h-5 text-primary" />
+              月末報告書 回答率
+              <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2">
+                {formatMonth(activeMonth)}
+              </span>
+            </h2>
+            <Card className="border-border/50 shadow-sm">
+              <CardContent className="p-5">
+                <div className="flex items-center gap-6">
+                  {/* 回答率サークル */}
+                  <div className="relative w-20 h-20 shrink-0">
+                    <svg viewBox="0 0 36 36" className="w-20 h-20 -rotate-90">
+                      <circle cx="18" cy="18" r="15.5" fill="none" stroke="#e5e7eb" strokeWidth="3" />
+                      <circle
+                        cx="18" cy="18" r="15.5" fill="none"
+                        stroke={rate === 100 ? '#2D9C8F' : rate >= 80 ? '#E5B85C' : '#C75C5C'}
+                        strokeWidth="3"
+                        strokeDasharray={`${rate * 0.974} ${100 - rate * 0.974 + 3}`}
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className={`font-mono-data text-xl font-bold ${
+                        rate === 100 ? 'text-[#2D9C8F]' : rate >= 80 ? 'text-[#E5B85C]' : 'text-[#C75C5C]'
+                      }`}>{rate}%</span>
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-4 mb-3">
+                      <div className="flex items-center gap-1.5">
+                        <UserCheck className="w-4 h-4 text-[#2D9C8F]" />
+                        <span className="text-sm text-muted-foreground">回答済み</span>
+                        <span className="font-mono-data font-bold text-foreground">{answeredCount}名</span>
+                      </div>
+                      <span className="text-muted-foreground/30">/</span>
+                      <div className="flex items-center gap-1.5">
+                        <Users className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">対象</span>
+                        <span className="font-mono-data font-bold text-foreground">{expectedCount}名</span>
+                      </div>
+                    </div>
+                    {unanswered.length > 0 && (
+                      <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200">
+                        <UserX className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                        <div>
+                          <div className="text-xs font-semibold text-amber-700 mb-0.5">未回答スタッフ</div>
+                          <div className="text-xs text-amber-600">
+                            {unanswered.join('、')}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {rate === 100 && (
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span className="text-xs font-semibold text-emerald-700">全員回答済み</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+        );
+      })()}
 
       {/* スタッフ個人実績 */}
       <section className="mb-8 pt-6 border-t-2 border-primary/20">

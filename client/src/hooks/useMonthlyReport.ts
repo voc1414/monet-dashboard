@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { registerNewStoresFromReports } from "@/lib/newBadge";
+import { registerNewStoresFromReports, isRetiredStaff } from "@/lib/newBadge";
 
 // 新モネ月末報告書 スプレッドシート
 const SPREADSHEET_ID = "1DXAaFk0aLDZwXq28krOcrDSiTOwd6BeTzV-xFXbLuKI";
@@ -401,6 +401,8 @@ export function useMonthlyReport() {
       if (month) {
         filtered = filtered.filter((r) => r.reportMonth === month);
       }
+      // 退社スタッフを除外（退社月以降のデータを非表示）
+      filtered = filtered.filter((r) => !isRetiredStaff(r.name, r.storeNormalized, r.reportMonth));
       if (filtered.length === 0) return null;
 
       const totalTechSales = filtered.reduce((s, r) => s + r.techSales, 0);
@@ -436,7 +438,9 @@ export function useMonthlyReport() {
   // 全店舗の集計（特定月）
   const getAllStoresStats = useMemo(() => {
     return (month?: string): StoreMonthlyStats[] => {
-      const storeArr = Array.from(new Set(rawData.map((r) => r.storeNormalized)));
+      // 退社スタッフを除外したデータから店舗名を取得
+      const activeData = rawData.filter((r) => !isRetiredStaff(r.name, r.storeNormalized, r.reportMonth));
+      const storeArr = Array.from(new Set(activeData.map((r) => r.storeNormalized)));
       const results: StoreMonthlyStats[] = [];
       for (const store of storeArr) {
         const stats = getStoreMonthlyStats(store, month);
@@ -453,7 +457,8 @@ export function useMonthlyReport() {
   const getStaffTrend = useMemo(() => {
     return (storeName: string): StaffMonthlyTrend[] => {
       const normalizedTarget = normalizeStoreName(storeName);
-      const storeData = rawData.filter((r) => r.storeNormalized === normalizedTarget);
+      // 退社スタッフを除外
+      const storeData = rawData.filter((r) => r.storeNormalized === normalizedTarget && !isRetiredStaff(r.name, r.storeNormalized, r.reportMonth));
       if (storeData.length === 0) return [];
 
       // 全月を取得（古い順）

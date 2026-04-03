@@ -5,6 +5,7 @@
  * - 店舗: オープン日から指定の終了月末まで「NEW」を表示
  * - スタッフ: NEW店舗に所属するスタッフは、ベテランリストに含まれない限り「NEW」を表示
  * - 新店舗自動検出: 月末報告書に未知の店舗名が出た場合、初回登場月から6ヶ月間NEWを自動点灯
+ * - 退社スタッフ: 退社月以降のデータを表示しない
  *
  * 【既知の店舗NEW期限】
  * - 高槻院: 2026年8月末まで
@@ -36,6 +37,34 @@ const KNOWN_STORES = new Set([
   "福島院",
   "高槻院",
 ]);
+
+// 退社スタッフ管理
+// key: スタッフ名, value: 退社月 "YYYY-MM"（この月以降のデータを除外）
+const RETIRED_STAFF: Record<string, { store: string; retiredMonth: string }> = {
+  "Hitomi": { store: "福島院", retiredMonth: "2026-04" },
+  "hitomi": { store: "福島院", retiredMonth: "2026-04" },
+};
+
+/**
+ * スタッフが退社済みかどうか判定
+ * @param staffName スタッフ名
+ * @param storeName 店舗名（省略可）
+ * @param month 対象月 "YYYY-MM"（省略時は現在月）
+ * @returns 退社済みなら true
+ */
+export function isRetiredStaff(staffName: string, storeName?: string, month?: string): boolean {
+  const targetMonth = month || getCurrentYearMonth();
+  // 名前で検索（大文字小文字無視）
+  const nameKey = Object.keys(RETIRED_STAFF).find(
+    k => k.toLowerCase() === staffName.trim().toLowerCase()
+  );
+  if (!nameKey) return false;
+  const info = RETIRED_STAFF[nameKey];
+  // 店舗が指定されている場合は店舗も一致するかチェック
+  if (storeName && info.store !== storeName) return false;
+  // 退社月以降ならtrue
+  return targetMonth >= info.retiredMonth;
+}
 
 // 動的に検出された新店舗のキャッシュ
 // key: 店舗名, value: 初回検出月 "YYYY-MM"
