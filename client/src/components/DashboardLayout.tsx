@@ -5,7 +5,7 @@
  * Typography: Noto Sans JP (body), Inter (data)
  */
 import { Link, useLocation } from "wouter";
-import { ChevronRight, RefreshCw, Home, Users, ClipboardList } from "lucide-react";
+import { ChevronRight, RefreshCw, Home, Users, ClipboardList, Settings } from "lucide-react";
 import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 
@@ -85,6 +85,15 @@ export default function DashboardLayout({
               >
                 <ClipboardList className="w-4 h-4" />
                 アンケート
+              </span>
+            </Link>
+            <div className="w-px h-5 bg-border/60" />
+            <Link href="/admin">
+              <span
+                className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground/70 hover:text-primary transition-colors px-2.5 py-1.5 rounded-md border border-border/50 hover:border-primary/30 hover:bg-primary/5"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                管理者ページ
               </span>
             </Link>
           </nav>
