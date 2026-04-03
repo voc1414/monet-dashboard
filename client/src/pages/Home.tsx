@@ -6,7 +6,7 @@
 import { Link } from "wouter";
 import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
-import { MapPin, Users, TrendingUp, BarChart3, ArrowRight, DollarSign, Scissors, ShoppingBag, Calendar, ChevronDown } from "lucide-react";
+import { MapPin, Users, TrendingUp, BarChart3, ArrowRight, DollarSign, Scissors, ShoppingBag, Calendar, ChevronDown, AlertTriangle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -14,6 +14,7 @@ import { useNpsData, calculateStoreStats, filterByMonth, getAvailableMonths } fr
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { getNpsClass, NPS_INDUSTRY_AVERAGE } from "@/lib/npsClass";
 import { isNewStore } from "@/lib/newBadge";
+import { validateStoreReport, getAlertSummary } from "@/lib/reportValidation";
 
 const HERO_IMAGE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663489426081/aLPZvLfFDC4rFYToBquZNR/monet-salon_83a99286.jpg";
 
@@ -97,6 +98,9 @@ export default function Home() {
     const activeMonth = selectedMonth === "all" || selectedMonth === "__init__" ? undefined : selectedMonth;
     const report = getStoreMonthlyStats(name, activeMonth);
 
+    const alerts = validateStoreReport(report);
+    const alertSummary = getAlertSummary(alerts);
+
     return {
       shortName: name,
       totalResponses: nps?.totalResponses || 0,
@@ -119,6 +123,9 @@ export default function Home() {
       staffCount: report?.staffCount || 0,
       hasReportData: !!report,
       reportMonthLabel: report?.monthLabel || "",
+      alertCount: alertSummary.total,
+      alertErrors: alertSummary.errors,
+      alertWarnings: alertSummary.warnings,
     };
   });
 
@@ -310,6 +317,18 @@ export default function Home() {
                                       {st.shortName}
                                       {isNewStore(st.shortName) && (
                                         <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none">NEW</span>
+                                      )}
+                                      {st.alertCount > 0 && (
+                                        <span className="inline-flex items-center gap-0.5 text-[10px] font-bold rounded px-1.5 py-0.5 leading-none"
+                                          style={{
+                                            color: st.alertErrors > 0 ? '#dc2626' : '#d97706',
+                                            backgroundColor: st.alertErrors > 0 ? '#fee2e2' : '#fef3c7',
+                                            border: `1px solid ${st.alertErrors > 0 ? '#fecaca' : '#fde68a'}`,
+                                          }}
+                                        >
+                                          <AlertTriangle className="w-3 h-3" />
+                                          {st.alertCount}
+                                        </span>
                                       )}
                                     </h3>
                                     <div className="flex items-center gap-2 text-[10px] text-muted-foreground">

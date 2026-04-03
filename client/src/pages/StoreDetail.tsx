@@ -31,6 +31,8 @@ import { isNewStore, isNewStaff } from "@/lib/newBadge";
 import type { FankuruPdf } from "@/hooks/useFankuruData";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import type { StaffReport } from "@/hooks/useMonthlyReport";
+import { validateStoreReport, getAlertSummary } from "@/lib/reportValidation";
+import type { ReportAlert } from "@/lib/reportValidation";
 
 const NPS_HEADER_IMAGE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663489426081/aLPZvLfFDC4rFYToBquZNR/nps-header-6cTohzoTSmSjrDCLc4VzHg.webp";
 
@@ -285,6 +287,11 @@ export default function StoreDetail() {
   const activeMonth = selectedMonth === "all" || selectedMonth === "__init__" ? undefined : selectedMonth;
   const reportStats = useMemo(() => getStoreMonthlyStats(storeId, activeMonth), [getStoreMonthlyStats, storeId, activeMonth]);
 
+  // 異常値検出
+  const reportAlerts = useMemo(() => validateStoreReport(reportStats), [reportStats]);
+  const alertSummary = useMemo(() => getAlertSummary(reportAlerts), [reportAlerts]);
+  const [showAlerts, setShowAlerts] = useState(false);
+
   const formatMonth = (ym: string) => {
     const [y, m] = ym.split("-");
     return `${y}年${parseInt(m)}月`;
@@ -332,6 +339,81 @@ export default function StoreDetail() {
           </Select>
         </div>
       </div>
+
+      {/* 入力値異常アラート */}
+      {reportAlerts.length > 0 && (
+        <section className="mb-6">
+          <button
+            onClick={() => setShowAlerts(!showAlerts)}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors hover:bg-accent/30"
+            style={{
+              borderColor: alertSummary.errors > 0 ? '#ef4444' : alertSummary.warnings > 0 ? '#f59e0b' : '#3b82f6',
+              backgroundColor: alertSummary.errors > 0 ? '#fef2f2' : alertSummary.warnings > 0 ? '#fffbeb' : '#eff6ff',
+            }}
+          >
+            <AlertTriangle
+              className="w-5 h-5 shrink-0"
+              style={{ color: alertSummary.errors > 0 ? '#ef4444' : alertSummary.warnings > 0 ? '#f59e0b' : '#3b82f6' }}
+            />
+            <div className="flex-1 text-left">
+              <span className="text-sm font-bold" style={{ color: alertSummary.errors > 0 ? '#dc2626' : alertSummary.warnings > 0 ? '#d97706' : '#2563eb' }}>
+                月末報告書の入力値に{reportAlerts.length}件の注意点があります
+              </span>
+              <span className="text-xs text-muted-foreground ml-2">
+                {alertSummary.errors > 0 && `エラー${alertSummary.errors}件`}
+                {alertSummary.errors > 0 && alertSummary.warnings > 0 && " / "}
+                {alertSummary.warnings > 0 && `警告${alertSummary.warnings}件`}
+                {(alertSummary.errors > 0 || alertSummary.warnings > 0) && alertSummary.infos > 0 && " / "}
+                {alertSummary.infos > 0 && `情報${alertSummary.infos}件`}
+              </span>
+            </div>
+            <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${showAlerts ? 'rotate-180' : ''}`} />
+          </button>
+
+          {showAlerts && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mt-2 space-y-2"
+            >
+              {reportAlerts.map((alert, i) => (
+                <div
+                  key={`${alert.staffName}-${alert.field}-${i}`}
+                  className="flex items-start gap-3 px-4 py-3 rounded-lg border text-sm"
+                  style={{
+                    borderColor: alert.severity === 'error' ? '#fecaca' : alert.severity === 'warning' ? '#fde68a' : '#bfdbfe',
+                    backgroundColor: alert.severity === 'error' ? '#fef2f2' : alert.severity === 'warning' ? '#fffbeb' : '#eff6ff',
+                  }}
+                >
+                  {alert.severity === 'error' ? (
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
+                  ) : alert.severity === 'warning' ? (
+                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-500" />
+                  ) : (
+                    <Lightbulb className="w-4 h-4 shrink-0 mt-0.5 text-blue-500" />
+                  )}
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="font-bold text-foreground">{alert.staffName}</span>
+                      <span
+                        className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                        style={{
+                          color: alert.severity === 'error' ? '#dc2626' : alert.severity === 'warning' ? '#d97706' : '#2563eb',
+                          backgroundColor: alert.severity === 'error' ? '#fee2e2' : alert.severity === 'warning' ? '#fef3c7' : '#dbeafe',
+                        }}
+                      >
+                        {alert.severity === 'error' ? 'エラー' : alert.severity === 'warning' ? '警告' : '情報'}
+                      </span>
+                    </div>
+                    <p className="text-muted-foreground leading-relaxed">{alert.message}</p>
+                  </div>
+                </div>
+              ))}
+            </motion.div>
+          )}
+        </section>
+      )}
 
       {/* スタッフ個人実績 */}
       <section className="mb-8 pt-6 border-t-2 border-primary/20">
