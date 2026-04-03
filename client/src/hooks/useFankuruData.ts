@@ -175,6 +175,7 @@ async function fetchPdfData(): Promise<Record<string, FankuruPdf[]>> {
         const driveFileId = cols[5].trim();
         const previewUrl = cols[6].trim();
         const viewUrl = cols[7].trim();
+        const stylist = (cols[8] || "").trim(); // 担当者列（GASが抽出）
         
         const storeName = normalizeStoreName(rawStoreName);
         
@@ -189,7 +190,7 @@ async function fetchPdfData(): Promise<Record<string, FankuruPdf[]>> {
           folder,
           yearMonth,
           date,
-          stylist: "",
+          stylist,
           driveFileId,
           previewUrl,
           viewUrl,
@@ -226,6 +227,55 @@ async function fetchPdfData(): Promise<Record<string, FankuruPdf[]>> {
 
 // ファンくるフォルダが設定されている店舗
 const FANKURU_ENABLED_STORES = new Set(["姪浜院", "堀江院", "堀江院2nd", "楽々園院"]);
+
+export function useFankuruDataByStaff(staffName: string) {
+  const [allData, setAllData] = useState<Record<string, FankuruPdf[]>>(LEGACY_DATA);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await fetchPdfData();
+      setAllData(data);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "データ取得エラー");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // スタッフ名で全店舗のPDFをフィルタリング
+  const pdfs = useMemo(() => {
+    const result: FankuruPdf[] = [];
+    const normalizedTarget = staffName.trim().toLowerCase();
+    if (!normalizedTarget) return result;
+    for (const storePdfs of Object.values(allData)) {
+      for (const pdf of storePdfs) {
+        const stylist = (pdf.stylist || "").trim().toLowerCase();
+        if (stylist && (stylist.includes(normalizedTarget) || normalizedTarget.includes(stylist))) {
+          result.push(pdf);
+        }
+      }
+    }
+    return result.sort((a, b) => b.date.localeCompare(a.date));
+  }, [allData, staffName]);
+
+  const availableMonths = useMemo(() => {
+    const months = new Set<string>();
+    pdfs.forEach((p) => {
+      if (p.yearMonth) months.add(p.yearMonth);
+    });
+    return Array.from(months).sort().reverse();
+  }, [pdfs]);
+
+  return { pdfs, loading, error, availableMonths };
+}
 
 export function useFankuruData(storeName: string) {
   const hasFolderMapping = FANKURU_ENABLED_STORES.has(storeName);

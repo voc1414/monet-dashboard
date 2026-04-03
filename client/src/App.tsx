@@ -11,6 +11,7 @@ import NpsOverview from "./pages/NpsOverview";
 import StaffList from "./pages/StaffList";
 import SurveyList from "./pages/SurveyList";
 import SurveyDetail from "./pages/SurveyDetail";
+import StaffDetail from "./pages/StaffDetail";
 
 function Router() {
   return (
@@ -20,6 +21,7 @@ function Router() {
         <Route path="/" component={Home} />
         <Route path="/store/:storeId" component={StoreDetail} />
         <Route path="/staff" component={StaffList} />
+        <Route path="/staff/:staffId" component={StaffDetail} />
         <Route path="/survey" component={SurveyList} />
         <Route path="/survey/:storeId" component={SurveyDetail} />
         <Route path="/store/:storeId/nps" component={NpsOverview} />

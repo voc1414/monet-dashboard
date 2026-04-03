@@ -244,7 +244,9 @@ export default function StaffList() {
                                 <span className="text-primary font-bold text-sm">{staff.name.charAt(0)}</span>
                               </div>
                             )}
-                            <span className="font-bold text-sm text-foreground hover:text-primary transition-colors">{staff.name}</span>
+                            <Link href={`/staff/${encodeURIComponent(staff.name)}`}>
+                              <span className="font-bold text-sm text-primary hover:text-primary/80 transition-colors cursor-pointer" onClick={(e) => e.stopPropagation()}>{staff.name}</span>
+                            </Link>
                             {isNewStaff(staff.name, staff.storeNormalized) && (
                               <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none">NEW</span>
                             )}
@@ -292,7 +294,9 @@ export default function StaffList() {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-1.5">
-                                  <span className="font-bold text-sm text-foreground">{staff.name}</span>
+                                  <Link href={`/staff/${encodeURIComponent(staff.name)}`}>
+                                    <span className="font-bold text-sm text-primary hover:text-primary/80 transition-colors cursor-pointer" onClick={(e) => e.stopPropagation()}>{staff.name}</span>
+                                  </Link>
                                   {isNewStaff(staff.name, staff.storeNormalized) && (
                                     <span className="text-[9px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none">NEW</span>
                                   )}
