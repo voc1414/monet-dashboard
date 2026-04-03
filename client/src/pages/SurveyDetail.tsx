@@ -264,23 +264,31 @@ export default function SurveyDetail() {
     return Array.from(set).sort().reverse();
   }, [allNpsMonths, fankuruMonths, monthlyMonths]);
 
+  // デフォルト月: 全データ読み込み完了後に決定する
+  // NPS月を優先し、なければファンくる/月末報告書の月にフォールバック
   const defaultMonth = useMemo(() => {
     const now = new Date();
     const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const ym = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, "0")}`;
-    return allMonths.includes(ym) ? ym : allMonths[0] || "all";
-  }, [allMonths]);
+    // 先月のデータがあればそれを使う
+    if (allMonths.includes(ym)) return ym;
+    // なければNPS月の最新を優先
+    if (allNpsMonths.length > 0) return allNpsMonths[0];
+    // NPSもなければ全月の最新
+    return allMonths[0] || "all";
+  }, [allMonths, allNpsMonths]);
 
   const [selectedMonth, setSelectedMonth] = useState<string>("__init__");
   const [selectedScore, setSelectedScore] = useState<number | null>(null);
   const [selectedPdf, setSelectedPdf] = useState<FankuruPdf | null>(null);
   const [showAllReviews, setShowAllReviews] = useState(false);
 
+  // 全データの読み込みが完了してからデフォルト月を設定する
   useEffect(() => {
-    if (selectedMonth === "__init__" && allMonths.length > 0) {
+    if (selectedMonth === "__init__" && !npsLoading && !fankuruLoading && allMonths.length > 0) {
       setSelectedMonth(defaultMonth);
     }
-  }, [allMonths, defaultMonth, selectedMonth]);
+  }, [allMonths, defaultMonth, selectedMonth, npsLoading, fankuruLoading]);
 
   const activeMonth = selectedMonth === "__init__" ? defaultMonth : selectedMonth;
 
