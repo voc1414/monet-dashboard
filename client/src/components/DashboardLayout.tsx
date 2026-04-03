@@ -184,6 +184,12 @@ export default function DashboardLayout({
               <span className="text-[10px] font-medium">アンケート</span>
             </div>
           </Link>
+          <Link href="/admin">
+            <div className="flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-colors text-muted-foreground/60">
+              <Settings className="w-5 h-5" />
+              <span className="text-[10px] font-medium">管理者</span>
+            </div>
+          </Link>
         </div>
       </nav>
     </div>
