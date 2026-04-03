@@ -1,7 +1,7 @@
 /*
  * Design: Atelier Blanc — クリーンアトリエ
  * Page: 店舗別アンケート詳細（StoreDetail.tsxと同じデザインベース）
- * セクション順: ファンくる → NPS調査結果 → 総合アドバイス → カテゴリ別評価 → トップ3レビュー → ワースト3レビュー
+ * セクション順: NPS調査結果 → 総合アドバイス → カテゴリ別評価 → トップ3レビュー → ワースト3レビュー → ファンくる
  * 個人売上セクションなし
  */
 import { useParams, Link } from "wouter";
@@ -440,165 +440,7 @@ export default function SurveyDetail() {
         </div>
       </div>
 
-      {/* ===== 1. ファンくる調査結果（一番上） ===== */}
-      <section className="mb-8 pt-6 border-t-2 border-sage/20">
-        <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-          <FolderOpen className="w-5 h-5 text-sage" />
-          ファンくる調査結果
-          {(filteredFankuruPdfs.length > 0 || filteredFankuruComments.length > 0) && (
-            <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2">
-              {filteredFankuruPdfs.length + filteredFankuruComments.length}件
-            </span>
-          )}
-        </h2>
-
-        {!hasFolderMapping ? (
-          <Card className="border-border/50 border-dashed">
-            <CardContent className="p-8 text-center text-muted-foreground">
-              <FolderOpen className="w-8 h-8 mx-auto mb-2 opacity-40" />
-              <p className="text-sm">この店舗のファンくるフォルダはまだ設定されていません</p>
-            </CardContent>
-          </Card>
-        ) : fankuruLoading ? (
-          <Card className="border-border/50">
-            <CardContent className="p-8 text-center text-muted-foreground">
-              <Loader2 className="w-6 h-6 mx-auto mb-2 animate-spin opacity-50" />
-              <p className="text-sm">ファンくるデータを読み込み中...</p>
-            </CardContent>
-          </Card>
-        ) : !hasFankuruData ? (
-          <Card className="border-border/50 border-dashed">
-            <CardContent className="p-8 text-center text-muted-foreground">
-              <FileText className="w-8 h-8 mx-auto mb-2 opacity-40" />
-              <p className="text-sm">この月のファンくるデータはありません</p>
-              <p className="text-xs mt-1 opacity-70">Google Driveにファイルが追加されると自動的に表示されます</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <>
-            {/* ファンくるPDFリスト */}
-            {filteredFankuruPdfs.length > 0 && (
-              <div className="grid gap-3 mb-4">
-                {filteredFankuruPdfs.map((pdf, i) => (
-                  <motion.div
-                    key={pdf.id}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.05 * i }}
-                  >
-                    <Card
-                      className={`border-border/50 shadow-sm hover:shadow-md transition-all cursor-pointer group ${
-                        selectedPdf?.id === pdf.id ? "ring-2 ring-sage/40 border-sage/30" : ""
-                      }`}
-                      onClick={() => setSelectedPdf(selectedPdf?.id === pdf.id ? null : pdf)}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-sage/10 flex items-center justify-center shrink-0">
-                            <FileText className="w-5 h-5 text-sage" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-sm text-foreground group-hover:text-sage transition-colors">
-                              {pdf.displayName}
-                              {pdf.stylist && (
-                                <span className="ml-2 text-xs font-normal text-muted-foreground">
-                                  担当: {pdf.stylist}
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[10px] text-muted-foreground mt-0.5">
-                              フォルダ: {pdf.folder || "ルート"}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                              selectedPdf?.id === pdf.id
-                                ? "bg-sage text-white"
-                                : "bg-sage/10 text-sage group-hover:bg-sage/20"
-                            }`}>
-                              <Eye className="w-3 h-3" />
-                              {selectedPdf?.id === pdf.id ? "閉じる" : "詳細を見る"}
-                            </span>
-                            <a
-                              href={pdf.viewUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
-                              onClick={(e) => e.stopPropagation()}
-                              title="Google Driveで開く"
-                            >
-                              <ExternalLink className="w-4 h-4" />
-                            </a>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-
-            {/* PDF Preview */}
-            {selectedPdf && (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-4"
-              >
-                <Card className="border-border/50 shadow-sm overflow-hidden">
-                  <div className="px-4 py-3 border-b border-border/40 flex items-center justify-between bg-sage/5">
-                    <div className="flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-sage" />
-                      <span className="text-sm font-medium text-foreground">{selectedPdf.displayName}</span>
-                    </div>
-                    <a
-                      href={selectedPdf.viewUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-xs text-sage hover:text-sage/80 transition-colors"
-                    >
-                      Google Driveで開く
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  </div>
-                  <div className="w-full" style={{ height: "80vh", minHeight: "500px" }}>
-                    <iframe
-                      src={selectedPdf.previewUrl}
-                      className="w-full h-full border-0"
-                      title={selectedPdf.displayName}
-                      allow="autoplay"
-                    />
-                  </div>
-                </Card>
-              </motion.div>
-            )}
-
-            {/* ファンくるコメント */}
-            {filteredFankuruComments.length > 0 && (
-              <div className="space-y-3">
-                {filteredFankuruComments.map((f, i) => (
-                  <Card key={i} className="border-border/50 shadow-sm">
-                    <CardContent className="p-4">
-                      <div className="flex items-start gap-3">
-                        <Quote className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs font-semibold text-amber-700">ファンくるコメント</span>
-                            <span className="text-xs text-muted-foreground">{f.staffName}</span>
-                          </div>
-                          <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{f.comment}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-      </section>
-
-      {/* ===== 2. NPS調査結果 ===== */}
+      {/* ===== 1. NPS調査結果 ===== */}
       <section className="mb-8 pt-6 border-t-2 border-[#2D9C8F]/20">
         <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
           <BarChart3 className="w-5 h-5 text-[#2D9C8F]" />
@@ -829,6 +671,164 @@ export default function SurveyDetail() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ===== ファンくる調査結果（一番下） ===== */}
+      <section className="mb-8 pt-6 border-t-2 border-sage/20">
+        <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+          <FolderOpen className="w-5 h-5 text-sage" />
+          ファンくる調査結果
+          {(filteredFankuruPdfs.length > 0 || filteredFankuruComments.length > 0) && (
+            <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2">
+              {filteredFankuruPdfs.length + filteredFankuruComments.length}件
+            </span>
+          )}
+        </h2>
+
+        {!hasFolderMapping ? (
+          <Card className="border-border/50 border-dashed">
+            <CardContent className="p-8 text-center text-muted-foreground">
+              <FolderOpen className="w-8 h-8 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">この店舗のファンくるフォルダはまだ設定されていません</p>
+            </CardContent>
+          </Card>
+        ) : fankuruLoading ? (
+          <Card className="border-border/50">
+            <CardContent className="p-8 text-center text-muted-foreground">
+              <Loader2 className="w-6 h-6 mx-auto mb-2 animate-spin opacity-50" />
+              <p className="text-sm">ファンくるデータを読み込み中...</p>
+            </CardContent>
+          </Card>
+        ) : !hasFankuruData ? (
+          <Card className="border-border/50 border-dashed">
+            <CardContent className="p-8 text-center text-muted-foreground">
+              <FileText className="w-8 h-8 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">この月のファンくるデータはありません</p>
+              <p className="text-xs mt-1 opacity-70">Google Driveにファイルが追加されると自動的に表示されます</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            {/* ファンくるPDFリスト */}
+            {filteredFankuruPdfs.length > 0 && (
+              <div className="grid gap-3 mb-4">
+                {filteredFankuruPdfs.map((pdf, i) => (
+                  <motion.div
+                    key={pdf.id}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.05 * i }}
+                  >
+                    <Card
+                      className={`border-border/50 shadow-sm hover:shadow-md transition-all cursor-pointer group ${
+                        selectedPdf?.id === pdf.id ? "ring-2 ring-sage/40 border-sage/30" : ""
+                      }`}
+                      onClick={() => setSelectedPdf(selectedPdf?.id === pdf.id ? null : pdf)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-sage/10 flex items-center justify-center shrink-0">
+                            <FileText className="w-5 h-5 text-sage" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm text-foreground group-hover:text-sage transition-colors">
+                              {pdf.displayName}
+                              {pdf.stylist && (
+                                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                  担当: {pdf.stylist}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground mt-0.5">
+                              フォルダ: {pdf.folder || "ルート"}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                              selectedPdf?.id === pdf.id
+                                ? "bg-sage text-white"
+                                : "bg-sage/10 text-sage group-hover:bg-sage/20"
+                            }`}>
+                              <Eye className="w-3 h-3" />
+                              {selectedPdf?.id === pdf.id ? "閉じる" : "詳細を見る"}
+                            </span>
+                            <a
+                              href={pdf.viewUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+                              onClick={(e) => e.stopPropagation()}
+                              title="Google Driveで開く"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+
+            {/* PDF Preview */}
+            {selectedPdf && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-4"
+              >
+                <Card className="border-border/50 shadow-sm overflow-hidden">
+                  <div className="px-4 py-3 border-b border-border/40 flex items-center justify-between bg-sage/5">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-sage" />
+                      <span className="text-sm font-medium text-foreground">{selectedPdf.displayName}</span>
+                    </div>
+                    <a
+                      href={selectedPdf.viewUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs text-sage hover:text-sage/80 transition-colors"
+                    >
+                      Google Driveで開く
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                  <div className="w-full" style={{ height: "80vh", minHeight: "500px" }}>
+                    <iframe
+                      src={selectedPdf.previewUrl}
+                      className="w-full h-full border-0"
+                      title={selectedPdf.displayName}
+                      allow="autoplay"
+                    />
+                  </div>
+                </Card>
+              </motion.div>
+            )}
+
+            {/* ファンくるコメント */}
+            {filteredFankuruComments.length > 0 && (
+              <div className="space-y-3">
+                {filteredFankuruComments.map((f, i) => (
+                  <Card key={i} className="border-border/50 shadow-sm">
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <Quote className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-semibold text-amber-700">ファンくるコメント</span>
+                            <span className="text-xs text-muted-foreground">{f.staffName}</span>
+                          </div>
+                          <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{f.comment}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </section>
 
       {/* NPS回答なし */}
       {!loading && storeRecords.length === 0 && !hasFankuruData && (

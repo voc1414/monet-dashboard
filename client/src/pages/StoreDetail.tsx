@@ -233,6 +233,12 @@ export default function StoreDetail() {
   const [selectedPdf, setSelectedPdf] = useState<FankuruPdf | null>(null);
   const { pdfs: fankuruPdfs, loading: fankuruLoading, hasFolderMapping } = useFankuruData(storeId);
 
+  // ファンくるPDFを選択月でフィルタリング
+  const filteredFankuruPdfs = useMemo(() => {
+    if (selectedMonth === "all" || selectedMonth === "__init__") return fankuruPdfs;
+    return fankuruPdfs.filter(p => p.yearMonth === selectedMonth);
+  }, [fankuruPdfs, selectedMonth]);
+
   // 全データの読み込みが完了してからデフォルト月を設定する
   useEffect(() => {
     if (selectedMonth === "__init__" && !npsLoading && !reportLoading && allMonths.length > 0) {
@@ -614,8 +620,8 @@ export default function StoreDetail() {
         <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
           <FolderOpen className="w-5 h-5 text-sage" />
           ファンくる調査結果
-          {fankuruPdfs.length > 0 && (
-            <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2">{fankuruPdfs.length}件</span>
+          {filteredFankuruPdfs.length > 0 && (
+            <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2">{filteredFankuruPdfs.length}件</span>
           )}
         </h2>
 
@@ -633,11 +639,11 @@ export default function StoreDetail() {
               <p className="text-sm">ファンくるデータを読み込み中...</p>
             </CardContent>
           </Card>
-        ) : fankuruPdfs.length === 0 ? (
+        ) : filteredFankuruPdfs.length === 0 ? (
           <Card className="border-border/50 border-dashed">
             <CardContent className="p-8 text-center text-muted-foreground">
               <FileText className="w-8 h-8 mx-auto mb-2 opacity-40" />
-              <p className="text-sm">調査結果PDFはまだアップロードされていません</p>
+              <p className="text-sm">この月のファンくるデータはありません</p>
               <p className="text-xs mt-1 opacity-70">Google Driveにファイルが追加されると自動的に表示されます</p>
             </CardContent>
           </Card>
@@ -645,7 +651,7 @@ export default function StoreDetail() {
           <>
             {/* PDF List */}
             <div className="grid gap-3">
-              {fankuruPdfs.map((pdf, i) => (
+              {filteredFankuruPdfs.map((pdf, i) => (
                 <motion.div
                   key={pdf.id}
                   initial={{ opacity: 0, y: 6 }}
