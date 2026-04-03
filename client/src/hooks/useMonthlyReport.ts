@@ -171,6 +171,26 @@ export interface StaffReport {
   photoUrl2: string;
 }
 
+export interface MonthDataPoint {
+  month: string;
+  monthLabel: string;
+  sales: number;
+  techSales: number;
+  retailSales: number;
+  customers: number;
+  newCustomers: number;
+  returnCustomers: number;
+  unitPrice: number;
+  nextReservationRate: number;
+  hasData: boolean;
+}
+
+export interface StaffMonthlyTrend {
+  staffName: string;
+  employmentType: string;
+  data: MonthDataPoint[];
+}
+
 export interface StoreMonthlyStats {
   store: string;
   month: string;
@@ -404,6 +424,51 @@ export function useMonthlyReport() {
     };
   }, [rawData, getStoreMonthlyStats]);
 
+  /**
+   * スタッフ別の月次トレンドデータを取得
+   * 指定店舗の各スタッフについて、全月のデータを返す
+   */
+  const getStaffTrend = useMemo(() => {
+    return (storeName: string): StaffMonthlyTrend[] => {
+      const normalizedTarget = normalizeStoreName(storeName);
+      const storeData = rawData.filter((r) => r.storeNormalized === normalizedTarget);
+      if (storeData.length === 0) return [];
+
+      // 全月を取得（古い順）
+      const allMonths = Array.from(new Set(storeData.map((r) => r.reportMonth).filter(Boolean))).sort();
+
+      // スタッフ名一覧
+      const staffNames = Array.from(new Set(storeData.map((r) => r.name).filter(Boolean)));
+
+      return staffNames.map((name) => {
+        const staffData = storeData.filter((r) => r.name === name);
+        const monthlyData: MonthDataPoint[] = allMonths.map((month) => {
+          const record = staffData.find((r) => r.reportMonth === month);
+          const monthNum = parseInt(month.split("-")[1]);
+          return {
+            month,
+            monthLabel: `${monthNum}月`,
+            sales: record?.totalSales || 0,
+            techSales: record?.techSales || 0,
+            retailSales: record?.retailSales || 0,
+            customers: record ? (record.newCustomers + record.returnCustomers) : 0,
+            newCustomers: record?.newCustomers || 0,
+            returnCustomers: record?.returnCustomers || 0,
+            unitPrice: record?.unitPrice || 0,
+            nextReservationRate: record?.nextReservationRate || 0,
+            hasData: !!record,
+          };
+        });
+
+        return {
+          staffName: name,
+          employmentType: staffData[0]?.employmentType || "",
+          data: monthlyData,
+        };
+      });
+    };
+  }, [rawData]);
+
   return {
     rawData,
     loading,
@@ -411,5 +476,6 @@ export function useMonthlyReport() {
     availableMonths,
     getStoreMonthlyStats,
     getAllStoresStats,
+    getStaffTrend,
   };
 }

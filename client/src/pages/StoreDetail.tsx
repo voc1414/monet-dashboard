@@ -24,13 +24,13 @@ import { generateStoreAdvice } from "@/lib/npsAdvice";
 import type { NpsAdvice } from "@/lib/npsAdvice";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend
+  PieChart, Pie, Cell, Legend, LineChart, Line
 } from "recharts";
 import { useFankuruData } from "@/hooks/useFankuruData";
 import { isNewStore, isNewStaff } from "@/lib/newBadge";
 import type { FankuruPdf } from "@/hooks/useFankuruData";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
-import type { StaffReport } from "@/hooks/useMonthlyReport";
+import type { StaffReport, StaffMonthlyTrend } from "@/hooks/useMonthlyReport";
 import { validateStoreReport, getAlertSummary } from "@/lib/reportValidation";
 import type { ReportAlert } from "@/lib/reportValidation";
 
@@ -213,7 +213,7 @@ export default function StoreDetail() {
   const params = useParams<{ storeId: string }>();
   const storeId = decodeURIComponent(params.storeId || "");
   const { records, loading: npsLoading, error: npsError, lastUpdated, refresh } = useNpsData();
-  const { loading: reportLoading, error: reportError, getStoreMonthlyStats, availableMonths: reportMonths } = useMonthlyReport();
+  const { loading: reportLoading, error: reportError, getStoreMonthlyStats, availableMonths: reportMonths, getStaffTrend } = useMonthlyReport();
   const loading = npsLoading || reportLoading;
   const error = npsError || reportError;
   const allNpsMonths = useMemo(() => getAvailableMonths(records), [records]);
@@ -487,6 +487,189 @@ export default function StoreDetail() {
           </Card>
         )}
       </section>
+
+      {/* スタッフ別月次トレンド */}
+      {(() => {
+        const trendData = getStaffTrend(storeId);
+        if (trendData.length === 0 || trendData[0]?.data.length < 2) return null;
+
+        // スタッフ別の色パレット
+        const STAFF_COLORS = [
+          '#2D9C8F', '#E5B85C', '#6B8EAE', '#C75C5C', '#8B7EC8',
+          '#D4845A', '#5BA88C', '#B07AA1', '#4E9FD5', '#E88E8E'
+        ];
+
+        // 月ラベル一覧（全スタッフ共通）
+        const months = trendData[0].data.map(d => d.monthLabel);
+
+        // 売上グラフ用データ: 各月にスタッフ名をキーとした売上を格納
+        const salesChartData = months.map((label, mi) => {
+          const point: Record<string, any> = { month: label };
+          trendData.forEach(staff => {
+            const d = staff.data[mi];
+            point[staff.staffName] = d?.hasData ? d.sales : null;
+          });
+          return point;
+        });
+
+        // 客数グラフ用データ
+        const customerChartData = months.map((label, mi) => {
+          const point: Record<string, any> = { month: label };
+          trendData.forEach(staff => {
+            const d = staff.data[mi];
+            point[staff.staffName] = d?.hasData ? d.customers : null;
+          });
+          return point;
+        });
+
+        // 前月比の計算
+        const latestIdx = trendData[0].data.length - 1;
+        const prevIdx = latestIdx - 1;
+
+        return (
+          <section className="mb-8 pt-6 border-t-2 border-primary/20">
+            <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-primary" />
+              スタッフ別月次トレンド
+              <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2">
+                {months.length}ヶ月分
+              </span>
+            </h2>
+
+            {/* 前月比サマリーカード */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 mb-6">
+              {trendData.map((staff, si) => {
+                const curr = staff.data[latestIdx];
+                const prev = staff.data[prevIdx];
+                if (!curr?.hasData) return null;
+                const salesDiff = prev?.hasData ? curr.sales - prev.sales : null;
+                const custDiff = prev?.hasData ? curr.customers - prev.customers : null;
+                return (
+                  <Card key={staff.staffName} className="border-border/50 shadow-sm">
+                    <CardContent className="p-3">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: STAFF_COLORS[si % STAFF_COLORS.length] }} />
+                        <span className="text-xs font-bold text-foreground truncate">{staff.staffName}</span>
+                      </div>
+                      <div className="space-y-1.5">
+                        <div>
+                          <div className="text-[10px] text-muted-foreground">売上</div>
+                          <div className="flex items-center gap-1">
+                            <span className="font-mono-data text-xs font-bold">{formatCurrency(curr.sales)}</span>
+                            {salesDiff !== null && (
+                              <span className={`text-[10px] font-mono-data font-semibold ${salesDiff >= 0 ? 'text-[#2D9C8F]' : 'text-[#C75C5C]'}`}>
+                                {salesDiff >= 0 ? '+' : ''}{formatCurrency(salesDiff).replace('¥', '').replace('—', '0')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-muted-foreground">客数</div>
+                          <div className="flex items-center gap-1">
+                            <span className="font-mono-data text-xs font-bold">{curr.customers}名</span>
+                            {custDiff !== null && (
+                              <span className={`text-[10px] font-mono-data font-semibold ${custDiff >= 0 ? 'text-[#2D9C8F]' : 'text-[#C75C5C]'}`}>
+                                {custDiff >= 0 ? '+' : ''}{custDiff}名
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* 売上推移グラフ */}
+              <Card className="border-border/50 shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-foreground flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-primary" />
+                    売上推移
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4">
+                  <ResponsiveContainer width="100%" height={260}>
+                    <BarChart data={salesChartData} margin={{ top: 10, right: 10, bottom: 5, left: -10 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
+                      <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => v >= 10000 ? `${Math.round(v / 10000)}万` : `${v}`} />
+                      <Tooltip
+                        contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e5e5' }}
+                        formatter={(value: number, name: string) => [value ? `¥${value.toLocaleString()}` : '—', name]}
+                      />
+                      {trendData.map((staff, si) => (
+                        <Bar
+                          key={staff.staffName}
+                          dataKey={staff.staffName}
+                          fill={STAFF_COLORS[si % STAFF_COLORS.length]}
+                          radius={[2, 2, 0, 0]}
+                          stackId="sales"
+                        />
+                      ))}
+                    </BarChart>
+                  </ResponsiveContainer>
+                  {/* Legend */}
+                  <div className="flex flex-wrap gap-3 mt-3 justify-center">
+                    {trendData.map((staff, si) => (
+                      <div key={staff.staffName} className="flex items-center gap-1.5">
+                        <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: STAFF_COLORS[si % STAFF_COLORS.length] }} />
+                        <span className="text-[10px] text-muted-foreground">{staff.staffName}</span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 客数推移グラフ */}
+              <Card className="border-border/50 shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-foreground flex items-center gap-2">
+                    <Users className="w-4 h-4 text-[#6B8EAE]" />
+                    客数推移
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4">
+                  <ResponsiveContainer width="100%" height={260}>
+                    <LineChart data={customerChartData} margin={{ top: 10, right: 10, bottom: 5, left: -10 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
+                      <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} />
+                      <Tooltip
+                        contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e5e5' }}
+                        formatter={(value: number, name: string) => [value !== null ? `${value}名` : '—', name]}
+                      />
+                      {trendData.map((staff, si) => (
+                        <Line
+                          key={staff.staffName}
+                          type="monotone"
+                          dataKey={staff.staffName}
+                          stroke={STAFF_COLORS[si % STAFF_COLORS.length]}
+                          strokeWidth={2}
+                          dot={{ r: 4, fill: STAFF_COLORS[si % STAFF_COLORS.length] }}
+                          activeDot={{ r: 6 }}
+                          connectNulls={false}
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                  {/* Legend */}
+                  <div className="flex flex-wrap gap-3 mt-3 justify-center">
+                    {trendData.map((staff, si) => (
+                      <div key={staff.staffName} className="flex items-center gap-1.5">
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: STAFF_COLORS[si % STAFF_COLORS.length] }} />
+                        <span className="text-[10px] text-muted-foreground">{staff.staffName}</span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+        );
+      })()}
 
       {/* NPS Survey Results */}
       <section className="mb-8 pt-6 border-t-2 border-[#2D9C8F]/20">
