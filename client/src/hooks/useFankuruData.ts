@@ -228,6 +228,62 @@ async function fetchPdfData(): Promise<Record<string, FankuruPdf[]>> {
 // ファンくるフォルダが設定されている店舗
 const FANKURU_ENABLED_STORES = new Set(["姪浜院", "堀江院", "堀江院2nd", "楽々園院"]);
 
+/**
+ * ファンくるのスタイリスト名（ひらがな/カタカナ/略称）と
+ * 月末報告書のスタッフ名（漢字）を紐づけるマッピングテーブル。
+ * キー: ファンくるPDFに記載される名前（小文字化済み）
+ * 値: 月末報告書のスタッフ名（ダッシュボード表示名）
+ */
+const STYLIST_NAME_ALIASES: Record<string, string[]> = {
+  // 金田 ↔ かねだ
+  "金田": ["かねだ", "カネダ", "kaneda"],
+  // 今後追加が必要な場合はここに追記
+  // 例: "山田太郎": ["やまだ", "ヤマダ", "yamada"],
+};
+
+// 逆引きマップを構築（エイリアス → 正式名）
+const ALIAS_TO_CANONICAL: Record<string, string> = {};
+for (const [canonical, aliases] of Object.entries(STYLIST_NAME_ALIASES)) {
+  for (const alias of aliases) {
+    ALIAS_TO_CANONICAL[alias.toLowerCase()] = canonical;
+  }
+  // 正式名自身も登録
+  ALIAS_TO_CANONICAL[canonical.toLowerCase()] = canonical;
+}
+
+/**
+ * スタイリスト名を正規化する。
+ * エイリアスがあれば正式名に変換、なければそのまま返す。
+ */
+function normalizeStylistName(name: string): string {
+  const lower = name.trim().toLowerCase();
+  return ALIAS_TO_CANONICAL[lower] || name.trim();
+}
+
+/**
+ * スタッフ名とスタイリスト名が一致するかチェックする。
+ * 直接一致、部分一致、エイリアス経由の一致をすべてチェック。
+ */
+function matchesStylist(stylistRaw: string, staffName: string): boolean {
+  if (!stylistRaw || !staffName) return false;
+  const stylist = stylistRaw.trim().toLowerCase();
+  const target = staffName.trim().toLowerCase();
+  
+  // 直接一致・部分一致
+  if (stylist.includes(target) || target.includes(stylist)) return true;
+  
+  // エイリアス経由: 両方を正規化して比較
+  const normalizedStylist = normalizeStylistName(stylistRaw);
+  const normalizedTarget = normalizeStylistName(staffName);
+  if (normalizedStylist.toLowerCase() === normalizedTarget.toLowerCase()) return true;
+  
+  // 正規化した名前での部分一致
+  if (normalizedStylist.toLowerCase().includes(normalizedTarget.toLowerCase()) ||
+      normalizedTarget.toLowerCase().includes(normalizedStylist.toLowerCase())) return true;
+  
+  return false;
+}
+
 export function useFankuruDataByStaff(staffName: string) {
   const [allData, setAllData] = useState<Record<string, FankuruPdf[]>>(LEGACY_DATA);
   const [loading, setLoading] = useState(true);
@@ -250,15 +306,13 @@ export function useFankuruDataByStaff(staffName: string) {
     loadData();
   }, [loadData]);
 
-  // スタッフ名で全店舗のPDFをフィルタリング
+  // スタッフ名で全店舗のPDFをフィルタリング（エイリアス対応）
   const pdfs = useMemo(() => {
     const result: FankuruPdf[] = [];
-    const normalizedTarget = staffName.trim().toLowerCase();
-    if (!normalizedTarget) return result;
+    if (!staffName.trim()) return result;
     for (const storePdfs of Object.values(allData)) {
       for (const pdf of storePdfs) {
-        const stylist = (pdf.stylist || "").trim().toLowerCase();
-        if (stylist && (stylist.includes(normalizedTarget) || normalizedTarget.includes(stylist))) {
+        if (pdf.stylist && matchesStylist(pdf.stylist, staffName)) {
           result.push(pdf);
         }
       }
