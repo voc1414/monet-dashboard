@@ -184,6 +184,26 @@ function parseCSV(text: string): string[][] {
   return rows;
 }
 
+/**
+ * 同じスタッフ名×同じ報告月の重複を排除し、回答日時が新しい方を残す
+ */
+function deduplicateReports(reports: StaffReport[]): StaffReport[] {
+  const map = new Map<string, StaffReport>();
+  for (const r of reports) {
+    const key = `${r.name}__${r.reportMonth}`;
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, r);
+    } else {
+      // answerDateが新しい方を残す
+      if (r.answerDate > existing.answerDate) {
+        map.set(key, r);
+      }
+    }
+  }
+  return Array.from(map.values());
+}
+
 export function useMonthlyReport() {
   const [rawData, setRawData] = useState<StaffReport[]>([]);
   const [loading, setLoading] = useState(true);
@@ -252,8 +272,11 @@ export function useMonthlyReport() {
           };
         });
 
+        // 同じスタッフ×同月の重複排除: 回答日時が新しい方を残す
+        const deduped = deduplicateReports(reports);
+
         if (!cancelled) {
-          setRawData(reports);
+          setRawData(deduped);
           setError(null);
         }
       } catch (e) {
