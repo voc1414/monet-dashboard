@@ -253,8 +253,28 @@ function parseCSV(text: string): string[][] {
 }
 
 /**
+ * AM/PM形式の日時文字列をDateオブジェクトに変換する。
+ * 例: "2026-04-03 09:21:56 am" → Date
+ */
+function parseAnswerDate(dateStr: string): Date {
+  if (!dateStr) return new Date(0);
+  const cleaned = dateStr.trim().replace(/\s+(am|pm)/i, (_, p) => ` ${p.toUpperCase()}`);
+  const d = new Date(cleaned);
+  if (!isNaN(d.getTime())) return d;
+  // フォールバック: 手動パース
+  const parts = dateStr.trim().match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2}):(\d{2})\s*(am|pm)?/i);
+  if (!parts) return new Date(0);
+  const [, year, month, day, hour, min, sec, ampm] = parts;
+  let h = parseInt(hour);
+  if (ampm?.toLowerCase() === "pm" && h < 12) h += 12;
+  if (ampm?.toLowerCase() === "am" && h === 12) h = 0;
+  return new Date(parseInt(year), parseInt(month) - 1, parseInt(day), h, parseInt(min), parseInt(sec));
+}
+
+/**
  * 同じ店舗×同じスタッフ名×同じ報告月の重複を排除し、回答日時が新しい方を残す
  * → 異なる店舗に同名スタッフがいる場合も正しく両方表示される
+ * → AM/PM形式の日時をDate型に変換して正確に比較
  */
 function deduplicateReports(reports: StaffReport[]): StaffReport[] {
   const map = new Map<string, StaffReport>();
@@ -264,8 +284,10 @@ function deduplicateReports(reports: StaffReport[]): StaffReport[] {
     if (!existing) {
       map.set(key, r);
     } else {
-      // answerDateが新しい方を残す
-      if (r.answerDate > existing.answerDate) {
+      // Date型に変換して正確に新しい方を判定
+      const existingDate = parseAnswerDate(existing.answerDate);
+      const newDate = parseAnswerDate(r.answerDate);
+      if (newDate.getTime() > existingDate.getTime()) {
         map.set(key, r);
       }
     }
