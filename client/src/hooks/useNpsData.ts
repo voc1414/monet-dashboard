@@ -150,14 +150,18 @@ export function calculateStoreStats(records: NpsRecord[]): StoreStats[] {
 
 export function filterByMonth(records: NpsRecord[], yearMonth: string): NpsRecord[] {
   if (!yearMonth) return records;
-  return records.filter((r) => r.date.startsWith(yearMonth));
+  // yearMonthは "2026-03" 形式、r.dateは "2026/03/15" 形式の場合がある
+  // スラッシュ区切りにも対応
+  const slashMonth = yearMonth.replace(/-/g, "/");
+  return records.filter((r) => r.date.startsWith(yearMonth) || r.date.startsWith(slashMonth));
 }
 
 export function getAvailableMonths(records: NpsRecord[]): string[] {
   const months = new Set<string>();
   records.forEach((r) => {
     if (r.date) {
-      const ym = r.date.substring(0, 7);
+      // "2026/01/29" → "2026-01" に統一（スラッシュ→ハイフン）
+      const ym = r.date.substring(0, 7).replace(/\//g, "-");
       months.add(ym);
     }
   });

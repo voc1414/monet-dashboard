@@ -27,7 +27,6 @@ import { useFankuruDataByStaff } from "@/hooks/useFankuruData";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import type { StaffReport } from "@/hooks/useMonthlyReport";
 import { isNewStaff } from "@/lib/newBadge";
-import { useStaffOverrides } from "@/hooks/useStaffOverrides";
 import type { FankuruPdf } from "@/hooks/useFankuruData";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -242,7 +241,6 @@ export default function StaffDetail() {
   const staffName = decodeURIComponent(params.staffId || "");
   const { records, loading: npsLoading, lastUpdated, refresh } = useNpsData();
   const { rawData, loading: reportLoading, availableMonths: reportMonths, getStaffTrend } = useMonthlyReport();
-  const { getDisplayName } = useStaffOverrides();
   const loading = npsLoading || reportLoading;
 
   // スタッフの所属店舗を特定
@@ -250,12 +248,6 @@ export default function StaffDetail() {
     const staffData = rawData.find(r => r.name === staffName);
     return staffData?.storeNormalized || "";
   }, [rawData, staffName]);
-
-  // DBオーバーライドを適用した表示名
-  const staffDisplayName = useMemo(() => {
-    if (!staffStore) return staffName;
-    return getDisplayName(staffName, staffStore);
-  }, [staffName, staffStore, getDisplayName]);
 
   // ファンくるデータ（店舗名で絞り込み、同姓同名対策）
   const { pdfs: fankuruPdfs, loading: fankuruLoading } = useFankuruDataByStaff(staffName, staffStore);
@@ -436,7 +428,7 @@ export default function StaffDetail() {
 
   const breadcrumbs = [
     { label: "スタッフ一覧", href: "/staff" },
-    { label: staffDisplayName },
+    { label: staffName },
   ];
 
   return (
@@ -459,7 +451,7 @@ export default function StaffDetail() {
             )}
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
-                {staffDisplayName}
+                {staffName}
                 {staffStore && isNewStaff(staffName, staffStore) && (
                   <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none">NEW</span>
                 )}
