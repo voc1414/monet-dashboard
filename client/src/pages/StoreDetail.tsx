@@ -28,6 +28,7 @@ import {
 } from "recharts";
 import { useFankuruData } from "@/hooks/useFankuruData";
 import { isNewStore, isNewStaff } from "@/lib/newBadge";
+import { useStaffOverrides } from "@/hooks/useStaffOverrides";
 import type { FankuruPdf } from "@/hooks/useFankuruData";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import type { StaffReport, StaffMonthlyTrend } from "@/hooks/useMonthlyReport";
@@ -214,6 +215,7 @@ export default function StoreDetail() {
   const storeId = decodeURIComponent(params.storeId || "");
   const { records, loading: npsLoading, error: npsError, lastUpdated, refresh } = useNpsData();
   const { loading: reportLoading, error: reportError, getStoreMonthlyStats, availableMonths: reportMonths, getStaffTrend } = useMonthlyReport();
+  const { getDisplayName } = useStaffOverrides();
   const loading = npsLoading || reportLoading;
   const error = npsError || reportError;
   const allNpsMonths = useMemo(() => getAvailableMonths(records), [records]);
@@ -395,7 +397,7 @@ export default function StoreDetail() {
                   )}
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className="font-bold text-foreground">{alert.staffName}</span>
+                      <span className="font-bold text-foreground">{getDisplayName(alert.staffName, storeId)}</span>
                       <span
                         className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
                         style={{
@@ -436,12 +438,12 @@ export default function StoreDetail() {
                           <img src={sr.photoUrl2} alt={sr.name} className="w-10 h-10 rounded-full object-cover object-center shrink-0" />
                         ) : (
                           <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                            <span className="text-primary font-bold text-sm">{sr.name.charAt(0)}</span>
+                            <span className="text-primary font-bold text-sm">{getDisplayName(sr.name, storeId).charAt(0)}</span>
                           </div>
                         )}
                         <div>
                           <div className="font-bold text-sm text-foreground flex items-center gap-1.5">
-                            {sr.name}
+                            {getDisplayName(sr.name, storeId)}
                             {isNewStaff(sr.name, storeId) && (
                               <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none">NEW</span>
                             )}
@@ -549,7 +551,7 @@ export default function StoreDetail() {
                     <CardContent className="p-3">
                       <div className="flex items-center gap-1.5 mb-2">
                         <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: STAFF_COLORS[si % STAFF_COLORS.length] }} />
-                        <span className="text-xs font-bold text-foreground truncate">{staff.staffName}</span>
+                        <span className="text-xs font-bold text-foreground truncate">{getDisplayName(staff.staffName, storeId)}</span>
                       </div>
                       <div className="space-y-1.5">
                         <div>
@@ -616,7 +618,7 @@ export default function StoreDetail() {
                     {trendData.map((staff, si) => (
                       <div key={staff.staffName} className="flex items-center gap-1.5">
                         <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: STAFF_COLORS[si % STAFF_COLORS.length] }} />
-                        <span className="text-[10px] text-muted-foreground">{staff.staffName}</span>
+                        <span className="text-[10px] text-muted-foreground">{getDisplayName(staff.staffName, storeId)}</span>
                       </div>
                     ))}
                   </div>
@@ -660,7 +662,7 @@ export default function StoreDetail() {
                     {trendData.map((staff, si) => (
                       <div key={staff.staffName} className="flex items-center gap-1.5">
                         <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: STAFF_COLORS[si % STAFF_COLORS.length] }} />
-                        <span className="text-[10px] text-muted-foreground">{staff.staffName}</span>
+                        <span className="text-[10px] text-muted-foreground">{getDisplayName(staff.staffName, storeId)}</span>
                       </div>
                     ))}
                   </div>

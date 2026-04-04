@@ -8,6 +8,13 @@
       "when": 1775227645432,
       "tag": "0000_naive_mastermind",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1775270441895,
+      "tag": "0001_outstanding_scarlet_witch",
+      "breakpoints": true
     }
   ]
 }

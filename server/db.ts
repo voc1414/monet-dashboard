@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, staffOverrides, InsertStaffOverride, StaffOverride } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,4 +89,59 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// ===== Staff Overrides =====
+
+/** 全スタッフオーバーライドを取得 */
+export async function getAllStaffOverrides(): Promise<StaffOverride[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(staffOverrides);
+}
+
+/** 特定のスタッフオーバーライドを取得（originalName + storeで検索） */
+export async function getStaffOverride(originalName: string, store: string): Promise<StaffOverride | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(staffOverrides)
+    .where(and(eq(staffOverrides.originalName, originalName), eq(staffOverrides.store, store)))
+    .limit(1);
+  return result[0];
+}
+
+/** スタッフオーバーライドを作成または更新（upsert） */
+export async function upsertStaffOverride(data: {
+  originalName: string;
+  store: string;
+  displayName: string;
+  hidden?: number;
+  retiredMonth?: string | null;
+}): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const existing = await getStaffOverride(data.originalName, data.store);
+  if (existing) {
+    await db.update(staffOverrides)
+      .set({
+        displayName: data.displayName,
+        hidden: data.hidden ?? existing.hidden,
+        retiredMonth: data.retiredMonth !== undefined ? data.retiredMonth : existing.retiredMonth,
+      })
+      .where(eq(staffOverrides.id, existing.id));
+  } else {
+    await db.insert(staffOverrides).values({
+      originalName: data.originalName,
+      store: data.store,
+      displayName: data.displayName,
+      hidden: data.hidden ?? 0,
+      retiredMonth: data.retiredMonth ?? null,
+    });
+  }
+}
+
+/** スタッフオーバーライドを削除 */
+export async function deleteStaffOverride(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(staffOverrides).where(eq(staffOverrides.id, id));
+}

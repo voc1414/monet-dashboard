@@ -18,6 +18,7 @@ import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { useNpsData, filterByMonth } from "@/hooks/useNpsData";
 import type { StaffReport } from "@/hooks/useMonthlyReport";
 import { isNewStaff } from "@/lib/newBadge";
+import { useStaffOverrides } from "@/hooks/useStaffOverrides";
 
 const formatCurrency = (n: number) => {
   if (n === 0) return "—";
@@ -47,6 +48,7 @@ interface StaffNpsInfo {
 export default function StaffList() {
   const { rawData, loading, error, availableMonths } = useMonthlyReport();
   const { records: npsRecords, loading: npsLoading } = useNpsData();
+  const { getDisplayName, isHidden } = useStaffOverrides();
   const [, navigate] = useLocation();
 
   // デフォルトは先月
@@ -84,8 +86,10 @@ export default function StaffList() {
     } else {
       filtered = rawData.filter((r) => r.reportMonth === activeMonth);
     }
-    return [...filtered].sort((a, b) => b.totalSales - a.totalSales);
-  }, [rawData, activeMonth]);
+    // DBオーバーライドで非表示設定のスタッフを除外
+    const visible = filtered.filter(r => !isHidden(r.name, r.storeNormalized));
+    return [...visible].sort((a, b) => b.totalSales - a.totalSales);
+  }, [rawData, activeMonth, isHidden]);
 
   // スタッフごとのNPS情報を計算
   const staffNpsMap = useMemo(() => {
@@ -235,10 +239,10 @@ export default function StaffList() {
                             <img src={staff.photoUrl2} alt={staff.name} className="w-9 h-9 rounded-full object-cover object-center shrink-0" />
                           ) : (
                             <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                              <span className="text-primary font-bold text-sm">{staff.name.charAt(0)}</span>
+                              <span className="text-primary font-bold text-sm">{getDisplayName(staff.name, staff.storeNormalized).charAt(0)}</span>
                             </div>
                           )}
-                          <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">{staff.name}</span>
+                          <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">{getDisplayName(staff.name, staff.storeNormalized)}</span>
                           {isNewStaff(staff.name, staff.storeNormalized) && (
                             <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none">NEW</span>
                           )}
@@ -273,13 +277,13 @@ export default function StaffList() {
                             <img src={staff.photoUrl2} alt={staff.name} className="w-8 h-8 rounded-full object-cover object-center shrink-0" />
                           ) : (
                             <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                              <span className="text-primary font-bold text-xs">{staff.name.charAt(0)}</span>
+                              <span className="text-primary font-bold text-xs">{getDisplayName(staff.name, staff.storeNormalized).charAt(0)}</span>
                             </div>
                           )}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-1.5">
-                                <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">{staff.name}</span>
+                                <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">{getDisplayName(staff.name, staff.storeNormalized)}</span>
                                 {isNewStaff(staff.name, staff.storeNormalized) && (
                                   <span className="text-[9px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none">NEW</span>
                                 )}

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { publicProcedure, router } from "../_core/trpc";
 import { ENV } from "../_core/env";
 import { SignJWT, jwtVerify } from "jose";
+import { getAllStaffOverrides, upsertStaffOverride, deleteStaffOverride } from "../db";
 
 const JWT_SECRET_KEY = new TextEncoder().encode(ENV.cookieSecret || "monet-admin-secret-key");
 
@@ -30,6 +31,19 @@ function getTokenFromRequest(req: any): string | undefined {
   }
   return undefined;
 }
+
+/** 管理者認証済みプロシージャ */
+const adminProcedure = publicProcedure.use(async ({ ctx, next }) => {
+  const token = getTokenFromRequest(ctx.req);
+  if (!token) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "管理者認証が必要です" });
+  }
+  const isValid = await verifyAdminToken(token);
+  if (!isValid) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "管理者トークンが無効です" });
+  }
+  return next({ ctx });
+});
 
 export const adminRouter = router({
   login: publicProcedure
@@ -65,6 +79,35 @@ export const adminRouter = router({
     // Client-side will clear localStorage
     return { success: true };
   }),
+
+  // ===== スタッフオーバーライド CRUD =====
+
+  /** 全スタッフオーバーライドを取得（公開API — ダッシュボード側でも使用） */
+  staffOverrides: publicProcedure.query(async () => {
+    return getAllStaffOverrides();
+  }),
+
+  /** スタッフオーバーライドを作成/更新（管理者のみ） */
+  upsertStaffOverride: adminProcedure
+    .input(z.object({
+      originalName: z.string().min(1),
+      store: z.string().min(1),
+      displayName: z.string().min(1),
+      hidden: z.number().optional(),
+      retiredMonth: z.string().nullable().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      await upsertStaffOverride(input);
+      return { success: true };
+    }),
+
+  /** スタッフオーバーライドを削除（管理者のみ） */
+  deleteStaffOverride: adminProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      await deleteStaffOverride(input.id);
+      return { success: true };
+    }),
 });
 
 // 管理者認証ミドルウェア
