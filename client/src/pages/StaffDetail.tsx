@@ -237,32 +237,36 @@ const NEGATIVE_KEYWORDS = [
 
 // ===== Main Component =====
 export default function StaffDetail() {
-  const params = useParams<{ staffId: string }>();
+  const params = useParams<{ storeId: string; staffId: string }>();
   const staffName = decodeURIComponent(params.staffId || "");
+  const storeParam = decodeURIComponent(params.storeId || "");
   const { records, loading: npsLoading, lastUpdated, refresh } = useNpsData();
   const { rawData, loading: reportLoading, availableMonths: reportMonths, getStaffTrend } = useMonthlyReport();
   const loading = npsLoading || reportLoading;
 
-  // スタッフの所属店舗を特定
+  // スタッフの所属店舗を特定（URLパラメータ優先）
   const staffStore = useMemo(() => {
+    if (storeParam) return storeParam;
     const staffData = rawData.find(r => r.name === staffName);
     return staffData?.storeNormalized || "";
-  }, [rawData, staffName]);
+  }, [rawData, staffName, storeParam]);
 
   // ファンくるデータ（店舗名で絞り込み、同姓同名対策）
   const { pdfs: fankuruPdfs, loading: fankuruLoading } = useFankuruDataByStaff(staffName, staffStore);
 
   // スタッフの写真URLを取得
   const staffPhoto = useMemo(() => {
-    const staffData = rawData.find(r => r.name === staffName && r.photoUrl2);
+    const staffData = rawData.find(r => r.name === staffName && r.storeNormalized === staffStore && r.photoUrl2)
+      || rawData.find(r => r.name === staffName && r.photoUrl2);
     return staffData?.photoUrl2 || "";
-  }, [rawData, staffName]);
+  }, [rawData, staffName, staffStore]);
 
   // スタッフの雇用形態を取得
   const staffEmploymentType = useMemo(() => {
-    const staffData = rawData.find(r => r.name === staffName);
+    const staffData = rawData.find(r => r.name === staffName && r.storeNormalized === staffStore)
+      || rawData.find(r => r.name === staffName);
     return staffData?.employmentType || "";
-  }, [rawData, staffName]);
+  }, [rawData, staffName, staffStore]);
 
   // 月の管理
   const npsMonths = useMemo(() => {
@@ -278,9 +282,9 @@ export default function StaffDetail() {
 
   const staffReportMonths = useMemo(() => {
     const months = new Set<string>();
-    rawData.filter(r => r.name === staffName).forEach(r => months.add(r.reportMonth));
+    rawData.filter(r => r.name === staffName && (!staffStore || r.storeNormalized === staffStore)).forEach(r => months.add(r.reportMonth));
     return Array.from(months).sort().reverse();
-  }, [rawData, staffName]);
+  }, [rawData, staffName, staffStore]);
 
   const allMonths = useMemo(() => {
     const set = new Set([...npsMonths, ...fankuruMonths, ...staffReportMonths]);
@@ -313,11 +317,11 @@ export default function StaffDetail() {
   const staffReport = useMemo(() => {
     if (activeMonth === "all") {
       // 全期間: 最新月のデータを返す
-      const reports = rawData.filter(r => r.name === staffName).sort((a, b) => b.reportMonth.localeCompare(a.reportMonth));
+      const reports = rawData.filter(r => r.name === staffName && (!staffStore || r.storeNormalized === staffStore)).sort((a, b) => b.reportMonth.localeCompare(a.reportMonth));
       return reports[0] || null;
     }
-    return rawData.find(r => r.name === staffName && r.reportMonth === activeMonth) || null;
-  }, [rawData, staffName, activeMonth]);
+    return rawData.find(r => r.name === staffName && (!staffStore || r.storeNormalized === staffStore) && r.reportMonth === activeMonth) || null;
+  }, [rawData, staffName, staffStore, activeMonth]);
 
   // NPS: スタッフ名でフィルタ
   const staffNpsRecords = useMemo(() => {

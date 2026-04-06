@@ -121,8 +121,8 @@ export default function StaffList() {
     if (rawData.length > 0) setLastUpdated(new Date());
   }, [rawData]);
 
-  const handleStaffClick = (staffName: string) => {
-    navigate(`/staff/${encodeURIComponent(staffName)}`);
+  const handleStaffClick = (staffName: string, storeName: string) => {
+    navigate(`/staff/${encodeURIComponent(storeName)}/${encodeURIComponent(staffName)}`);
   };
 
   return (
@@ -225,7 +225,7 @@ export default function StaffList() {
                 >
                   <Card
                     className="border-border/50 shadow-sm hover:shadow-md hover:border-primary/30 transition-all cursor-pointer group"
-                    onClick={() => handleStaffClick(staff.name)}
+                    onClick={() => handleStaffClick(staff.name, staff.storeNormalized)}
                   >
                     <CardContent className="p-0">
                       {/* Desktop Layout */}

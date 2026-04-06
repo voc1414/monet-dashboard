@@ -28,7 +28,7 @@ function Router() {
         <Route path="/" component={Home} />
         <Route path="/store/:storeId" component={StoreDetail} />
         <Route path="/staff" component={StaffList} />
-        <Route path="/staff/:staffId" component={StaffDetail} />
+        <Route path="/staff/:storeId/:staffId" component={StaffDetail} />
         <Route path="/survey" component={SurveyList} />
         <Route path="/survey/:storeId" component={SurveyDetail} />
         <Route path="/store/:storeId/nps" component={NpsOverview} />
