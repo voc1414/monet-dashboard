@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import DashboardLayout from "@/components/DashboardLayout";
 import { useNpsData, calculateStoreStats, filterByMonth, getAvailableMonths } from "@/hooks/useNpsData";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
+import { useSalonBoardData } from "@/hooks/useSalonBoardData";
 import { getNpsClass, NPS_INDUSTRY_AVERAGE } from "@/lib/npsClass";
 import { isNewStore } from "@/lib/newBadge";
 import { validateStoreReport, getAlertSummary } from "@/lib/reportValidation";
@@ -60,16 +61,17 @@ const ALL_STORES = AREA_STORES.flatMap((a) => a.stores);
 export default function Home() {
   const { records, loading: npsLoading, error: npsError, lastUpdated, refresh } = useNpsData();
   const { loading: reportLoading, error: reportError, getStoreMonthlyStats, availableMonths: reportMonths } = useMonthlyReport();
+  const { loading: sbLoading, error: sbError, getStoreMonth, availableMonths: sbMonths, hasData: hasSbData } = useSalonBoardData();
 
-  const loading = npsLoading || reportLoading;
-  const error = npsError || reportError;
+  const loading = npsLoading || reportLoading || sbLoading;
+  const error = npsError || reportError || sbError;
 
   const allNpsMonths = useMemo(() => getAvailableMonths(records), [records]);
 
   const allMonths = useMemo(() => {
-    const set = new Set([...allNpsMonths, ...reportMonths]);
+    const set = new Set([...allNpsMonths, ...reportMonths, ...sbMonths]);
     return Array.from(set).sort().reverse();
-  }, [allNpsMonths, reportMonths]);
+  }, [allNpsMonths, reportMonths, sbMonths]);
 
   const defaultMonth = useMemo(() => {
     const now = new Date();
@@ -98,8 +100,21 @@ export default function Home() {
     const activeMonth = selectedMonth === "all" || selectedMonth === "__init__" ? undefined : selectedMonth;
     const report = getStoreMonthlyStats(name, activeMonth);
 
+    // サロンボードデータ（店舗レベルの数値）
+    const sbData = activeMonth ? getStoreMonth(name, activeMonth) : null;
+    const hasSb = activeMonth ? hasSbData(name, activeMonth) : false;
+
     const alerts = validateStoreReport(report);
     const alertSummary = getAlertSummary(alerts);
+
+    // 店舗レベルの数値: サロンボードデータを優先、なければ月末報告書にフォールバック
+    const storeTotalSales = hasSb ? (sbData?.totalSales || 0) : (report?.totalSales || 0);
+    const storeTechSales = hasSb ? (sbData?.techSales || 0) : (report?.totalTechSales || 0);
+    const storeRetailSales = hasSb ? (sbData?.retailSales || 0) : (report?.totalRetailSales || 0);
+    const storeTotalCustomers = hasSb ? (sbData?.totalCustomers || 0) : (report?.totalCustomers || 0);
+    const storeNewCustomers = hasSb ? (sbData?.newCustomers || 0) : (report?.totalNewCustomers || 0);
+    const storeReturnCustomers = hasSb ? (sbData?.returnCustomers || 0) : (report?.totalReturnCustomers || 0);
+    const storeUnitPrice = hasSb ? (sbData?.unitPrice || 0) : (report?.avgUnitPrice || 0);
 
     return {
       shortName: name,
@@ -112,20 +127,21 @@ export default function Home() {
       promoterPct: nps?.promoterPct || 0,
       passivePct: nps?.passivePct || 0,
       detractorPct: nps?.detractorPct || 0,
-      totalSales: report?.totalSales || 0,
-      totalTechSales: report?.totalTechSales || 0,
-      totalRetailSales: report?.totalRetailSales || 0,
-      totalCustomers: report?.totalCustomers || 0,
-      totalNewCustomers: report?.totalNewCustomers || 0,
-      totalReturnCustomers: report?.totalReturnCustomers || 0,
-      avgUnitPrice: report?.avgUnitPrice || 0,
+      totalSales: storeTotalSales,
+      totalTechSales: storeTechSales,
+      totalRetailSales: storeRetailSales,
+      totalCustomers: storeTotalCustomers,
+      totalNewCustomers: storeNewCustomers,
+      totalReturnCustomers: storeReturnCustomers,
+      avgUnitPrice: storeUnitPrice,
       nextReservationRate: report?.nextReservationRate || 0,
       staffCount: report?.staffCount || 0,
-      hasReportData: !!report,
+      hasReportData: hasSb || !!report,
       reportMonthLabel: report?.monthLabel || "",
       alertCount: alertSummary.total,
       alertErrors: alertSummary.errors,
       alertWarnings: alertSummary.warnings,
+      dataSource: hasSb ? "salonboard" as const : "report" as const,
     };
   });
 

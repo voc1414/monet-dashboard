@@ -30,6 +30,7 @@ import { useFankuruData } from "@/hooks/useFankuruData";
 import { isNewStore, isNewStaff } from "@/lib/newBadge";
 import type { FankuruPdf } from "@/hooks/useFankuruData";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
+import { useSalonBoardData } from "@/hooks/useSalonBoardData";
 import type { StaffReport, StaffMonthlyTrend } from "@/hooks/useMonthlyReport";
 import { validateStoreReport, getAlertSummary } from "@/lib/reportValidation";
 import type { ReportAlert } from "@/lib/reportValidation";
@@ -214,13 +215,15 @@ export default function StoreDetail() {
   const storeId = decodeURIComponent(params.storeId || "");
   const { records, loading: npsLoading, error: npsError, lastUpdated, refresh } = useNpsData();
   const { loading: reportLoading, error: reportError, getStoreMonthlyStats, availableMonths: reportMonths, getStaffTrend } = useMonthlyReport();
-  const loading = npsLoading || reportLoading;
-  const error = npsError || reportError;
+  const { loading: sbLoading, error: sbError, getStoreMonth, hasData: hasSbData } = useSalonBoardData();
+  const loading = npsLoading || reportLoading || sbLoading;
+  const error = npsError || reportError || sbError;
   const allNpsMonths = useMemo(() => getAvailableMonths(records), [records]);
+  const { availableMonths: sbMonths } = useSalonBoardData();
   const allMonths = useMemo(() => {
-    const set = new Set([...allNpsMonths, ...reportMonths]);
+    const set = new Set([...allNpsMonths, ...reportMonths, ...sbMonths]);
     return Array.from(set).sort().reverse();
-  }, [allNpsMonths, reportMonths]);
+  }, [allNpsMonths, reportMonths, sbMonths]);
   // デフォルト月: NPS月を優先
   const defaultMonth = useMemo(() => {
     const now = new Date();
@@ -1012,44 +1015,69 @@ export default function StoreDetail() {
         )}
       </section>
 
-      {/* 店舗売上サマリ */}
-      <section className="mb-8 pt-6 border-t-2 border-primary/20">
-        <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-          <DollarSign className="w-5 h-5 text-primary" />
-          店舗売上サマリ
-          {reportStats && reportStats.monthLabel && (
-            <span className="text-xs font-normal text-muted-foreground">— {reportStats.monthLabel}分</span>
-          )}
-        </h2>
-        {reportStats ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { label: "総売上", value: formatCurrency(reportStats.totalSales), sub: `技術: ${formatCurrency(reportStats.totalTechSales)} / 店販: ${formatCurrency(reportStats.totalRetailSales)}`, icon: DollarSign },
-              { label: "客単価", value: formatCurrency(reportStats.avgUnitPrice), sub: `総売上 ÷ 総客数`, icon: Scissors },
-              { label: "総客数", value: `${reportStats.totalCustomers}名`, sub: `新規: ${reportStats.totalNewCustomers} / 再来: ${reportStats.totalReturnCustomers}`, icon: Users },
-              { label: "次回予約率", value: `${reportStats.nextReservationRate}%`, sub: `予約: ${reportStats.totalNextReservation} / 総客: ${reportStats.totalCustomers}`, icon: TrendingUp },
-            ].map((item, i) => (
-              <motion.div key={item.label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.04 }}>
-                <Card className="border-border/50 shadow-sm">
-                  <CardContent className="p-4">
-                    <item.icon className="w-4 h-4 text-primary mb-2" />
-                    <div className="font-mono-data text-lg md:text-xl font-bold">{item.value}</div>
-                    <div className="text-[10px] text-muted-foreground mt-1">{item.label}</div>
-                    <div className="text-[9px] text-muted-foreground/70 mt-0.5">{item.sub}</div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-        ) : (
-          <Card className="border-border/50 border-dashed">
-            <CardContent className="p-6 text-center text-muted-foreground">
-              <DollarSign className="w-6 h-6 mx-auto mb-2 opacity-40" />
-              <p className="text-sm">この期間の売上データはまだありません</p>
-            </CardContent>
-          </Card>
-        )}
-      </section>
+      {/* 店舗売上サマリ（サロンボードデータ優先、フォールバックは月末報告書） */}
+      {(() => {
+        const sbData = activeMonth ? getStoreMonth(storeId, activeMonth) : null;
+        const hasSb = activeMonth ? hasSbData(storeId, activeMonth) : false;
+
+        // 店舗レベルの数値: サロンボードデータを優先、なければ月末報告書にフォールバック
+        const storeTotalSales = hasSb ? (sbData?.totalSales || 0) : (reportStats?.totalSales || 0);
+        const storeTechSales = hasSb ? (sbData?.techSales || 0) : (reportStats?.totalTechSales || 0);
+        const storeRetailSales = hasSb ? (sbData?.retailSales || 0) : (reportStats?.totalRetailSales || 0);
+        const storeUnitPrice = hasSb ? (sbData?.unitPrice || 0) : (reportStats?.avgUnitPrice || 0);
+        const storeTotalCustomers = hasSb ? (sbData?.totalCustomers || 0) : (reportStats?.totalCustomers || 0);
+        const storeNewCustomers = hasSb ? (sbData?.newCustomers || 0) : (reportStats?.totalNewCustomers || 0);
+        const storeReturnCustomers = hasSb ? (sbData?.returnCustomers || 0) : (reportStats?.totalReturnCustomers || 0);
+        // 次回予約率は常に月末報告書から（サロンボードにはない）
+        const nextReservationRate = reportStats?.nextReservationRate || 0;
+        const nextReservation = reportStats?.totalNextReservation || 0;
+
+        const hasAnyData = hasSb || !!reportStats;
+        const monthLabel = reportStats?.monthLabel || (activeMonth ? `${parseInt(activeMonth.split("-")[1])}月` : "");
+
+        return (
+          <section className="mb-8 pt-6 border-t-2 border-primary/20">
+            <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-primary" />
+              店舗売上サマリ
+              {monthLabel && (
+                <span className="text-xs font-normal text-muted-foreground">— {monthLabel}分</span>
+              )}
+              {hasSb && (
+                <span className="text-[10px] font-medium text-primary/70 bg-primary/5 border border-primary/20 rounded px-1.5 py-0.5">SalonBoard</span>
+              )}
+            </h2>
+            {hasAnyData ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                  { label: "総売上", value: formatCurrency(storeTotalSales), sub: `技術: ${formatCurrency(storeTechSales)} / 店販: ${formatCurrency(storeRetailSales)}`, icon: DollarSign },
+                  { label: "客単価", value: formatCurrency(storeUnitPrice), sub: `総売上 ÷ 総客数`, icon: Scissors },
+                  { label: "総客数", value: `${storeTotalCustomers}名`, sub: `新規: ${storeNewCustomers} / 再来: ${storeReturnCustomers}`, icon: Users },
+                  { label: "次回予約率", value: `${nextReservationRate}%`, sub: `予約: ${nextReservation} / 総客: ${storeTotalCustomers}`, icon: TrendingUp },
+                ].map((item, i) => (
+                  <motion.div key={item.label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.04 }}>
+                    <Card className="border-border/50 shadow-sm">
+                      <CardContent className="p-4">
+                        <item.icon className="w-4 h-4 text-primary mb-2" />
+                        <div className="font-mono-data text-lg md:text-xl font-bold">{item.value}</div>
+                        <div className="text-[10px] text-muted-foreground mt-1">{item.label}</div>
+                        <div className="text-[9px] text-muted-foreground/70 mt-0.5">{item.sub}</div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))}
+              </div>
+            ) : (
+              <Card className="border-border/50 border-dashed">
+                <CardContent className="p-6 text-center text-muted-foreground">
+                  <DollarSign className="w-6 h-6 mx-auto mb-2 opacity-40" />
+                  <p className="text-sm">この期間の売上データはまだありません</p>
+                </CardContent>
+              </Card>
+            )}
+          </section>
+        );
+      })()}
     </DashboardLayout>
   );
 }
