@@ -4,20 +4,21 @@
  * Colors: Warm white base, monet water-blue accent, sage green secondary
  */
 import { useParams, Link } from "wouter";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
-  MapPin, Users, TrendingUp, BarChart3, ArrowRight, Calendar,
+  MapPin, Users, TrendingUp, BarChart3, ArrowRight,
   DollarSign, Scissors, Star, MessageSquare, ChevronDown,
   Trophy, ThumbsUp, Target, AlertTriangle, AlertCircle,
   Lightbulb, CheckCircle2, ArrowUpRight,
   FileText, ExternalLink, Loader2, FolderOpen, Eye
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PeriodSelector, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
+import type { PeriodSelection } from "@/components/PeriodSelector";
 import ScoreDetailModal from "@/components/ScoreDetailModal";
 import DashboardLayout from "@/components/DashboardLayout";
-import { useNpsData, calculateStoreStats, filterByMonth, getAvailableMonths } from "@/hooks/useNpsData";
+import { useNpsData, calculateStoreStats, getAvailableMonths } from "@/hooks/useNpsData";
 import type { NpsRecord, StoreStats } from "@/hooks/useNpsData";
 import { getNpsClass, NPS_INDUSTRY_AVERAGE } from "@/lib/npsClass";
 import { generateStoreAdvice } from "@/lib/npsAdvice";
@@ -224,38 +225,40 @@ export default function StoreDetail() {
     const set = new Set([...allNpsMonths, ...reportMonths, ...sbMonths]);
     return Array.from(set).sort().reverse();
   }, [allNpsMonths, reportMonths, sbMonths]);
-  // デフォルト月: NPS月を優先
-  const defaultMonth = useMemo(() => {
-    const now = new Date();
-    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const ym = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, "0")}`;
-    if (allMonths.includes(ym)) return ym;
-    if (allNpsMonths.length > 0) return allNpsMonths[0];
-    return allMonths[0] || "all";
-  }, [allMonths, allNpsMonths]);
-  const [selectedMonth, setSelectedMonth] = useState<string>("__init__");
+  const [periodSelection, setPeriodSelection] = useState<PeriodSelection>(getDefaultPeriodSelection());
+
+  /** 選択された期間に含まれる月リスト（"all" = 全期間） */
+  const activeFilterMonths = useMemo(
+    () => getFilterMonths(periodSelection, allMonths),
+    [periodSelection, allMonths]
+  );
+
+  /** 後方互換: 単月の場合の selectedMonth 文字列 */
+  const selectedMonth = useMemo(() => {
+    if (activeFilterMonths === "all") return "all";
+    if (activeFilterMonths.length === 1) return activeFilterMonths[0];
+    return "multi";
+  }, [activeFilterMonths]);
+
   const [selectedScore, setSelectedScore] = useState<number | null>(null);
   const [selectedPdf, setSelectedPdf] = useState<FankuruPdf | null>(null);
   const { pdfs: fankuruPdfs, loading: fankuruLoading, hasFolderMapping } = useFankuruData(storeId);
 
   // ファンくるPDFを選択月でフィルタリング
   const filteredFankuruPdfs = useMemo(() => {
-    if (selectedMonth === "all" || selectedMonth === "__init__") return fankuruPdfs;
-    return fankuruPdfs.filter(p => p.yearMonth === selectedMonth);
-  }, [fankuruPdfs, selectedMonth]);
-
-  // 全データの読み込みが完了してからデフォルト月を設定する
-  useEffect(() => {
-    if (selectedMonth === "__init__" && !npsLoading && !reportLoading && allMonths.length > 0) {
-      setSelectedMonth(defaultMonth);
-    }
-  }, [allMonths, defaultMonth, selectedMonth, npsLoading, reportLoading]);
+    if (activeFilterMonths === "all") return fankuruPdfs;
+    return fankuruPdfs.filter(p => activeFilterMonths.includes(p.yearMonth));
+  }, [fankuruPdfs, activeFilterMonths]);
 
   const storeRecords = useMemo(() => {
-    const filtered = records.filter((r) => r.storeShort === storeId);
-    if (selectedMonth === "all") return filtered;
-    return filterByMonth(filtered, selectedMonth);
-  }, [records, storeId, selectedMonth]);
+    const filtered = records.filter((r: any) => r.storeShort === storeId);
+    if (activeFilterMonths === "all") return filtered;
+    return filtered.filter((r: any) => {
+      const d = new Date(r.date);
+      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      return activeFilterMonths.includes(ym);
+    });
+  }, [records, storeId, activeFilterMonths]);
 
   const storeStats = useMemo(() => {
     if (storeRecords.length === 0) return null;
@@ -287,7 +290,7 @@ export default function StoreDetail() {
   }, [storeStats]);
 
   // 月末報告書の実データ
-  const activeMonth = selectedMonth === "all" || selectedMonth === "__init__" ? undefined : selectedMonth;
+  const activeMonth = selectedMonth === "all" || selectedMonth === "multi" ? undefined : selectedMonth;
   const reportStats = useMemo(() => getStoreMonthlyStats(storeId, activeMonth), [getStoreMonthlyStats, storeId, activeMonth]);
 
   // 異常値検出
@@ -326,21 +329,12 @@ export default function StoreDetail() {
           </div>
         </div>
 
-        {/* Month Selector */}
-        <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-muted-foreground" />
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-[180px] bg-white">
-              <SelectValue placeholder="期間を選択" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">全期間</SelectItem>
-              {allMonths.map((m) => (
-                <SelectItem key={m} value={m}>{formatMonth(m)}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {/* Period Selector */}
+        <PeriodSelector
+          allMonths={allMonths}
+          selection={periodSelection}
+          onChange={setPeriodSelection}
+        />
       </div>
 
       {/* 入力値異常アラート */}
@@ -680,9 +674,7 @@ export default function StoreDetail() {
           <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-[#2D9C8F]" />
             NPS調査結果
-            {selectedMonth !== "all" && (
-              <span className="text-xs font-normal text-muted-foreground">— {formatMonth(selectedMonth)}</span>
-            )}
+            <span className="text-xs font-normal text-muted-foreground">— {getPeriodLabel(periodSelection)}</span>
           </h2>
           <Link href={`/store/${encodeURIComponent(storeId)}/nps`}>
             <span className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 transition-colors cursor-pointer">
@@ -789,7 +781,7 @@ export default function StoreDetail() {
         ) : (
           <Card className="border-border/50">
             <CardContent className="p-8 text-center text-muted-foreground">
-              {selectedMonth !== "all" ? "この期間のデータはありません" : "データがありません"}
+              {periodSelection.mode !== "all" ? "この期間のデータはありません" : "データがありません"}
             </CardContent>
           </Card>
         )}
