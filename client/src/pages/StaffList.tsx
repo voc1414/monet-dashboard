@@ -8,7 +8,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import {
-  Users, Building2,
+  Users, Building2, AlertTriangle,
   ChevronRight, ArrowUpDown, ArrowUp, ArrowDown
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -366,11 +366,17 @@ export default function StaffList() {
                           <span className="text-sm text-muted-foreground">{staff.employmentType}</span>
                         </div>
                         <div className="col-span-2 text-right">
-                          <span className={`font-mono-data text-base font-bold ${
+                          <span className={`font-mono-data text-base font-bold flex items-center justify-end gap-1 ${
                             staff.nextReservationRate >= 80 ? "text-[#2D9C8F]" :
                             staff.nextReservationRate >= 60 ? "text-[#E5B85C]" :
                             "text-[#C75C5C]"
                           }`}>
+                            {staff.nextReservationRate <= 60 && (
+                              <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5" title="要改善">
+                                <AlertTriangle className="w-3 h-3" />
+                                要改善
+                              </span>
+                            )}
                             {staff.nextReservationRate}%
                           </span>
                         </div>
@@ -405,11 +411,17 @@ export default function StaffList() {
                                 <Building2 className="w-3 h-3" />
                                 {staff.storeNormalized}
                               </span>
-                              <span className={`text-[11px] font-mono-data font-bold shrink-0 ${
+                              <span className={`text-[11px] font-mono-data font-bold shrink-0 flex items-center gap-1 ${
                                 staff.nextReservationRate >= 80 ? "text-[#2D9C8F]" :
                                 staff.nextReservationRate >= 60 ? "text-[#E5B85C]" :
                                 "text-[#C75C5C]"
                               }`}>
+                                {staff.nextReservationRate <= 60 && (
+                                  <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1 py-0.5">
+                                    <AlertTriangle className="w-2.5 h-2.5" />
+                                    要改善
+                                  </span>
+                                )}
                                 次回予約 {staff.nextReservationRate}%
                               </span>
                             </div>
