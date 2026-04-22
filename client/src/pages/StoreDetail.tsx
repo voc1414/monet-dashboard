@@ -462,7 +462,17 @@ export default function StoreDetail() {
                         </div>
                         <div>
                           <div className="text-[10px] text-muted-foreground">次回予約率</div>
-                          <div className="font-mono-data text-sm font-bold">{sr.nextReservationRate}%</div>
+                          <div className="font-mono-data text-sm font-bold flex items-center gap-1">
+                            <span className={sr.nextReservationRate >= 80 ? "text-[#2D9C8F]" : sr.nextReservationRate >= 60 ? "text-[#E5B85C]" : "text-[#C75C5C]"}>
+                              {sr.nextReservationRate}%
+                            </span>
+                            {sr.nextReservationRate <= 60 && (
+                              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1 py-0.5" title="要改善">
+                                <AlertTriangle className="w-2.5 h-2.5" />
+                                要改善
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <div>
                           <div className="text-[10px] text-muted-foreground">店販売上</div>
@@ -1045,7 +1055,7 @@ export default function StoreDetail() {
                   { label: "総売上", value: formatCurrency(storeTotalSales), sub: `技術: ${formatCurrency(storeTechSales)} / 店販: ${formatCurrency(storeRetailSales)}`, icon: DollarSign },
                   { label: "客単価", value: formatCurrency(storeUnitPrice), sub: `総売上 ÷ 総客数`, icon: Scissors },
                   { label: "総客数", value: `${storeTotalCustomers}名`, sub: `新規: ${storeNewCustomers} / 再来: ${storeReturnCustomers}`, icon: Users },
-                  { label: "次回予約率", value: `${nextReservationRate}%`, sub: `予約: ${nextReservation} / 総客: ${storeTotalCustomers}`, icon: TrendingUp },
+                  { label: "次回予約率", value: `${nextReservationRate}%`, sub: `予約: ${nextReservation} / 総客: ${storeTotalCustomers}`, icon: TrendingUp, warn: nextReservationRate <= 60 },
                 ].map((item, i) => (
                   <motion.div key={item.label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.04 }}>
                     <Card className="border-border/50 shadow-sm">
@@ -1054,6 +1064,12 @@ export default function StoreDetail() {
                         <div className="font-mono-data text-lg md:text-xl font-bold">{item.value}</div>
                         <div className="text-[10px] text-muted-foreground mt-1">{item.label}</div>
                         <div className="text-[9px] text-muted-foreground/70 mt-0.5">{item.sub}</div>
+                        {('warn' in item) && item.warn && (
+                          <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 mt-1.5" title="要改善">
+                            <AlertTriangle className="w-2.5 h-2.5" />
+                            要改善
+                          </span>
+                        )}
                       </CardContent>
                     </Card>
                   </motion.div>
