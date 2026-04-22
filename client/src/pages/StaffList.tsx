@@ -8,11 +8,12 @@ import { useState, useMemo, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import {
-  Users, Calendar, Building2, ArrowRight,
+  Users, Building2,
   ChevronRight, ArrowUpDown, ArrowUp, ArrowDown
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PeriodSelector, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
+import type { PeriodSelection } from "@/components/PeriodSelector";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { useNpsData, filterByMonth } from "@/hooks/useNpsData";
@@ -80,29 +81,21 @@ export default function StaffList() {
       : <ArrowDown className="w-3 h-3 text-primary" />;
   };
 
-  // デフォルトは先月
-  const defaultMonth = useMemo(() => {
-    const now = new Date();
-    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    return `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, "0")}`;
-  }, []);
+  // 期間セレクタ状態
+  const [periodSelection, setPeriodSelection] = useState<PeriodSelection>(getDefaultPeriodSelection());
 
-  const [selectedMonth, setSelectedMonth] = useState<string>("__init__");
+  // 期間フィルタから対象月リストを取得
+  const filterMonthsResult = useMemo(
+    () => getFilterMonths(periodSelection, availableMonths),
+    [periodSelection, availableMonths]
+  );
 
-  useEffect(() => {
-    if (availableMonths.length > 0 && selectedMonth === "__init__") {
-      const hasDefault = availableMonths.includes(defaultMonth);
-      setSelectedMonth(hasDefault ? defaultMonth : availableMonths[0]);
-    }
-  }, [availableMonths, defaultMonth, selectedMonth]);
-
-  const activeMonth = selectedMonth === "__init__" ? defaultMonth : selectedMonth;
-
-  // 選択月のスタッフデータ
+  // 選択期間のスタッフデータ
   const staffListUnsorted = useMemo(() => {
     if (!rawData.length) return [];
     let filtered: StaffReport[];
-    if (activeMonth === "all") {
+    if (filterMonthsResult === "all") {
+      // 全期間: 各スタッフの最新月のデータを使用
       const map = new Map<string, StaffReport>();
       for (const r of rawData) {
         const key = `${r.name}__${r.storeNormalized}`;
@@ -112,11 +105,25 @@ export default function StaffList() {
         }
       }
       filtered = Array.from(map.values());
+    } else if (filterMonthsResult.length === 1) {
+      // 単月
+      filtered = rawData.filter((r) => r.reportMonth === filterMonthsResult[0]);
     } else {
-      filtered = rawData.filter((r) => r.reportMonth === activeMonth);
+      // 複数月: 各スタッフの最新月のデータを使用
+      const monthSet = new Set(filterMonthsResult);
+      const inRange = rawData.filter((r) => monthSet.has(r.reportMonth));
+      const map = new Map<string, StaffReport>();
+      for (const r of inRange) {
+        const key = `${r.name}__${r.storeNormalized}`;
+        const existing = map.get(key);
+        if (!existing || r.reportMonth > existing.reportMonth) {
+          map.set(key, r);
+        }
+      }
+      filtered = Array.from(map.values());
     }
     return filtered;
-  }, [rawData, activeMonth]);
+  }, [rawData, filterMonthsResult]);
 
   // ソート適用
   const staffList = useMemo(() => {
@@ -145,7 +152,19 @@ export default function StaffList() {
     const map = new Map<string, StaffNpsInfo>();
     if (!npsRecords.length) return map;
 
-    const filteredNps = activeMonth === "all" ? npsRecords : filterByMonth(npsRecords, activeMonth);
+    let filteredNps;
+    if (filterMonthsResult === "all") {
+      filteredNps = npsRecords;
+    } else if (filterMonthsResult.length === 1) {
+      filteredNps = filterByMonth(npsRecords, filterMonthsResult[0]);
+    } else {
+      const monthSet = new Set(filterMonthsResult);
+      filteredNps = npsRecords.filter((r) => {
+        const d = new Date(r.date);
+        const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        return monthSet.has(ym);
+      });
+    }
 
     const grouped = new Map<string, number[]>();
     for (const r of filteredNps) {
@@ -165,9 +184,9 @@ export default function StaffList() {
       map.set(name, { totalResponses: total, avgScore: Math.round(avg * 10) / 10, npsScore, promoters, passives, detractors });
     }
     return map;
-  }, [npsRecords, activeMonth]);
+  }, [npsRecords, filterMonthsResult]);
 
-  const monthLabel = activeMonth === "all" ? "全期間" : formatMonth(activeMonth);
+  const monthLabel = getPeriodLabel(periodSelection);
 
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   useEffect(() => {
@@ -207,18 +226,11 @@ export default function StaffList() {
               店舗一覧へ
             </span>
           </Link>
-          <Select value={activeMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-[160px] h-9 text-sm">
-              <Calendar className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
-              <SelectValue placeholder="期間を選択" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">全期間</SelectItem>
-              {availableMonths.map((m) => (
-                <SelectItem key={m} value={m}>{formatMonth(m)}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <PeriodSelector
+            allMonths={availableMonths}
+            selection={periodSelection}
+            onChange={setPeriodSelection}
+          />
         </div>
       </div>
 
@@ -270,7 +282,7 @@ export default function StaffList() {
           <CardContent className="p-8 text-center text-muted-foreground">
             <Users className="w-8 h-8 mx-auto mb-2 opacity-40" />
             <p className="text-sm">
-              {activeMonth === "all"
+              {periodSelection.mode === "all"
                 ? "スタッフデータはまだありません"
                 : `${monthLabel}のスタッフデータはまだありません`}
             </p>
