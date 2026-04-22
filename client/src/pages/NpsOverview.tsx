@@ -616,7 +616,7 @@ export default function NpsOverview() {
                         ))}
                       </div>
                     ) : (
-                      <p className="text-xs text-muted-foreground py-4 text-center">データなし</p>
+                      <p className="text-xs text-muted-foreground py-4 text-center">NPS —</p>
                     )}
                   </CardContent>
                 </Card>
@@ -667,12 +667,8 @@ export default function NpsOverview() {
         <Card className="border-border/50">
           <CardContent className="p-12 text-center text-muted-foreground">
             <BarChart3 className="w-12 h-12 mx-auto mb-4 text-muted-foreground/30" />
-            <p className="text-lg font-medium mb-2">データがありません</p>
-            <p className="text-sm">
-              {periodSelection.mode !== "all"
-                ? "選択した期間のデータが見つかりませんでした。別の期間を選択してください。"
-                : "この店舗のNPSデータはまだ登録されていません。"}
-            </p>
+            <p className="text-lg font-medium mb-2">この期間のNPSデータはありません</p>
+            <p className="text-sm">別の期間を選択してください</p>
           </CardContent>
         </Card>
       )}

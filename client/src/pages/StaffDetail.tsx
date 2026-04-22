@@ -41,7 +41,6 @@ const NPS_COLORS = {
 };
 
 const formatCurrency = (n: number) => {
-  if (n === 0) return "—";
   return `¥${n.toLocaleString()}`;
 };
 
@@ -581,7 +580,7 @@ export default function StaffDetail() {
           <Card className="border-border/50 border-dashed">
             <CardContent className="p-6 text-center text-muted-foreground">
               <DollarSign className="w-6 h-6 mx-auto mb-2 opacity-40" />
-              <p className="text-sm">この期間の売上データはまだありません</p>
+              <p className="text-sm">この期間の売上データはありません</p>
             </CardContent>
           </Card>
         )}

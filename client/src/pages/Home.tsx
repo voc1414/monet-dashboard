@@ -26,7 +26,6 @@ const formatMonth = (ym: string) => {
 };
 
 const formatCurrency = (n: number) => {
-  if (n === 0) return "—";
   return `¥${n.toLocaleString()}`;
 };
 
@@ -264,11 +263,11 @@ export default function Home() {
       {/* KPIカード 6項目: NPSスコア、全店総合売上、全店総合技術売上、全店総合店販売上、全店売上単価、店舗数 */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
         {[
-          { label: "NPSスコア", value: `${overallNps > 0 ? "+" : ""}${overallNps}`, icon: TrendingUp, color: "text-[#2D9C8F]", extra: loading ? undefined : getNpsClass(overallNps) },
-          { label: "全店総合売上", value: formatCurrency(totalAllSales), icon: DollarSign, color: "text-primary" },
-          { label: "全店総合技術売上", value: formatCurrency(totalAllTechSales), icon: Scissors, color: "text-primary" },
-          { label: "全店総合店販売上", value: formatCurrency(totalAllRetailSales), icon: ShoppingBag, color: "text-primary" },
-          { label: "全店売上単価", value: formatCurrency(overallUnitPrice), icon: BarChart3, color: "text-primary" },
+          { label: "NPSスコア", value: totalResponses > 0 ? `${overallNps > 0 ? "+" : ""}${overallNps}` : "—", icon: TrendingUp, color: "text-[#2D9C8F]", extra: loading ? undefined : (totalResponses > 0 ? getNpsClass(overallNps) : undefined) },
+          { label: "全店総合売上", value: storesWithReport.length > 0 ? formatCurrency(totalAllSales) : "—", icon: DollarSign, color: "text-primary" },
+          { label: "全店総合技術売上", value: storesWithReport.length > 0 ? formatCurrency(totalAllTechSales) : "—", icon: Scissors, color: "text-primary" },
+          { label: "全店総合店販売上", value: storesWithReport.length > 0 ? formatCurrency(totalAllRetailSales) : "—", icon: ShoppingBag, color: "text-primary" },
+          { label: "全店売上単価", value: storesWithReport.length > 0 ? formatCurrency(overallUnitPrice) : "—", icon: BarChart3, color: "text-primary" },
           { label: "店舗数", value: `${storeCount}`, icon: MapPin, color: "text-primary" },
         ].map((stat, i) => (
           <motion.div
@@ -404,7 +403,7 @@ export default function Home() {
                                   <div>
                                     <div className="text-[10px] text-muted-foreground mb-0.5">客単価</div>
                                     <div className="font-mono-data text-sm font-bold">
-                                      {st.hasReportData && st.avgUnitPrice > 0 ? formatCurrency(st.avgUnitPrice) : "—"}
+                                      {st.hasReportData ? formatCurrency(st.avgUnitPrice) : "—"}
                                     </div>
                                   </div>
                                   <div>
@@ -416,24 +415,26 @@ export default function Home() {
                                   <div>
                                     <div className="text-[10px] text-muted-foreground mb-0.5">新規数</div>
                                     <div className="font-mono-data text-sm font-bold">
-                                      {st.hasReportData && st.totalNewCustomers > 0 ? `${st.totalNewCustomers}名` : "—"}
+                                      {st.hasReportData ? `${st.totalNewCustomers}名` : "—"}
                                     </div>
                                   </div>
                                   <div>
                                     <div className="text-[10px] text-muted-foreground mb-0.5">次回予約率</div>
                                     <div className="font-mono-data text-sm font-bold flex items-center gap-1">
-                                      {st.hasReportData && st.nextReservationRate > 0 ? (
-                                        <>
-                                          <span className={st.nextReservationRate >= 80 ? "text-[#2D9C8F]" : st.nextReservationRate >= 60 ? "text-[#E5B85C]" : "text-[#C75C5C]"}>
-                                            {st.nextReservationRate}%
-                                          </span>
-                                          {st.nextReservationRate <= 60 && (
-                                            <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1 py-0.5" title="要改善">
-                                              <AlertTriangle className="w-2.5 h-2.5" />
-                                              要改善
+                                      {st.hasReportData ? (
+                                        st.nextReservationRate > 0 ? (
+                                          <>
+                                            <span className={st.nextReservationRate >= 80 ? "text-[#2D9C8F]" : st.nextReservationRate >= 60 ? "text-[#E5B85C]" : "text-[#C75C5C]"}>
+                                              {st.nextReservationRate}%
                                             </span>
-                                          )}
-                                        </>
+                                            {st.nextReservationRate <= 60 && (
+                                              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1 py-0.5" title="要改善">
+                                                <AlertTriangle className="w-2.5 h-2.5" />
+                                                要改善
+                                              </span>
+                                            )}
+                                          </>
+                                        ) : "0%"
                                       ) : "—"}
                                     </div>
                                   </div>
@@ -454,7 +455,7 @@ export default function Home() {
                                 ) : (
                                   <div className="text-center">
                                     <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium text-muted-foreground bg-muted/50 border border-border/50">
-                                      データなし
+                                      NPS —
                                     </span>
                                   </div>
                                 )}
@@ -475,7 +476,7 @@ export default function Home() {
         {!loading && storeStats.length === 0 && selectedMonth !== "all" && (
           <Card className="border-border/50">
             <CardContent className="p-8 text-center text-muted-foreground">
-              この期間のデータはありません
+              この期間の店舗データはありません
             </CardContent>
           </Card>
         )}

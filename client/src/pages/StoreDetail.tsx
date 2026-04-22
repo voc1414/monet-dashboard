@@ -39,7 +39,6 @@ import type { ReportAlert } from "@/lib/reportValidation";
 const NPS_HEADER_IMAGE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663489426081/aLPZvLfFDC4rFYToBquZNR/nps-header-6cTohzoTSmSjrDCLc4VzHg.webp";
 
 const formatCurrency = (n: number) => {
-  if (n === 0) return "—";
   return `¥${n.toLocaleString()}`;
 };
 
@@ -524,7 +523,7 @@ export default function StoreDetail() {
           <Card className="border-border/50 border-dashed">
             <CardContent className="p-6 text-center text-muted-foreground">
               <Users className="w-6 h-6 mx-auto mb-2 opacity-40" />
-              <p className="text-sm">この期間のスタッフ実績データはまだありません</p>
+              <p className="text-sm">この期間のスタッフ実績データはありません</p>
             </CardContent>
           </Card>
         )}
@@ -600,7 +599,7 @@ export default function StoreDetail() {
                             <span className="font-mono-data text-xs font-bold">{formatCurrency(curr.sales)}</span>
                             {salesDiff !== null && (
                               <span className={`text-[10px] font-mono-data font-semibold ${salesDiff >= 0 ? 'text-[#2D9C8F]' : 'text-[#C75C5C]'}`}>
-                                {salesDiff >= 0 ? '+' : ''}{formatCurrency(salesDiff).replace('¥', '').replace('—', '0')}
+                                {salesDiff >= 0 ? '+' : ''}{formatCurrency(salesDiff).replace('¥', '')}
                               </span>
                             )}
                           </div>
@@ -826,7 +825,7 @@ export default function StoreDetail() {
         ) : (
           <Card className="border-border/50">
             <CardContent className="p-8 text-center text-muted-foreground">
-              {periodSelection.mode !== "all" ? "この期間のデータはありません" : "データがありません"}
+              この期間のNPSデータはありません
             </CardContent>
           </Card>
         )}
@@ -948,7 +947,7 @@ export default function StoreDetail() {
           <Card className="border-border/50 border-dashed">
             <CardContent className="p-8 text-center text-muted-foreground">
               <FileText className="w-8 h-8 mx-auto mb-2 opacity-40" />
-              <p className="text-sm">この月のファンくるデータはありません</p>
+              <p className="text-sm">この期間のファンくるデータはありません</p>
               <p className="text-xs mt-1 opacity-70">Google Driveにファイルが追加されると自動的に表示されます</p>
             </CardContent>
           </Card>
@@ -1119,7 +1118,7 @@ export default function StoreDetail() {
               <Card className="border-border/50 border-dashed">
                 <CardContent className="p-6 text-center text-muted-foreground">
                   <DollarSign className="w-6 h-6 mx-auto mb-2 opacity-40" />
-                  <p className="text-sm">この期間の売上データはまだありません</p>
+                  <p className="text-sm">この期間の売上データはありません</p>
                 </CardContent>
               </Card>
             )}

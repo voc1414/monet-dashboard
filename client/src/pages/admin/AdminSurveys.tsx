@@ -79,7 +79,7 @@ function FankuruStoreSection({ storeName }: { storeName: string }) {
       {/* PDF List */}
       {filteredPdfs.length === 0 ? (
         <div className="p-4 text-center text-xs text-muted-foreground">
-          ファンくるデータがありません
+          この期間のファンくるデータはありません
         </div>
       ) : (
         <div className="divide-y divide-border/20">

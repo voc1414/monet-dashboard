@@ -8,10 +8,12 @@ import { useState, useMemo, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import {
-  Users, Building2, AlertTriangle,
+  Users, Building2, AlertTriangle, Search, Store,
   ChevronRight, ArrowUpDown, ArrowUp, ArrowDown
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PeriodSelector, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
 import type { PeriodSelection } from "@/components/PeriodSelector";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -21,7 +23,6 @@ import type { StaffReport } from "@/hooks/useMonthlyReport";
 import { isNewStaff } from "@/lib/newBadge";
 
 const formatCurrency = (n: number) => {
-  if (n === 0) return "—";
   return `¥${n.toLocaleString()}`;
 };
 
@@ -59,6 +60,10 @@ export default function StaffList() {
   const { rawData, loading, error, availableMonths } = useMonthlyReport();
   const { records: npsRecords, loading: npsLoading } = useNpsData();
   const [, navigate] = useLocation();
+
+  // 検索・フィルタ状態
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterStore, setFilterStore] = useState("all");
 
   // ソート状態（デフォルト: 次回予約率の降順）
   const [sortField, setSortField] = useState<SortField>("nextReservationRate");
@@ -125,9 +130,29 @@ export default function StaffList() {
     return filtered;
   }, [rawData, filterMonthsResult]);
 
+  // 店舗一覧（フィルタ用）
+  const storeList = useMemo(() => {
+    const stores = new Set(staffListUnsorted.map((s) => s.storeNormalized));
+    return Array.from(stores).sort((a, b) => a.localeCompare(b, "ja"));
+  }, [staffListUnsorted]);
+
+  // 検索・店舗フィルタ適用
+  const staffFiltered = useMemo(() => {
+    return staffListUnsorted.filter((s) => {
+      // 店舗フィルタ
+      if (filterStore !== "all" && s.storeNormalized !== filterStore) return false;
+      // 名前検索
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        return s.name.toLowerCase().includes(q) || s.storeNormalized.toLowerCase().includes(q);
+      }
+      return true;
+    });
+  }, [staffListUnsorted, filterStore, searchQuery]);
+
   // ソート適用
   const staffList = useMemo(() => {
-    const list = [...staffListUnsorted];
+    const list = [...staffFiltered];
     const dir = sortDirection === "asc" ? 1 : -1;
 
     list.sort((a, b) => {
@@ -145,7 +170,7 @@ export default function StaffList() {
       }
     });
     return list;
-  }, [staffListUnsorted, sortField, sortDirection]);
+  }, [staffFiltered, sortField, sortDirection]);
 
   // スタッフごとのNPS情報を計算
   const staffNpsMap = useMemo(() => {
@@ -214,8 +239,9 @@ export default function StaffList() {
             スタッフ一覧
           </h1>
           <p className="text-xs text-muted-foreground mt-1">
-            全店舗のスタッフ個人実績（{SORT_LABELS[sortField]}{sortDirection === "asc" ? "昇順" : "降順"}）
+            {filterStore !== "all" ? `${filterStore}の` : "全店舗の"}スタッフ個人実績（{SORT_LABELS[sortField]}{sortDirection === "asc" ? "昇順" : "降順"}）
             {staffList.length > 0 && ` — ${staffList.length}名`}
+            {staffList.length < staffListUnsorted.length && staffList.length > 0 && ` / 全${staffListUnsorted.length}名`}
           </p>
         </div>
 
@@ -231,6 +257,33 @@ export default function StaffList() {
             selection={periodSelection}
             onChange={setPeriodSelection}
           />
+        </div>
+      </div>
+
+      {/* Search & Store Filter */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="スタッフ名で検索..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Store className="w-4 h-4 text-muted-foreground" />
+          <Select value={filterStore} onValueChange={setFilterStore}>
+            <SelectTrigger className="w-[160px] bg-white">
+              <SelectValue placeholder="店舗" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">全店舗</SelectItem>
+              {storeList.map((s) => (
+                <SelectItem key={s} value={s}>{s}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -282,9 +335,9 @@ export default function StaffList() {
           <CardContent className="p-8 text-center text-muted-foreground">
             <Users className="w-8 h-8 mx-auto mb-2 opacity-40" />
             <p className="text-sm">
-              {periodSelection.mode === "all"
-                ? "スタッフデータはまだありません"
-                : `${monthLabel}のスタッフデータはまだありません`}
+              {staffListUnsorted.length === 0
+                ? "この期間のスタッフデータはありません"
+                : "検索条件に一致するスタッフがいません"}
             </p>
           </CardContent>
         </Card>

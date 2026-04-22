@@ -518,7 +518,7 @@ export default function SurveyDetail() {
         ) : (
           <Card className="border-border/50">
             <CardContent className="p-8 text-center text-muted-foreground">
-              {!isAllPeriod ? "この期間のNPSデータはありません" : "NPSデータがありません"}
+              この期間のNPSデータはありません
             </CardContent>
           </Card>
         )}
@@ -672,7 +672,7 @@ export default function SurveyDetail() {
           <Card className="border-border/50 border-dashed">
             <CardContent className="p-8 text-center text-muted-foreground">
               <FileText className="w-8 h-8 mx-auto mb-2 opacity-40" />
-              <p className="text-sm">この月のファンくるデータはありません</p>
+              <p className="text-sm">この期間のファンくるデータはありません</p>
               <p className="text-xs mt-1 opacity-70">Google Driveにファイルが追加されると自動的に表示されます</p>
             </CardContent>
           </Card>
@@ -804,7 +804,7 @@ export default function SurveyDetail() {
       {!loading && storeRecords.length === 0 && !hasFankuruData && (
         <div className="text-center py-12 text-muted-foreground mb-8">
           <MessageSquare className="w-8 h-8 mx-auto mb-3 opacity-30" />
-          <p className="text-sm">この月のアンケートデータはありません</p>
+          <p className="text-sm">この期間のアンケートデータはありません</p>
         </div>
       )}
 
