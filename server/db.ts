@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, staffStatus, type StaffStatus } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,4 +89,45 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// ─── Staff Status helpers ───
+
+/** Get all staff status records */
+export async function getAllStaffStatus(): Promise<StaffStatus[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(staffStatus);
+}
+
+/** Get a single staff status by name + store */
+export async function getStaffStatusByKey(staffName: string, storeName: string): Promise<StaffStatus | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select().from(staffStatus)
+    .where(and(eq(staffStatus.staffName, staffName), eq(staffStatus.storeName, storeName)))
+    .limit(1);
+  return rows[0];
+}
+
+/** Upsert staff status (insert or update on duplicate staffName+storeName) */
+export async function upsertStaffStatus(input: {
+  staffName: string;
+  storeName: string;
+  status: "active" | "retired";
+  retiredMonth?: string | null;
+}): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.insert(staffStatus).values({
+    staffName: input.staffName,
+    storeName: input.storeName,
+    status: input.status,
+    retiredMonth: input.retiredMonth ?? null,
+  }).onDuplicateKeyUpdate({
+    set: {
+      status: input.status,
+      retiredMonth: input.retiredMonth ?? null,
+      updatedAt: new Date(),
+    },
+  });
+}

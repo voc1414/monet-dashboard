@@ -38,7 +38,7 @@ const KNOWN_STORES = new Set([
   "高槻院",
 ]);
 
-// 退社スタッフ管理
+// 退社スタッフ管理（ハードコードフォールバック）
 // key: スタッフ名, value: 退社月 "YYYY-MM"（この月以降のデータを除外）
 const RETIRED_STAFF: Record<string, { store: string; retiredMonth: string }> = {
   "Hitomi": { store: "福島院", retiredMonth: "2026-04" },
@@ -46,7 +46,32 @@ const RETIRED_STAFF: Record<string, { store: string; retiredMonth: string }> = {
 };
 
 /**
+ * DB連携用: 退社スタッフのステータスマップ
+ * useStaffStatusフックからsetRetiredStaffMapで注入される
+ * key: "staffName|storeName", value: { status, retiredMonth }
+ */
+type RetiredStaffEntry = { status: "active" | "retired"; retiredMonth: string | null };
+let dbRetiredStaffMap: Map<string, RetiredStaffEntry> | null = null;
+
+/**
+ * DB連携: 退社スタッフマップを設定する
+ * useStaffStatusフックから呼ばれる
+ */
+export function setRetiredStaffMap(map: Map<string, RetiredStaffEntry> | null): void {
+  dbRetiredStaffMap = map;
+}
+
+/**
+ * DB連携: 退社スタッフマップが設定済みかどうか
+ */
+export function hasRetiredStaffMap(): boolean {
+  return dbRetiredStaffMap !== null && dbRetiredStaffMap.size > 0;
+}
+
+/**
  * スタッフが退社済みかどうか判定
+ * DB連携マップが設定されている場合はDBデータを優先し、
+ * 未設定の場合はハードコードのフォールバックを使用する。
  * @param staffName スタッフ名
  * @param storeName 店舗名（省略可）
  * @param month 対象月 "YYYY-MM"（省略時は現在月）
@@ -54,15 +79,42 @@ const RETIRED_STAFF: Record<string, { store: string; retiredMonth: string }> = {
  */
 export function isRetiredStaff(staffName: string, storeName?: string, month?: string): boolean {
   const targetMonth = month || getCurrentYearMonth();
-  // 名前で検索（大文字小文字無視）
+
+  // DB連携マップが設定されている場合はDBデータを使用
+  if (dbRetiredStaffMap && dbRetiredStaffMap.size > 0) {
+    // 店舗名指定ありの場合: 完全一致
+    if (storeName) {
+      const key = `${staffName}|${storeName}`;
+      const entry = dbRetiredStaffMap.get(key);
+      if (entry) {
+        if (entry.status !== "retired") return false;
+        if (entry.retiredMonth) return targetMonth >= entry.retiredMonth;
+        return true;
+      }
+    }
+
+    // 名前のみで検索（大文字小文字無視）
+    const nameLower = staffName.trim().toLowerCase();
+    for (const [mapKey, entry] of Array.from(dbRetiredStaffMap.entries())) {
+      const [mapName, mapStore] = mapKey.split("|");
+      if (mapName.trim().toLowerCase() !== nameLower) continue;
+      if (storeName && mapStore !== storeName) continue;
+      if (entry.status !== "retired") return false;
+      if (entry.retiredMonth) return targetMonth >= entry.retiredMonth;
+      return true;
+    }
+
+    // DBに登録されていない = 退社ではない
+    return false;
+  }
+
+  // フォールバック: ハードコードデータを使用
   const nameKey = Object.keys(RETIRED_STAFF).find(
     k => k.toLowerCase() === staffName.trim().toLowerCase()
   );
   if (!nameKey) return false;
   const info = RETIRED_STAFF[nameKey];
-  // 店舗が指定されている場合は店舗も一致するかチェック
   if (storeName && info.store !== storeName) return false;
-  // 退社月以降ならtrue
   return targetMonth >= info.retiredMonth;
 }
 

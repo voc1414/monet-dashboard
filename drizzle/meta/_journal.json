@@ -8,6 +8,20 @@
       "when": 1775227645432,
       "tag": "0000_naive_mastermind",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1776846842143,
+      "tag": "0001_busy_iron_monger",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1776846878700,
+      "tag": "0002_simple_blade",
+      "breakpoints": true
     }
   ]
 }

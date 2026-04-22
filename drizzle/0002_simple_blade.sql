@@ -1,0 +1,1 @@
+ALTER TABLE `staff_status` ADD CONSTRAINT `staff_store_idx` UNIQUE(`staffName`,`storeName`);
