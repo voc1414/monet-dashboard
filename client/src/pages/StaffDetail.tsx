@@ -4,7 +4,7 @@
  * セクション順: 個人売上 → 個別アドバイス → ファンくるデータ → NPS結果
  */
 import { useParams } from "wouter";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User, Calendar, BarChart3, DollarSign, UserCheck, Scissors,
@@ -14,7 +14,8 @@ import {
   ChevronDown, ChevronUp, Users, Quote, Star, MessageSquare, Building2, ClipboardCheck
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PeriodSelector, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
+import type { PeriodSelection } from "@/components/PeriodSelector";
 import { Badge } from "@/components/ui/badge";
 import ScoreDetailModal from "@/components/ScoreDetailModal";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -291,44 +292,43 @@ export default function StaffDetail() {
     return Array.from(set).sort().reverse();
   }, [npsMonths, fankuruMonths, staffReportMonths]);
 
-  const defaultMonth = useMemo(() => {
-    const now = new Date();
-    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const ym = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, "0")}`;
-    if (allMonths.includes(ym)) return ym;
-    if (staffReportMonths.length > 0) return staffReportMonths[0];
-    return allMonths[0] || "all";
-  }, [allMonths, staffReportMonths]);
-
-  const [selectedMonth, setSelectedMonth] = useState<string>("__init__");
+  const [periodSelection, setPeriodSelection] = useState<PeriodSelection>(getDefaultPeriodSelection());
   const [selectedScore, setSelectedScore] = useState<number | null>(null);
   const [selectedPdf, setSelectedPdf] = useState<FankuruPdf | null>(null);
   const [showAllReviews, setShowAllReviews] = useState(false);
 
-  useEffect(() => {
-    if (selectedMonth === "__init__" && !npsLoading && !reportLoading && !fankuruLoading && allMonths.length > 0) {
-      setSelectedMonth(defaultMonth);
-    }
-  }, [allMonths, defaultMonth, selectedMonth, npsLoading, reportLoading, fankuruLoading]);
-
-  const activeMonth = selectedMonth === "__init__" ? defaultMonth : selectedMonth;
+  const filterM = useMemo(() => getFilterMonths(periodSelection, allMonths), [periodSelection, allMonths]);
+  const isAllPeriod = filterM === "all";
+  /** 単一月を取得（月末報告書のような単月データ用） */
+  const singleMonth = useMemo(() => {
+    if (isAllPeriod) return undefined;
+    const months = filterM as string[];
+    return months.length === 1 ? months[0] : undefined;
+  }, [filterM, isAllPeriod]);
 
   // 月末報告書データ（スタッフ個人）
   const staffReport = useMemo(() => {
-    if (activeMonth === "all") {
+    const staffRows = rawData.filter(r => r.name === staffName && (!staffStore || r.storeNormalized === staffStore));
+    if (isAllPeriod) {
       // 全期間: 最新月のデータを返す
-      const reports = rawData.filter(r => r.name === staffName && (!staffStore || r.storeNormalized === staffStore)).sort((a, b) => b.reportMonth.localeCompare(a.reportMonth));
-      return reports[0] || null;
+      const sorted = [...staffRows].sort((a, b) => b.reportMonth.localeCompare(a.reportMonth));
+      return sorted[0] || null;
     }
-    return rawData.find(r => r.name === staffName && (!staffStore || r.storeNormalized === staffStore) && r.reportMonth === activeMonth) || null;
-  }, [rawData, staffName, staffStore, activeMonth]);
+    const months = filterM as string[];
+    const matching = staffRows.filter(r => months.includes(r.reportMonth)).sort((a, b) => b.reportMonth.localeCompare(a.reportMonth));
+    return matching[0] || null;
+  }, [rawData, staffName, staffStore, filterM, isAllPeriod]);
 
   // NPS: スタッフ名でフィルタ
   const staffNpsRecords = useMemo(() => {
     const filtered = records.filter(r => r.staff?.trim() === staffName);
-    if (activeMonth === "all") return filtered;
-    return filterByMonth(filtered, activeMonth);
-  }, [records, staffName, activeMonth]);
+    if (isAllPeriod) return filtered;
+    return filtered.filter(r => {
+      if (!r.date) return false;
+      const ym = r.date.substring(0, 7).replace(/\//g, "-");
+      return (filterM as string[]).includes(ym);
+    });
+  }, [records, staffName, filterM, isAllPeriod]);
 
   // スタッフ個人のStoreStats相当を計算
   const staffNpsStats = useMemo((): StoreStats | null => {
@@ -380,17 +380,17 @@ export default function StaffDetail() {
 
   // ファンくるPDF: 月でフィルタ
   const filteredFankuruPdfs = useMemo(() => {
-    if (activeMonth === "all") return fankuruPdfs;
-    return fankuruPdfs.filter(p => p.yearMonth === activeMonth);
-  }, [fankuruPdfs, activeMonth]);
+    if (isAllPeriod) return fankuruPdfs;
+    return fankuruPdfs.filter(p => (filterM as string[]).includes(p.yearMonth));
+  }, [fankuruPdfs, filterM, isAllPeriod]);
 
   // ファンくるコメント（月末報告書から）
   const filteredFankuruComments = useMemo(() => {
     return rawData
-      .filter(r => r.name === staffName && (activeMonth === "all" || r.reportMonth === activeMonth))
+      .filter(r => r.name === staffName && (isAllPeriod || (filterM as string[]).includes(r.reportMonth)))
       .filter(r => r.fankuruComment && r.fankuruComment.trim() !== "" && r.fankuruComment.trim() !== "なし")
       .map(r => ({ month: r.reportMonthLabel, comment: r.fankuruComment }));
-  }, [rawData, activeMonth, staffName]);
+  }, [rawData, filterM, isAllPeriod, staffName]);
 
   const hasFankuruData = filteredFankuruPdfs.length > 0 || filteredFankuruComments.length > 0;
 
@@ -424,11 +424,7 @@ export default function StaffDetail() {
     return staffNpsRecords.filter(r => !shown.has(r) && r.review && r.review.trim().length > 0);
   }, [staffNpsRecords, topReviews, worstReviews]);
 
-  const formatMonth = (ym: string) => {
-    if (!ym || ym === "all" || ym === "__init__") return "";
-    const [y, m] = ym.split("-");
-    return `${y}年${parseInt(m)}月`;
-  };
+
 
   const breadcrumbs = [
     { label: "スタッフ一覧", href: "/staff" },
@@ -477,25 +473,12 @@ export default function StaffDetail() {
           </div>
         </div>
 
-        {/* Month Selector */}
-        <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-muted-foreground" />
-          <Select value={activeMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-[180px] bg-white">
-              <SelectValue placeholder="期間を選択" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">全期間</SelectItem>
-              {allMonths.map(m => (
-                <SelectItem key={m} value={m}>{formatMonth(m)}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {/* Period Selector */}
+        <PeriodSelector allMonths={allMonths} selection={periodSelection} onChange={setPeriodSelection} />
       </div>
 
       {/* ===== 0. 月末報告書 回答ステータス ===== */}
-      {activeMonth && activeMonth !== "all" && activeMonth !== "__init__" && (() => {
+      {singleMonth && (() => {
         const hasSubmitted = !!staffReport;
         return (
           <div className="flex items-center gap-2 mb-4">
@@ -504,12 +487,12 @@ export default function StaffDetail() {
             {hasSubmitted ? (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
                 <CheckCircle2 className="w-3 h-3" />
-                {formatMonth(activeMonth)} 回答済み
+                {getPeriodLabel(periodSelection)} 回答済み
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
                 <AlertTriangle className="w-3 h-3" />
-                {formatMonth(activeMonth)} 未回答
+                {getPeriodLabel(periodSelection)} 未回答
               </span>
             )}
           </div>
@@ -521,8 +504,8 @@ export default function StaffDetail() {
         <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
           <DollarSign className="w-5 h-5 text-primary" />
           個人売上
-          {activeMonth !== "all" && activeMonth !== "__init__" && (
-            <span className="text-xs font-normal text-muted-foreground">— {formatMonth(activeMonth)}</span>
+          {!isAllPeriod && (
+            <span className="text-xs font-normal text-muted-foreground">— {getPeriodLabel(periodSelection)}</span>
           )}
         </h2>
 
@@ -1092,8 +1075,8 @@ export default function StaffDetail() {
         <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
           <BarChart3 className="w-5 h-5 text-[#2D9C8F]" />
           NPS調査結果
-          {activeMonth !== "all" && activeMonth !== "__init__" && (
-            <span className="text-xs font-normal text-muted-foreground">— {formatMonth(activeMonth)}</span>
+          {!isAllPeriod && (
+            <span className="text-xs font-normal text-muted-foreground">— {getPeriodLabel(periodSelection)}</span>
           )}
         </h2>
 

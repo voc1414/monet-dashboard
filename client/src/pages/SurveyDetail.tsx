@@ -5,7 +5,7 @@
  * 個人売上セクションなし
  */
 import { useParams, Link } from "wouter";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   MapPin, BarChart3, Calendar, Star, MessageSquare,
@@ -15,7 +15,8 @@ import {
   Sparkles, ChevronDown, Users, Quote
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PeriodSelector, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
+import type { PeriodSelection } from "@/components/PeriodSelector";
 import { Badge } from "@/components/ui/badge";
 import ScoreDetailModal from "@/components/ScoreDetailModal";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -264,40 +265,24 @@ export default function SurveyDetail() {
     return Array.from(set).sort().reverse();
   }, [allNpsMonths, fankuruMonths, monthlyMonths]);
 
-  // デフォルト月: 全データ読み込み完了後に決定する
-  // NPS月を優先し、なければファンくる/月末報告書の月にフォールバック
-  const defaultMonth = useMemo(() => {
-    const now = new Date();
-    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const ym = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, "0")}`;
-    // 先月のデータがあればそれを使う
-    if (allMonths.includes(ym)) return ym;
-    // なければNPS月の最新を優先
-    if (allNpsMonths.length > 0) return allNpsMonths[0];
-    // NPSもなければ全月の最新
-    return allMonths[0] || "all";
-  }, [allMonths, allNpsMonths]);
-
-  const [selectedMonth, setSelectedMonth] = useState<string>("__init__");
+  const [periodSelection, setPeriodSelection] = useState<PeriodSelection>(getDefaultPeriodSelection());
   const [selectedScore, setSelectedScore] = useState<number | null>(null);
   const [selectedPdf, setSelectedPdf] = useState<FankuruPdf | null>(null);
   const [showAllReviews, setShowAllReviews] = useState(false);
 
-  // 全データの読み込みが完了してからデフォルト月を設定する
-  useEffect(() => {
-    if (selectedMonth === "__init__" && !npsLoading && !fankuruLoading && allMonths.length > 0) {
-      setSelectedMonth(defaultMonth);
-    }
-  }, [allMonths, defaultMonth, selectedMonth, npsLoading, fankuruLoading]);
-
-  const activeMonth = selectedMonth === "__init__" ? defaultMonth : selectedMonth;
+  const filterM = useMemo(() => getFilterMonths(periodSelection, allMonths), [periodSelection, allMonths]);
+  const isAllPeriod = filterM === "all";
 
   // NPS: 月+店舗でフィルタ
   const storeRecords = useMemo(() => {
     const filtered = records.filter(r => r.storeShort === storeId);
-    if (activeMonth === "all") return filtered;
-    return filterByMonth(filtered, activeMonth);
-  }, [records, storeId, activeMonth]);
+    if (isAllPeriod) return filtered;
+    return filtered.filter(r => {
+      if (!r.date) return false;
+      const ym = r.date.substring(0, 7).replace(/\//g, "-");
+      return (filterM as string[]).includes(ym);
+    });
+  }, [records, storeId, filterM, isAllPeriod]);
 
   const storeStats = useMemo(() => {
     if (storeRecords.length === 0) return null;
@@ -331,17 +316,17 @@ export default function SurveyDetail() {
 
   // ファンくるPDF: 月でフィルタ
   const filteredFankuruPdfs = useMemo(() => {
-    if (activeMonth === "all") return fankuruPdfs;
-    return fankuruPdfs.filter(p => p.yearMonth === activeMonth);
-  }, [fankuruPdfs, activeMonth]);
+    if (isAllPeriod) return fankuruPdfs;
+    return fankuruPdfs.filter(p => (filterM as string[]).includes(p.yearMonth));
+  }, [fankuruPdfs, filterM, isAllPeriod]);
 
   // ファンくるコメント（月末報告書から）
   const filteredFankuruComments = useMemo(() => {
     return rawData
-      .filter(r => r.storeNormalized === storeId && r.reportMonth === activeMonth)
+      .filter(r => r.storeNormalized === storeId && (isAllPeriod || (filterM as string[]).includes(r.reportMonth)))
       .filter(r => r.fankuruComment && r.fankuruComment.trim() !== "" && r.fankuruComment.trim() !== "なし")
-      .map(r => ({ staffName: r.name, comment: r.fankuruComment }));
-  }, [rawData, activeMonth, storeId]);
+      .map(r => ({ month: r.reportMonthLabel, comment: r.fankuruComment }));
+  }, [rawData, filterM, isAllPeriod, storeId]);
 
   const hasFankuruData = filteredFankuruPdfs.length > 0 || filteredFankuruComments.length > 0;
 
@@ -385,11 +370,6 @@ export default function SurveyDetail() {
     return storeRecords.filter(r => !shown.has(r) && r.review && r.review.trim().length > 0);
   }, [storeRecords, topReviews, worstReviews]);
 
-  const formatMonth = (ym: string) => {
-    if (!ym || ym === "all" || ym === "__init__") return "";
-    const [y, m] = ym.split("-");
-    return `${y}年${parseInt(m)}月`;
-  };
 
   const breadcrumbs = [
     { label: "ホーム", href: "/" },
@@ -426,17 +406,7 @@ export default function SurveyDetail() {
         {/* Month Selector */}
         <div className="flex items-center gap-2">
           <Calendar className="w-4 h-4 text-muted-foreground" />
-          <Select value={activeMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-[180px] bg-white">
-              <SelectValue placeholder="期間を選択" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">全期間</SelectItem>
-              {allMonths.map(m => (
-                <SelectItem key={m} value={m}>{formatMonth(m)}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <PeriodSelector allMonths={allMonths} selection={periodSelection} onChange={setPeriodSelection} />
         </div>
       </div>
 
@@ -445,8 +415,8 @@ export default function SurveyDetail() {
         <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
           <BarChart3 className="w-5 h-5 text-[#2D9C8F]" />
           NPS調査結果
-          {activeMonth !== "all" && activeMonth !== "__init__" && (
-            <span className="text-xs font-normal text-muted-foreground">— {formatMonth(activeMonth)}</span>
+          {!isAllPeriod && (
+            <span className="text-xs font-normal text-muted-foreground">— {getPeriodLabel(periodSelection)}</span>
           )}
         </h2>
 
@@ -548,7 +518,7 @@ export default function SurveyDetail() {
         ) : (
           <Card className="border-border/50">
             <CardContent className="p-8 text-center text-muted-foreground">
-              {activeMonth !== "all" ? "この期間のNPSデータはありません" : "NPSデータがありません"}
+              {!isAllPeriod ? "この期間のNPSデータはありません" : "NPSデータがありません"}
             </CardContent>
           </Card>
         )}
@@ -816,7 +786,7 @@ export default function SurveyDetail() {
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <span className="text-xs font-semibold text-amber-700">ファンくるコメント</span>
-                            <span className="text-xs text-muted-foreground">{f.staffName}</span>
+                            <span className="text-xs text-muted-foreground">{f.month}</span>
                           </div>
                           <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{f.comment}</p>
                         </div>

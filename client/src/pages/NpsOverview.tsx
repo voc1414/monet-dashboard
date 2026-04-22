@@ -4,7 +4,7 @@
  * Colors: Warm white base, teal green for NPS, monet water-blue accent
  */
 import { useParams } from "wouter";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   BarChart3, Calendar, TrendingUp, TrendingDown, Users, MessageSquare,
@@ -13,11 +13,13 @@ import {
   Lightbulb, CheckCircle2, ArrowUpRight
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PeriodSelector, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
+import type { PeriodSelection } from "@/components/PeriodSelector";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ScoreDetailModal from "@/components/ScoreDetailModal";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useNpsData, calculateStoreStats, filterByMonth, getAvailableMonths } from "@/hooks/useNpsData";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { NpsRecord, StoreStats } from "@/hooks/useNpsData";
 import { generateStoreAdvice } from "@/lib/npsAdvice";
 import type { NpsAdvice } from "@/lib/npsAdvice";
@@ -275,27 +277,20 @@ export default function NpsOverview() {
   const storeId = decodeURIComponent(params.storeId || "");
   const { records, loading, error, lastUpdated, refresh } = useNpsData();
   const allMonths = useMemo(() => getAvailableMonths(records), [records]);
-  const defaultMonth = useMemo(() => {
-    const now = new Date();
-    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const ym = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, "0")}`;
-    return allMonths.includes(ym) ? ym : allMonths[0] || "all";
-  }, [allMonths]);
-  const [selectedMonth, setSelectedMonth] = useState<string>("__init__");
+  const [periodSelection, setPeriodSelection] = useState<PeriodSelection>(getDefaultPeriodSelection());
   const [reviewFilter, setReviewFilter] = useState<string>("all");
   const [selectedScore, setSelectedScore] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (selectedMonth === "__init__" && allMonths.length > 0) {
-      setSelectedMonth(defaultMonth);
-    }
-  }, [allMonths, defaultMonth, selectedMonth]);
-
   const storeRecords = useMemo(() => {
     const filtered = records.filter((r) => r.storeShort === storeId);
-    if (selectedMonth === "all") return filtered;
-    return filterByMonth(filtered, selectedMonth);
-  }, [records, storeId, selectedMonth]);
+    const filterM = getFilterMonths(periodSelection, allMonths);
+    if (filterM === "all") return filtered;
+    return filtered.filter(r => {
+      if (!r.date) return false;
+      const ym = r.date.substring(0, 7).replace(/\//g, "-");
+      return filterM.includes(ym);
+    });
+  }, [records, storeId, periodSelection, allMonths]);
 
   const storeStats = useMemo(() => {
     if (storeRecords.length === 0) return null;
@@ -410,18 +405,11 @@ export default function NpsOverview() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-muted-foreground" />
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-[180px] bg-white">
-              <SelectValue placeholder="期間を選択" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">全期間</SelectItem>
-              {allMonths.map((m) => (
-                <SelectItem key={m} value={m}>{formatMonth(m)}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <PeriodSelector
+            allMonths={allMonths}
+            selection={periodSelection}
+            onChange={setPeriodSelection}
+          />
         </div>
       </div>
 
@@ -681,7 +669,7 @@ export default function NpsOverview() {
             <BarChart3 className="w-12 h-12 mx-auto mb-4 text-muted-foreground/30" />
             <p className="text-lg font-medium mb-2">データがありません</p>
             <p className="text-sm">
-              {selectedMonth !== "all"
+              {periodSelection.mode !== "all"
                 ? "選択した期間のデータが見つかりませんでした。別の期間を選択してください。"
                 : "この店舗のNPSデータはまだ登録されていません。"}
             </p>

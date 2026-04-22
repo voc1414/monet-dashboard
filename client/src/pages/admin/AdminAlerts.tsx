@@ -6,7 +6,6 @@ import {
   AlertCircle,
   Info,
   Filter,
-  Calendar,
   Store,
   User,
   ChevronDown,
@@ -18,6 +17,8 @@ import { Badge } from "@/components/ui/badge";
 import AdminLayout from "@/components/AdminLayout";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { validateStoreReport, getAlertSummary, type ReportAlert, type AlertSeverity } from "@/lib/reportValidation";
+import { PeriodSelector, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
+import type { PeriodSelection } from "@/components/PeriodSelector";
 
 const AREA_STORES: { area: string; stores: string[] }[] = [
   { area: "大阪エリア", stores: ["堀江院", "堀江院2nd", "福島院", "高槻院"] },
@@ -26,11 +27,6 @@ const AREA_STORES: { area: string; stores: string[] }[] = [
 ];
 
 const ALL_STORES = AREA_STORES.flatMap((a) => a.stores);
-
-const formatMonth = (ym: string) => {
-  const [y, m] = ym.split("-");
-  return `${y}年${parseInt(m)}月`;
-};
 
 const severityConfig: Record<AlertSeverity, { icon: typeof AlertTriangle; label: string; color: string; bgColor: string; borderColor: string }> = {
   error: {
@@ -63,32 +59,49 @@ interface StoreAlert extends ReportAlert {
 export default function AdminAlerts() {
   const { loading, error, getStoreMonthlyStats, availableMonths } = useMonthlyReport();
 
-  const defaultMonth = useMemo(() => {
-    if (availableMonths.length === 0) return "all";
-    const now = new Date();
-    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const ym = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, "0")}`;
-    return availableMonths.includes(ym) ? ym : availableMonths[0] || "all";
-  }, [availableMonths]);
-
-  const [selectedMonth, setSelectedMonth] = useState<string>("__init__");
+  const [periodSelection, setPeriodSelection] = useState<PeriodSelection>(getDefaultPeriodSelection());
   const [filterSeverity, setFilterSeverity] = useState<string>("all");
   const [filterStore, setFilterStore] = useState<string>("all");
 
-  const activeMonth = selectedMonth === "__init__" ? defaultMonth : selectedMonth;
+  const filterM = useMemo(() => getFilterMonths(periodSelection, availableMonths), [periodSelection, availableMonths]);
+  const isAllPeriod = filterM === "all";
 
   // 全店舗のアラートを収集
+  // getStoreMonthlyStats は単一月のみ受け付けるため、複数月の場合は各月ごとに呼び出して集約する
   const allAlerts = useMemo(() => {
     const alerts: StoreAlert[] = [];
-    for (const storeName of ALL_STORES) {
-      const stats = getStoreMonthlyStats(storeName, activeMonth === "all" ? undefined : activeMonth);
-      const storeAlerts = validateStoreReport(stats);
-      for (const alert of storeAlerts) {
-        alerts.push({ ...alert, storeName });
+
+    if (isAllPeriod) {
+      // 全期間: month=undefined で全データ集約
+      for (const storeName of ALL_STORES) {
+        const stats = getStoreMonthlyStats(storeName, undefined);
+        const storeAlerts = validateStoreReport(stats);
+        for (const alert of storeAlerts) {
+          alerts.push({ ...alert, storeName });
+        }
+      }
+    } else {
+      const months = filterM as string[];
+      // 各月ごとにアラートを収集（重複排除のためSetで管理）
+      for (const storeName of ALL_STORES) {
+        const seenKeys = new Set<string>();
+        for (const month of months) {
+          const stats = getStoreMonthlyStats(storeName, month);
+          const storeAlerts = validateStoreReport(stats);
+          for (const alert of storeAlerts) {
+            // staffName + message でユニークキーを作成して重複排除
+            const key = `${alert.staffName}|${alert.message}|${month}`;
+            if (!seenKeys.has(key)) {
+              seenKeys.add(key);
+              alerts.push({ ...alert, storeName });
+            }
+          }
+        }
       }
     }
+
     return alerts;
-  }, [activeMonth, getStoreMonthlyStats]);
+  }, [filterM, isAllPeriod, getStoreMonthlyStats]);
 
   // フィルタリング
   const filteredAlerts = useMemo(() => {
@@ -153,20 +166,7 @@ export default function AdminAlerts() {
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-muted-foreground" />
-          <Select value={activeMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-[180px] bg-white">
-              <SelectValue placeholder="期間を選択" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">全期間</SelectItem>
-              {availableMonths.map((m) => (
-                <SelectItem key={m} value={m}>{formatMonth(m)}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <PeriodSelector allMonths={availableMonths} selection={periodSelection} onChange={setPeriodSelection} />
 
         <div className="flex items-center gap-2">
           <Filter className="w-4 h-4 text-muted-foreground" />
