@@ -1,6 +1,6 @@
 /**
  * Design: monet Brand Identity — 水彩ブルー × コンクリートモダン
- * Page: スタッフ一覧（全店舗横断・総売上順）
+ * Page: スタッフ一覧（全店舗横断・ソート機能付き）
  * Columns: 氏名、総売上、配属店舗、雇用形態、次回予約率
  * Feature: カード全体クリックでスタッフ個人ページへ遷移
  */
@@ -9,7 +9,7 @@ import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import {
   Users, Calendar, Building2, ArrowRight,
-  ChevronRight
+  ChevronRight, ArrowUpDown, ArrowUp, ArrowDown
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -44,10 +44,41 @@ interface StaffNpsInfo {
   detractors: number;
 }
 
+type SortField = "totalSales" | "storeNormalized" | "employmentType" | "nextReservationRate";
+type SortDirection = "asc" | "desc";
+
+const SORT_LABELS: Record<SortField, string> = {
+  totalSales: "総売上",
+  storeNormalized: "配属店舗",
+  employmentType: "雇用形態",
+  nextReservationRate: "次回予約率",
+};
+
 export default function StaffList() {
   const { rawData, loading, error, availableMonths } = useMonthlyReport();
   const { records: npsRecords, loading: npsLoading } = useNpsData();
   const [, navigate] = useLocation();
+
+  // ソート状態（デフォルト: 次回予約率の昇順）
+  const [sortField, setSortField] = useState<SortField>("nextReservationRate");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      // 総売上はデフォルト降順、それ以外は昇順
+      setSortDirection(field === "totalSales" ? "desc" : "asc");
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) return <ArrowUpDown className="w-3 h-3 text-muted-foreground/50" />;
+    return sortDirection === "asc"
+      ? <ArrowUp className="w-3 h-3 text-primary" />
+      : <ArrowDown className="w-3 h-3 text-primary" />;
+  };
 
   // デフォルトは先月
   const defaultMonth = useMemo(() => {
@@ -67,8 +98,8 @@ export default function StaffList() {
 
   const activeMonth = selectedMonth === "__init__" ? defaultMonth : selectedMonth;
 
-  // 選択月のスタッフデータを総売上順でソート
-  const staffList = useMemo(() => {
+  // 選択月のスタッフデータ
+  const staffListUnsorted = useMemo(() => {
     if (!rawData.length) return [];
     let filtered: StaffReport[];
     if (activeMonth === "all") {
@@ -84,8 +115,30 @@ export default function StaffList() {
     } else {
       filtered = rawData.filter((r) => r.reportMonth === activeMonth);
     }
-    return [...filtered].sort((a, b) => b.totalSales - a.totalSales);
+    return filtered;
   }, [rawData, activeMonth]);
+
+  // ソート適用
+  const staffList = useMemo(() => {
+    const list = [...staffListUnsorted];
+    const dir = sortDirection === "asc" ? 1 : -1;
+
+    list.sort((a, b) => {
+      switch (sortField) {
+        case "totalSales":
+          return (a.totalSales - b.totalSales) * dir;
+        case "storeNormalized":
+          return a.storeNormalized.localeCompare(b.storeNormalized, "ja") * dir;
+        case "employmentType":
+          return a.employmentType.localeCompare(b.employmentType, "ja") * dir;
+        case "nextReservationRate":
+          return (a.nextReservationRate - b.nextReservationRate) * dir;
+        default:
+          return 0;
+      }
+    });
+    return list;
+  }, [staffListUnsorted, sortField, sortDirection]);
 
   // スタッフごとのNPS情報を計算
   const staffNpsMap = useMemo(() => {
@@ -125,6 +178,9 @@ export default function StaffList() {
     navigate(`/staff/${encodeURIComponent(storeName)}/${encodeURIComponent(staffName)}`);
   };
 
+  // ソートラベル表示
+  const sortLabel = `${SORT_LABELS[sortField]}${sortDirection === "asc" ? "↑" : "↓"}`;
+
   return (
     <DashboardLayout
       breadcrumbs={[{ label: "スタッフ一覧" }]}
@@ -139,7 +195,7 @@ export default function StaffList() {
             スタッフ一覧
           </h1>
           <p className="text-xs text-muted-foreground mt-1">
-            全店舗のスタッフ個人実績（総売上順）
+            全店舗のスタッフ個人実績（{SORT_LABELS[sortField]}{sortDirection === "asc" ? "昇順" : "降順"}）
             {staffList.length > 0 && ` — ${staffList.length}名`}
           </p>
         </div>
@@ -164,6 +220,28 @@ export default function StaffList() {
             </SelectContent>
           </Select>
         </div>
+      </div>
+
+      {/* Mobile Sort Controls */}
+      <div className="md:hidden flex items-center gap-2 mb-4 overflow-x-auto pb-1">
+        {(["nextReservationRate", "totalSales", "storeNormalized", "employmentType"] as SortField[]).map((field) => (
+          <button
+            key={field}
+            onClick={() => handleSort(field)}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border ${
+              sortField === field
+                ? "bg-primary/10 text-primary border-primary/30"
+                : "bg-card text-muted-foreground border-border/50 hover:bg-accent/50"
+            }`}
+          >
+            {SORT_LABELS[field]}
+            {sortField === field && (
+              sortDirection === "asc"
+                ? <ArrowUp className="w-3 h-3" />
+                : <ArrowDown className="w-3 h-3" />
+            )}
+          </button>
+        ))}
       </div>
 
       {/* Loading */}
@@ -203,13 +281,33 @@ export default function StaffList() {
       {/* Staff List */}
       {!loading && staffList.length > 0 && (
         <>
-          {/* Table Header (desktop) */}
+          {/* Table Header (desktop) — clickable for sorting */}
           <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-2 text-[10px] text-muted-foreground font-medium uppercase tracking-wider border-b border-border/40 mb-2">
             <div className="col-span-3">氏名</div>
-            <div className="col-span-3 text-right">総売上</div>
-            <div className="col-span-2">配属店舗</div>
-            <div className="col-span-2">雇用形態</div>
-            <div className="col-span-2 text-right">次回予約率</div>
+            <div
+              className="col-span-3 text-right flex items-center justify-end gap-1 cursor-pointer hover:text-foreground transition-colors select-none"
+              onClick={() => handleSort("totalSales")}
+            >
+              総売上 {getSortIcon("totalSales")}
+            </div>
+            <div
+              className="col-span-2 flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors select-none"
+              onClick={() => handleSort("storeNormalized")}
+            >
+              配属店舗 {getSortIcon("storeNormalized")}
+            </div>
+            <div
+              className="col-span-2 flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors select-none"
+              onClick={() => handleSort("employmentType")}
+            >
+              雇用形態 {getSortIcon("employmentType")}
+            </div>
+            <div
+              className="col-span-2 text-right flex items-center justify-end gap-1 cursor-pointer hover:text-foreground transition-colors select-none"
+              onClick={() => handleSort("nextReservationRate")}
+            >
+              次回予約率 {getSortIcon("nextReservationRate")}
+            </div>
           </div>
 
           <div className="space-y-2">
