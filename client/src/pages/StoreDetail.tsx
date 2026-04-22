@@ -216,7 +216,7 @@ export default function StoreDetail() {
   const storeId = decodeURIComponent(params.storeId || "");
   const { records, loading: npsLoading, error: npsError, lastUpdated, refresh } = useNpsData();
   const { loading: reportLoading, error: reportError, getStoreMonthlyStats, availableMonths: reportMonths, getStaffTrend } = useMonthlyReport();
-  const { loading: sbLoading, error: sbError, getStoreMonth, hasData: hasSbData } = useSalonBoardData();
+  const { loading: sbLoading, error: sbError, getStoreMonth, getStoreMonthsAggregated, hasData: hasSbData } = useSalonBoardData();
   const loading = npsLoading || reportLoading || sbLoading;
   const error = npsError || reportError || sbError;
   const allNpsMonths = useMemo(() => getAvailableMonths(records), [records]);
@@ -233,12 +233,6 @@ export default function StoreDetail() {
     [periodSelection, allMonths]
   );
 
-  /** 後方互換: 単月の場合の selectedMonth 文字列 */
-  const selectedMonth = useMemo(() => {
-    if (activeFilterMonths === "all") return "all";
-    if (activeFilterMonths.length === 1) return activeFilterMonths[0];
-    return "multi";
-  }, [activeFilterMonths]);
 
   const [selectedScore, setSelectedScore] = useState<number | null>(null);
   const [selectedPdf, setSelectedPdf] = useState<FankuruPdf | null>(null);
@@ -289,9 +283,50 @@ export default function StoreDetail() {
     ];
   }, [storeStats]);
 
-  // 月末報告書の実データ
-  const activeMonth = selectedMonth === "all" || selectedMonth === "multi" ? undefined : selectedMonth;
-  const reportStats = useMemo(() => getStoreMonthlyStats(storeId, activeMonth), [getStoreMonthlyStats, storeId, activeMonth]);
+  // 月末報告書の実データ—選択月リストを使って正確にフィルタリング
+  const selectedMonthsList = useMemo(() => {
+    if (activeFilterMonths === "all") return undefined;
+    return activeFilterMonths;
+  }, [activeFilterMonths]);
+
+  const activeMonth = useMemo(() => {
+    if (!selectedMonthsList) return undefined;
+    if (selectedMonthsList.length === 1) return selectedMonthsList[0];
+    return undefined;
+  }, [selectedMonthsList]);
+
+  const reportStats = useMemo(() => {
+    if (!selectedMonthsList) {
+      // 全期間
+      return getStoreMonthlyStats(storeId, undefined);
+    } else if (selectedMonthsList.length === 1) {
+      // 単月
+      return getStoreMonthlyStats(storeId, selectedMonthsList[0]);
+    } else {
+      // 複数月: 各月ごとに取得して合算
+      const monthReports = selectedMonthsList
+        .map(m => getStoreMonthlyStats(storeId, m))
+        .filter((r): r is NonNullable<typeof r> => r !== null);
+      if (monthReports.length === 0) return null;
+      const totalTechSales = monthReports.reduce((s, r) => s + r.totalTechSales, 0);
+      const totalRetailSales = monthReports.reduce((s, r) => s + r.totalRetailSales, 0);
+      const totalSales = totalTechSales + totalRetailSales;
+      const totalNewCustomers = monthReports.reduce((s, r) => s + r.totalNewCustomers, 0);
+      const totalReturnCustomers = monthReports.reduce((s, r) => s + r.totalReturnCustomers, 0);
+      const totalCustomers = totalNewCustomers + totalReturnCustomers;
+      const avgUnitPrice = totalCustomers > 0 ? Math.round(totalSales / totalCustomers) : 0;
+      const totalNextReservation = monthReports.reduce((s, r) => s + (r.totalNextReservation || 0), 0);
+      const nextReservationRate = totalCustomers > 0 ? Math.round((totalNextReservation / totalCustomers) * 1000) / 10 : 0;
+      return {
+        ...monthReports[0],
+        totalSales, totalTechSales, totalRetailSales,
+        totalCustomers, totalNewCustomers, totalReturnCustomers,
+        avgUnitPrice, totalNextReservation, nextReservationRate,
+        staffCount: monthReports.reduce((s, r) => s + r.staffCount, 0),
+        monthLabel: "",
+      };
+    }
+  }, [getStoreMonthlyStats, storeId, selectedMonthsList]);
 
   // 異常値検出
   const reportAlerts = useMemo(() => validateStoreReport(reportStats), [reportStats]);
@@ -1019,8 +1054,13 @@ export default function StoreDetail() {
 
       {/* 店舗売上サマリ（サロンボードデータ優先、フォールバックは月末報告書） */}
       {(() => {
-        const sbData = activeMonth ? getStoreMonth(storeId, activeMonth) : null;
-        const hasSb = activeMonth ? hasSbData(storeId, activeMonth) : false;
+        // サロンボードデータ—単月・複数月・全期間すべて対応
+        const sbData = selectedMonthsList
+          ? (selectedMonthsList.length === 1
+              ? getStoreMonth(storeId, selectedMonthsList[0])
+              : getStoreMonthsAggregated(storeId, selectedMonthsList))
+          : getStoreMonthsAggregated(storeId); // 全期間
+        const hasSb = !!sbData;
 
         // 店舗レベルの数値: サロンボードデータを優先、なければ月末報告書にフォールバック
         const storeTotalSales = hasSb ? (sbData?.totalSales || 0) : (reportStats?.totalSales || 0);

@@ -253,6 +253,40 @@ export function useSalonBoardData() {
     };
   }, [data]);
 
+  /**
+   * 特定店舗の複数月データを合算して返す
+   * months が指定されない場合は全月合算
+   */
+  const getStoreMonthsAggregated = useMemo(() => {
+    return (storeName: string, months?: string[]): SalonBoardMonthlyData | null => {
+      let filtered = data.filter(d => d.storeName === storeName);
+      if (months && months.length > 0) {
+        filtered = filtered.filter(d => months.includes(d.yearMonth));
+      }
+      if (filtered.length === 0) return null;
+
+      const totalSales = filtered.reduce((s, d) => s + d.totalSales, 0);
+      const techSales = filtered.reduce((s, d) => s + d.techSales, 0);
+      const retailSales = filtered.reduce((s, d) => s + d.retailSales, 0);
+      const totalCustomers = filtered.reduce((s, d) => s + d.totalCustomers, 0);
+      const newCustomers = filtered.reduce((s, d) => s + d.newCustomers, 0);
+      const returnCustomers = filtered.reduce((s, d) => s + d.returnCustomers, 0);
+      const unitPrice = totalCustomers > 0 ? Math.round(totalSales / totalCustomers) : 0;
+
+      return {
+        storeName,
+        yearMonth: months && months.length === 1 ? months[0] : "",
+        totalSales,
+        techSales,
+        retailSales,
+        unitPrice,
+        totalCustomers,
+        newCustomers,
+        returnCustomers,
+      };
+    };
+  }, [data]);
+
   return {
     data,
     loading,
@@ -261,6 +295,7 @@ export function useSalonBoardData() {
     getStoreMonth,
     getStoreAllMonths,
     getAllStoresForMonth,
+    getStoreMonthsAggregated,
     hasData,
   };
 }
