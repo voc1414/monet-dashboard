@@ -60,17 +60,17 @@ export default function StaffList() {
   const { records: npsRecords, loading: npsLoading } = useNpsData();
   const [, navigate] = useLocation();
 
-  // ソート状態（デフォルト: 次回予約率の昇順）
+  // ソート状態（デフォルト: 次回予約率の降順）
   const [sortField, setSortField] = useState<SortField>("nextReservationRate");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
     } else {
       setSortField(field);
-      // 総売上はデフォルト降順、それ以外は昇順
-      setSortDirection(field === "totalSales" ? "desc" : "asc");
+      // 全てデフォルト降順
+      setSortDirection("desc");
     }
   };
 
