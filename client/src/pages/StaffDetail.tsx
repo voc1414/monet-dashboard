@@ -498,48 +498,21 @@ export default function StaffDetail() {
       {activeMonth && activeMonth !== "all" && activeMonth !== "__init__" && (() => {
         const hasSubmitted = !!staffReport;
         return (
-          <section className="mb-6 pt-6 border-t-2 border-primary/20">
-            <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-              <ClipboardCheck className="w-5 h-5 text-primary" />
-              月末報告書
-              <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2">
-                {formatMonth(activeMonth)}
+          <div className="flex items-center gap-2 mb-4">
+            <ClipboardCheck className="w-4 h-4 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">月末報告書</span>
+            {hasSubmitted ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <CheckCircle2 className="w-3 h-3" />
+                {formatMonth(activeMonth)} 回答済み
               </span>
-            </h2>
-            <Card className={`border-border/50 shadow-sm ${
-              hasSubmitted ? 'border-l-4 border-l-emerald-400' : 'border-l-4 border-l-amber-400'
-            }`}>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  {hasSubmitted ? (
-                    <>
-                      <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
-                        <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                      </div>
-                      <div>
-                        <div className="text-sm font-semibold text-emerald-700">回答済み</div>
-                        <div className="text-[10px] text-muted-foreground mt-0.5">
-                          {formatMonth(activeMonth)}の月末報告書は提出されています
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
-                        <AlertTriangle className="w-5 h-5 text-amber-600" />
-                      </div>
-                      <div>
-                        <div className="text-sm font-semibold text-amber-700">未回答</div>
-                        <div className="text-[10px] text-muted-foreground mt-0.5">
-                          {formatMonth(activeMonth)}の月末報告書がまだ提出されていません
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </section>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                <AlertTriangle className="w-3 h-3" />
+                {formatMonth(activeMonth)} 未回答
+              </span>
+            )}
+          </div>
         );
       })()}
 
@@ -811,6 +784,148 @@ export default function StaffDetail() {
                   </span>
                   <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                     <span className="w-3 h-0.5 rounded" style={{ backgroundColor: COLORS.nextReservation }} /> 次回予約率
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+        );
+      })()}
+
+      {/* ===== 1.6 過去12ヶ月の次回予約率グラフ ===== */}
+      {(() => {
+        // 全スタッフのトレンドデータを取得
+        const allStaffTrends = staffStore ? getStaffTrend(staffStore) : [];
+        const myTrend = allStaffTrends.find(t => t.staffName === staffName);
+        const myData = myTrend?.data || [];
+
+        // 過去12ヶ月のデータを取得（最新から12ヶ月）
+        const allMonths = myData.map(d => d.month).sort();
+        const last12Months = allMonths.slice(-12);
+
+        if (last12Months.length < 2) return null;
+
+        // 各月のデータを計算
+        const chartData = last12Months.map(month => {
+          // 自分の次回予約率
+          const myPoint = myData.find(d => d.month === month);
+          const myRate = myPoint?.hasData ? myPoint.nextReservationRate : null;
+
+          // 全スタッフの次回予約率（データがあるスタッフのみ）
+          const allRates: number[] = [];
+          allStaffTrends.forEach(t => {
+            const point = t.data.find(d => d.month === month);
+            if (point?.hasData && point.nextReservationRate > 0) {
+              allRates.push(point.nextReservationRate);
+            }
+          });
+
+          const avgRate = allRates.length > 0 ? Math.round(allRates.reduce((s, r) => s + r, 0) / allRates.length * 10) / 10 : null;
+          const maxRate = allRates.length > 0 ? Math.max(...allRates) : null;
+
+          const monthNum = parseInt(month.split("-")[1]);
+          return {
+            month,
+            monthLabel: `${monthNum}月`,
+            myRate,
+            avgRate,
+            maxRate,
+          };
+        });
+
+        // データがある月が2つ未満なら表示しない
+        const hasDataPoints = chartData.filter(d => d.myRate !== null);
+        if (hasDataPoints.length < 1) return null;
+
+        const CHART_COLORS = {
+          my: "#2D9C8F",
+          avg: "#94A3B8",
+          max: "#E5B85C",
+          warning: "#EF4444",
+        };
+
+        return (
+          <section className="mb-8 pt-6 border-t-2 border-primary/20">
+            <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+              <UserCheck className="w-5 h-5 text-primary" />
+              次回予約率推移
+              <span className="text-xs font-normal text-muted-foreground">— 過去12ヶ月</span>
+            </h2>
+            <Card className="border-border/50 shadow-sm">
+              <CardContent className="p-4">
+                <ResponsiveContainer width="100%" height={280}>
+                  <LineChart data={chartData} margin={{ top: 10, right: 10, bottom: 5, left: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
+                    <XAxis dataKey="monthLabel" tick={{ fontSize: 11 }} />
+                    <YAxis
+                      tick={{ fontSize: 10 }}
+                      tickFormatter={(v: number) => `${v}%`}
+                      domain={[0, 100]}
+                    />
+                    {/* 60%警告ライン */}
+                    <Tooltip
+                      contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e5e5" }}
+                      formatter={(value: any, name: string) => {
+                        if (value === null || value === undefined) return ["—", name];
+                        return [`${value}%`, name];
+                      }}
+                    />
+                    {/* 60%基準線 */}
+                    <Line
+                      type="monotone"
+                      dataKey={() => 60}
+                      name="基準線 (60%)"
+                      stroke={CHART_COLORS.warning}
+                      strokeWidth={1}
+                      strokeDasharray="6 4"
+                      dot={false}
+                      activeDot={false}
+                      connectNulls
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="maxRate"
+                      name="最大値"
+                      stroke={CHART_COLORS.max}
+                      strokeWidth={1.5}
+                      strokeDasharray="4 3"
+                      dot={{ r: 3, fill: CHART_COLORS.max }}
+                      connectNulls
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="avgRate"
+                      name="店舗平均"
+                      stroke={CHART_COLORS.avg}
+                      strokeWidth={1.5}
+                      strokeDasharray="5 5"
+                      dot={{ r: 3, fill: CHART_COLORS.avg }}
+                      connectNulls
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="myRate"
+                      name={staffName}
+                      stroke={CHART_COLORS.my}
+                      strokeWidth={3}
+                      dot={{ r: 5, fill: CHART_COLORS.my, strokeWidth: 2, stroke: "#fff" }}
+                      activeDot={{ r: 7 }}
+                      connectNulls
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+                <div className="flex items-center justify-center gap-4 mt-3 flex-wrap">
+                  <span className="flex items-center gap-1.5 text-[11px] text-foreground font-medium">
+                    <span className="w-4 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.my }} /> {staffName}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <span className="w-4 h-0.5 rounded border-dashed" style={{ backgroundColor: CHART_COLORS.avg }} /> 店舗平均
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <span className="w-4 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.max }} /> 最大値
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <span className="w-4 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.warning, opacity: 0.6 }} /> 基準線 (60%)
                   </span>
                 </div>
               </CardContent>
