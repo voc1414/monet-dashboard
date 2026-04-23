@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   Users,
@@ -30,42 +30,50 @@ import AdminLayout from "@/components/AdminLayout";
 import { isNewStaff } from "@/lib/newBadge";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 
-// Hardcoded staff list (source of truth for staff names + stores)
-const STAFF_DATA: { name: string; store: string }[] = [
-  // 姪浜院
-  { name: "山口純奈", store: "姪浜院" },
-  { name: "金田あゆみ", store: "姪浜院" },
-  { name: "石橋 茉", store: "姪浜院" },
-  { name: "藤田", store: "姪浜院" },
-  // 楽々園院
-  { name: "井上 恵子", store: "楽々園院" },
-  { name: "前田慶子", store: "楽々園院" },
-  { name: "千葉祐子", store: "楽々園院" },
-  { name: "石原葉子", store: "楽々園院" },
-  { name: "田中 江梨子", store: "楽々園院" },
-  // 堀江院
-  { name: "Kaede", store: "堀江院" },
-  // 堀江院2nd
-  { name: "Mimi", store: "堀江院2nd" },
-  { name: "sayuri", store: "堀江院2nd" },
-  { name: "Aki", store: "堀江院2nd" },
-  { name: "Kazumi", store: "堀江院2nd" },
-  { name: "Hiromi", store: "堀江院2nd" },
-  // 高槻院
-  { name: "Yuko", store: "高槻院" },
-  { name: "Asuka", store: "高槻院" },
-  { name: "Mariko", store: "高槻院" },
-  { name: "Nao", store: "高槻院" },
-  // 福島院
-  { name: "Yu", store: "福島院" },
-  { name: "yoshie", store: "福島院" },
-  { name: "Hiroko", store: "福島院" },
-  { name: "Mika", store: "福島院" },
-  { name: "Hitomi", store: "福島院" },
-];
+// ─── スタッフ名正規化 ───
 
-const ALL_STORES = ["堀江院", "堀江院2nd", "福島院", "高槻院", "姪浜院", "楽々園院"];
+/** テストデータとして除外するスタッフ名 */
+const TEST_NAMES = new Set(["C", "D", "テスト", "test", "Test"]);
+
+/**
+ * スタッフ名を正規化する。
+ * - 全角スペース（U+3000）→ 半角スペース
+ * - 連続スペースを1つに
+ * - 先頭・末尾のスペースを除去
+ * - 既知のサフィックス（"ホットペッパー" 等）を除去
+ */
+function normalizeStaffName(raw: string): string {
+  let name = raw
+    // 全角スペース → 半角スペース
+    .replace(/\u3000/g, " ")
+    // 連続スペースを1つに
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  // 既知のサフィックスを除去（スペース区切りの後に続くもの）
+  const suffixes = ["ホットペッパー", "hotpepper", "HP", "ＨＰ"];
+  for (const suffix of suffixes) {
+    const idx = name.indexOf(suffix);
+    if (idx > 0) {
+      name = name.substring(0, idx).trim();
+    }
+  }
+
+  return name;
+}
+
+/**
+ * DBステータスとのマッチング用に正規化したキーを生成する。
+ * スペースの有無・全角半角の差異を吸収する。
+ */
+function normalizeForMatching(name: string): string {
+  return name
+    .replace(/\u3000/g, " ")
+    .replace(/\s+/g, "")
+    .toLowerCase();
+}
 
 function getCurrentYearMonth(): string {
   const now = new Date();
@@ -91,6 +99,40 @@ export default function AdminStaff() {
     targetStatus: "active" | "retired";
     retiredMonth: string;
   }>({ open: false, staff: null, targetStatus: "active", retiredMonth: getCurrentYearMonth() });
+
+  // ─── スプレッドシートからスタッフ一覧を動的取得 ───
+  const { rawData, loading: reportLoading } = useMonthlyReport();
+
+  // rawDataからユニークなスタッフ一覧を抽出（正規化済み）
+  const dynamicStaffData = useMemo(() => {
+    if (!rawData.length) return [];
+
+    const seen = new Map<string, { name: string; store: string }>();
+    for (const r of rawData) {
+      const normalizedName = normalizeStaffName(r.name);
+      const store = r.storeNormalized;
+
+      // テストデータを除外
+      if (TEST_NAMES.has(normalizedName) || TEST_NAMES.has(r.name)) continue;
+      // 空の名前を除外
+      if (!normalizedName || !store) continue;
+
+      const key = `${normalizedName}|${store}`;
+      if (!seen.has(key)) {
+        seen.set(key, { name: normalizedName, store });
+      }
+    }
+
+    return Array.from(seen.values()).sort((a, b) =>
+      a.store.localeCompare(b.store, "ja") || a.name.localeCompare(b.name, "ja")
+    );
+  }, [rawData]);
+
+  // 動的に取得された店舗一覧
+  const allStores = useMemo(() => {
+    const stores = new Set(dynamicStaffData.map((s) => s.store));
+    return Array.from(stores).sort((a, b) => a.localeCompare(b, "ja"));
+  }, [dynamicStaffData]);
 
   // Fetch staff statuses from DB
   const statusQuery = trpc.admin.getStaffStatuses.useQuery(undefined, {
@@ -119,17 +161,36 @@ export default function AdminStaff() {
     },
   });
 
-  // Merge hardcoded staff data with DB status
+  // ─── DBステータスとのマージ（正規化マッチング） ───
   const staffList: StaffWithStatus[] = useMemo(() => {
     const dbStatuses = statusQuery.data || [];
-    const statusMap = new Map<string, { status: "active" | "retired"; retiredMonth: string | null }>();
+
+    // DB側の正規化キー → ステータスのマップ
+    // 完全一致用
+    const exactMap = new Map<string, { status: "active" | "retired"; retiredMonth: string | null }>();
+    // 正規化マッチング用（スペース除去+小文字）
+    const normalizedMap = new Map<string, { status: "active" | "retired"; retiredMonth: string | null }>();
+
     for (const s of dbStatuses) {
-      statusMap.set(`${s.staffName}|${s.storeName}`, { status: s.status, retiredMonth: s.retiredMonth });
+      const exactKey = `${s.staffName}|${s.storeName}`;
+      exactMap.set(exactKey, { status: s.status, retiredMonth: s.retiredMonth });
+
+      const normKey = `${normalizeForMatching(s.staffName)}|${s.storeName}`;
+      normalizedMap.set(normKey, { status: s.status, retiredMonth: s.retiredMonth });
     }
 
-    return STAFF_DATA.map((staff) => {
-      const key = `${staff.name}|${staff.store}`;
-      const dbStatus = statusMap.get(key);
+    // スプレッドシートのスタッフ一覧にDBステータスをマージ
+    const result: StaffWithStatus[] = dynamicStaffData.map((staff) => {
+      // 1. 完全一致を試みる
+      const exactKey = `${staff.name}|${staff.store}`;
+      let dbStatus = exactMap.get(exactKey);
+
+      // 2. 正規化マッチング（スペース差異を吸収）
+      if (!dbStatus) {
+        const normKey = `${normalizeForMatching(staff.name)}|${staff.store}`;
+        dbStatus = normalizedMap.get(normKey);
+      }
+
       return {
         name: staff.name,
         store: staff.store,
@@ -137,7 +198,23 @@ export default function AdminStaff() {
         retiredMonth: dbStatus?.retiredMonth || null,
       };
     });
-  }, [statusQuery.data]);
+
+    // DBにのみ存在するスタッフ（スプレッドシートにいないが退社ステータスが設定されている等）も追加
+    const dynamicKeys = new Set(dynamicStaffData.map((s) => `${normalizeForMatching(s.name)}|${s.store}`));
+    for (const s of dbStatuses) {
+      const normKey = `${normalizeForMatching(s.staffName)}|${s.storeName}`;
+      if (!dynamicKeys.has(normKey)) {
+        result.push({
+          name: s.staffName,
+          store: s.storeName,
+          status: s.status,
+          retiredMonth: s.retiredMonth,
+        });
+      }
+    }
+
+    return result;
+  }, [dynamicStaffData, statusQuery.data]);
 
   // Check if DB has been initialized
   const isDbInitialized = (statusQuery.data?.length || 0) > 0;
@@ -192,10 +269,15 @@ export default function AdminStaff() {
     });
   };
 
-  // Bulk initialize from hardcoded data
+  // Bulk initialize from dynamic spreadsheet data
   const handleBulkInit = () => {
-    // Default: Hitomi is retired, everyone else is active
-    const initList = STAFF_DATA.map((s) => ({
+    if (dynamicStaffData.length === 0) {
+      toast.error("スプレッドシートのデータがまだ読み込まれていません");
+      return;
+    }
+
+    // 既知の退社スタッフ（Hitomi@福島院）
+    const initList = dynamicStaffData.map((s) => ({
       staffName: s.name,
       storeName: s.store,
       status: (s.name === "Hitomi" && s.store === "福島院" ? "retired" : "active") as "active" | "retired",
@@ -204,6 +286,8 @@ export default function AdminStaff() {
     bulkInitMutation.mutate({ staffList: initList });
   };
 
+  const loading = reportLoading || statusQuery.isLoading;
+
   return (
     <AdminLayout
       title="スタッフ情報管理"
@@ -211,10 +295,14 @@ export default function AdminStaff() {
     >
       <p className="text-sm text-muted-foreground mb-6">
         スタッフの在籍・退社ステータスを管理します。ステータスの変更は全ページに即時反映されます。
+        <br />
+        <span className="text-xs text-muted-foreground/70">
+          スタッフ一覧は月末報告書スプレッドシートから自動取得されます。新しいスタッフが報告書を提出すると自動的に表示されます。
+        </span>
       </p>
 
       {/* DB initialization prompt */}
-      {!statusQuery.isLoading && !isDbInitialized && (
+      {!statusQuery.isLoading && !isDbInitialized && !reportLoading && dynamicStaffData.length > 0 && (
         <Card className="border-amber-200 bg-amber-50/50 mb-6">
           <CardContent className="p-4 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -224,7 +312,7 @@ export default function AdminStaff() {
                   スタッフステータスが未初期化です
                 </p>
                 <p className="text-xs text-amber-600 mt-0.5">
-                  初回のみ、現在のスタッフデータをデータベースに登録する必要があります。
+                  初回のみ、スプレッドシートのスタッフデータ（{dynamicStaffData.length}名）をデータベースに登録する必要があります。
                 </p>
               </div>
             </div>
@@ -264,7 +352,7 @@ export default function AdminStaff() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">全店舗</SelectItem>
-              {ALL_STORES.map((s) => (
+              {allStores.map((s) => (
                 <SelectItem key={s} value={s}>{s}</SelectItem>
               ))}
             </SelectContent>
@@ -306,14 +394,14 @@ export default function AdminStaff() {
         </Card>
         <Card className="border-border/50">
           <CardContent className="p-3">
-            <div className="text-xl font-bold font-mono-data">{ALL_STORES.length}</div>
+            <div className="text-xl font-bold font-mono-data">{allStores.length}</div>
             <div className="text-[10px] text-muted-foreground">店舗数</div>
           </CardContent>
         </Card>
       </div>
 
       {/* Staff List by Store */}
-      {statusQuery.isLoading ? (
+      {loading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           <span className="ml-2 text-sm text-muted-foreground">読み込み中...</span>
@@ -402,12 +490,16 @@ export default function AdminStaff() {
             </motion.div>
           ))}
 
-          {filteredStaff.length === 0 && (
+          {filteredStaff.length === 0 && !loading && (
             <Card className="border-border/50">
               <CardContent className="p-8 text-center">
                 <Users className="w-8 h-8 text-muted-foreground/30 mx-auto mb-3" />
                 <p className="text-muted-foreground text-sm">
-                  条件に一致するスタッフがいません
+                  {reportLoading
+                    ? "スプレッドシートからデータを読み込み中..."
+                    : rawData.length === 0
+                    ? "スプレッドシートにスタッフデータがありません"
+                    : "条件に一致するスタッフがいません"}
                 </p>
               </CardContent>
             </Card>
