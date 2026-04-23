@@ -48,3 +48,30 @@ export const staffStatus = mysqlTable("staff_status", {
 
 export type StaffStatus = typeof staffStatus.$inferSelect;
 export type InsertStaffStatus = typeof staffStatus.$inferInsert;
+
+/**
+ * Staff status change history — audit log for status transitions.
+ * Records every active↔retired change with timestamp and optional note.
+ */
+export const staffStatusHistory = mysqlTable("staff_status_history", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Staff display name */
+  staffName: varchar("staffName", { length: 100 }).notNull(),
+  /** Store name the staff belongs to */
+  storeName: varchar("storeName", { length: 100 }).notNull(),
+  /** Previous status before the change */
+  previousStatus: mysqlEnum("previousStatus", ["active", "retired"]).notNull(),
+  /** New status after the change */
+  newStatus: mysqlEnum("newStatus", ["active", "retired"]).notNull(),
+  /** Month associated with the change (e.g. retired month) */
+  changeMonth: varchar("changeMonth", { length: 7 }),
+  /** Who performed the change (admin username or system) */
+  changedBy: varchar("changedBy", { length: 100 }).default("admin").notNull(),
+  /** Optional note about the change */
+  note: text("note"),
+  /** When the change was recorded */
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type StaffStatusHistory = typeof staffStatusHistory.$inferSelect;
+export type InsertStaffStatusHistory = typeof staffStatusHistory.$inferInsert;

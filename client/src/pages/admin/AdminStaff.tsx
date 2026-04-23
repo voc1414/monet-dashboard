@@ -12,11 +12,16 @@ import {
   Loader2,
   RefreshCw,
   Database,
+  History,
+  ChevronDown,
+  ArrowRight,
+  MessageSquare,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
@@ -46,13 +51,10 @@ const TEST_NAMES = new Set(["C", "D", "テスト", "test", "Test"]);
  */
 function normalizeStaffName(raw: string): string {
   let name = raw
-    // 全角スペース → 半角スペース
     .replace(/\u3000/g, " ")
-    // 連続スペースを1つに
     .replace(/\s{2,}/g, " ")
     .trim();
 
-  // 既知のサフィックスを除去（スペース区切りの後に続くもの）
   const suffixes = ["ホットペッパー", "hotpepper", "HP", "ＨＰ"];
   for (const suffix of suffixes) {
     const idx = name.indexOf(suffix);
@@ -80,6 +82,17 @@ function getCurrentYearMonth(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
+function formatDateTime(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return d.toLocaleDateString("ja-JP", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 type StaffWithStatus = {
   name: string;
   store: string;
@@ -91,6 +104,7 @@ export default function AdminStaff() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStore, setFilterStore] = useState("all");
   const [showRetired, setShowRetired] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   // Dialog state for status toggle confirmation
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -98,7 +112,8 @@ export default function AdminStaff() {
     staff: StaffWithStatus | null;
     targetStatus: "active" | "retired";
     retiredMonth: string;
-  }>({ open: false, staff: null, targetStatus: "active", retiredMonth: getCurrentYearMonth() });
+    note: string;
+  }>({ open: false, staff: null, targetStatus: "active", retiredMonth: getCurrentYearMonth(), note: "" });
 
   // ─── スプレッドシートからスタッフ一覧を動的取得 ───
   const { rawData, loading: reportLoading } = useMonthlyReport();
@@ -112,9 +127,7 @@ export default function AdminStaff() {
       const normalizedName = normalizeStaffName(r.name);
       const store = r.storeNormalized;
 
-      // テストデータを除外
       if (TEST_NAMES.has(normalizedName) || TEST_NAMES.has(r.name)) continue;
-      // 空の名前を除外
       if (!normalizedName || !store) continue;
 
       const key = `${normalizedName}|${store}`;
@@ -140,11 +153,19 @@ export default function AdminStaff() {
     refetchOnWindowFocus: false,
   });
 
+  // Fetch staff status change history
+  const historyQuery = trpc.admin.getStaffStatusHistory.useQuery(undefined, {
+    retry: 1,
+    refetchOnWindowFocus: false,
+    enabled: showHistory,
+  });
+
   const updateStatusMutation = trpc.admin.updateStaffStatus.useMutation({
     onSuccess: () => {
       statusQuery.refetch();
+      if (showHistory) historyQuery.refetch();
       toast.success("ステータスを更新しました");
-      setConfirmDialog({ open: false, staff: null, targetStatus: "active", retiredMonth: getCurrentYearMonth() });
+      setConfirmDialog({ open: false, staff: null, targetStatus: "active", retiredMonth: getCurrentYearMonth(), note: "" });
     },
     onError: (err) => {
       toast.error("ステータスの更新に失敗しました", { description: err.message });
@@ -165,10 +186,7 @@ export default function AdminStaff() {
   const staffList: StaffWithStatus[] = useMemo(() => {
     const dbStatuses = statusQuery.data || [];
 
-    // DB側の正規化キー → ステータスのマップ
-    // 完全一致用
     const exactMap = new Map<string, { status: "active" | "retired"; retiredMonth: string | null }>();
-    // 正規化マッチング用（スペース除去+小文字）
     const normalizedMap = new Map<string, { status: "active" | "retired"; retiredMonth: string | null }>();
 
     for (const s of dbStatuses) {
@@ -179,13 +197,10 @@ export default function AdminStaff() {
       normalizedMap.set(normKey, { status: s.status, retiredMonth: s.retiredMonth });
     }
 
-    // スプレッドシートのスタッフ一覧にDBステータスをマージ
     const result: StaffWithStatus[] = dynamicStaffData.map((staff) => {
-      // 1. 完全一致を試みる
       const exactKey = `${staff.name}|${staff.store}`;
       let dbStatus = exactMap.get(exactKey);
 
-      // 2. 正規化マッチング（スペース差異を吸収）
       if (!dbStatus) {
         const normKey = `${normalizeForMatching(staff.name)}|${staff.store}`;
         dbStatus = normalizedMap.get(normKey);
@@ -199,7 +214,6 @@ export default function AdminStaff() {
       };
     });
 
-    // DBにのみ存在するスタッフ（スプレッドシートにいないが退社ステータスが設定されている等）も追加
     const dynamicKeys = new Set(dynamicStaffData.map((s) => `${normalizeForMatching(s.name)}|${s.store}`));
     for (const s of dbStatuses) {
       const normKey = `${normalizeForMatching(s.staffName)}|${s.storeName}`;
@@ -216,7 +230,6 @@ export default function AdminStaff() {
     return result;
   }, [dynamicStaffData, statusQuery.data]);
 
-  // Check if DB has been initialized
   const isDbInitialized = (statusQuery.data?.length || 0) > 0;
 
   // Filter staff
@@ -255,10 +268,11 @@ export default function AdminStaff() {
       staff,
       targetStatus,
       retiredMonth: staff.retiredMonth || getCurrentYearMonth(),
+      note: "",
     });
   };
 
-  // Execute status toggle
+  // Execute status toggle (now includes note)
   const executeToggle = () => {
     if (!confirmDialog.staff) return;
     updateStatusMutation.mutate({
@@ -266,6 +280,7 @@ export default function AdminStaff() {
       storeName: confirmDialog.staff.store,
       status: confirmDialog.targetStatus,
       retiredMonth: confirmDialog.targetStatus === "retired" ? confirmDialog.retiredMonth : null,
+      note: confirmDialog.note.trim() || null,
     });
   };
 
@@ -276,7 +291,6 @@ export default function AdminStaff() {
       return;
     }
 
-    // 既知の退社スタッフ（Hitomi@福島院）
     const initList = dynamicStaffData.map((s) => ({
       staffName: s.name,
       storeName: s.store,
@@ -317,7 +331,6 @@ export default function AdminStaff() {
               </div>
             </div>
             <Button
-              size="sm"
               onClick={handleBulkInit}
               disabled={bulkInitMutation.isPending}
               className="shrink-0"
@@ -507,6 +520,102 @@ export default function AdminStaff() {
         </div>
       )}
 
+      {/* ─── 変更履歴セクション ─── */}
+      <div className="mt-8">
+        <button
+          onClick={() => setShowHistory(!showHistory)}
+          className="flex items-center gap-2 text-sm font-bold text-foreground hover:text-primary transition-colors mb-4"
+        >
+          <History className="w-4 h-4" />
+          変更履歴
+          <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showHistory ? "rotate-180" : ""}`} />
+        </button>
+
+        {showHistory && (
+          <Card className="border-border/50 overflow-hidden">
+            <CardContent className="p-0">
+              {historyQuery.isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  <span className="ml-2 text-sm text-muted-foreground">履歴を読み込み中...</span>
+                </div>
+              ) : historyQuery.data && historyQuery.data.length > 0 ? (
+                <div className="divide-y divide-border/30">
+                  {historyQuery.data.map((entry) => (
+                    <div key={entry.id} className="px-4 py-3 hover:bg-accent/20 transition-colors">
+                      <div className="flex items-start gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+                          entry.newStatus === "retired" ? "bg-red-50" : "bg-green-50"
+                        }`}>
+                          {entry.newStatus === "retired" ? (
+                            <UserX className="w-4 h-4 text-red-500" />
+                          ) : (
+                            <UserCheck className="w-4 h-4 text-green-500" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium text-foreground">{entry.staffName}</span>
+                            <span className="text-xs text-muted-foreground">({entry.storeName})</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <Badge
+                              variant="outline"
+                              className={`text-[10px] ${
+                                entry.previousStatus === "retired"
+                                  ? "border-red-200 text-red-600 bg-red-50/50"
+                                  : "border-green-200 text-green-600 bg-green-50/50"
+                              }`}
+                            >
+                              {entry.previousStatus === "retired" ? "退社" : "在籍"}
+                            </Badge>
+                            <ArrowRight className="w-3 h-3 text-muted-foreground" />
+                            <Badge
+                              variant="outline"
+                              className={`text-[10px] ${
+                                entry.newStatus === "retired"
+                                  ? "border-red-200 text-red-600 bg-red-50/50"
+                                  : "border-green-200 text-green-600 bg-green-50/50"
+                              }`}
+                            >
+                              {entry.newStatus === "retired" ? "退社" : "在籍"}
+                            </Badge>
+                            {entry.changeMonth && (
+                              <span className="text-[10px] text-muted-foreground ml-1">
+                                ({entry.changeMonth})
+                              </span>
+                            )}
+                          </div>
+                          {entry.note && (
+                            <div className="flex items-start gap-1.5 mt-1.5">
+                              <MessageSquare className="w-3 h-3 text-muted-foreground mt-0.5 shrink-0" />
+                              <p className="text-xs text-muted-foreground">{entry.note}</p>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <span className="text-[10px] text-muted-foreground/70">
+                              {formatDateTime(entry.createdAt)}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground/50">
+                              by {entry.changedBy}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-8 text-center">
+                  <History className="w-6 h-6 text-muted-foreground/30 mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">変更履歴はまだありません</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
       {/* Confirm Dialog */}
       <Dialog open={confirmDialog.open} onOpenChange={(open) => {
         if (!open) setConfirmDialog({ ...confirmDialog, open: false });
@@ -527,7 +636,7 @@ export default function AdminStaff() {
                   ) : (
                     <span className="font-medium text-green-600">「在籍」</span>
                   )}
-                  に変更します。
+                  に変更します。この操作は変更履歴に記録されます。
                 </>
               )}
             </DialogDescription>
@@ -547,6 +656,25 @@ export default function AdminStaff() {
               </p>
             </div>
           )}
+
+          {/* メモ入力欄 */}
+          <div className="space-y-2 py-1">
+            <label className="text-sm font-medium text-foreground">メモ（任意）</label>
+            <Textarea
+              placeholder={
+                confirmDialog.targetStatus === "retired"
+                  ? "例: 自己都合退社、転居のため等"
+                  : "例: 復帰理由等"
+              }
+              value={confirmDialog.note}
+              onChange={(e) => setConfirmDialog({ ...confirmDialog, note: e.target.value })}
+              rows={2}
+              className="resize-none"
+            />
+            <p className="text-xs text-muted-foreground">
+              変更履歴に記録されます。
+            </p>
+          </div>
 
           <DialogFooter className="gap-2 sm:gap-0">
             <Button

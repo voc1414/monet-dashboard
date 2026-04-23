@@ -3,7 +3,7 @@ import { z } from "zod";
 import { publicProcedure, router } from "../_core/trpc";
 import { ENV } from "../_core/env";
 import { SignJWT, jwtVerify } from "jose";
-import { getAllStaffStatus, upsertStaffStatus } from "../db";
+import { getAllStaffStatus, upsertStaffStatus, insertStaffStatusHistory, getAllStaffStatusHistory, getStaffStatusByKey } from "../db";
 
 const JWT_SECRET_KEY = new TextEncoder().encode(ENV.cookieSecret || "monet-admin-secret-key");
 
@@ -87,17 +87,23 @@ export const adminRouter = router({
     return statuses;
   }),
 
-  /** Update staff status (admin only) */
+  /** Update staff status (admin only) — also records change in history */
   updateStaffStatus: publicProcedure
     .input(z.object({
       staffName: z.string().min(1),
       storeName: z.string().min(1),
       status: z.enum(["active", "retired"]),
       retiredMonth: z.string().regex(/^\d{4}-\d{2}$/).optional().nullable(),
+      note: z.string().optional().nullable(),
     }))
     .mutation(async ({ ctx, input }) => {
       await requireAdminFromCtx(ctx);
 
+      // Get the previous status before updating
+      const existing = await getStaffStatusByKey(input.staffName, input.storeName);
+      const previousStatus = existing?.status || "active";
+
+      // Update the status
       await upsertStaffStatus({
         staffName: input.staffName,
         storeName: input.storeName,
@@ -105,7 +111,25 @@ export const adminRouter = router({
         retiredMonth: input.status === "retired" ? (input.retiredMonth || getCurrentYearMonth()) : null,
       });
 
+      // Record the change in history
+      await insertStaffStatusHistory({
+        staffName: input.staffName,
+        storeName: input.storeName,
+        previousStatus,
+        newStatus: input.status,
+        changeMonth: input.status === "retired" ? (input.retiredMonth || getCurrentYearMonth()) : null,
+        changedBy: ENV.adminUsername || "admin",
+        note: input.note ?? null,
+      });
+
       return { success: true };
+    }),
+
+  /** Get all staff status change history (admin only) */
+  getStaffStatusHistory: publicProcedure
+    .query(async ({ ctx }) => {
+      await requireAdminFromCtx(ctx);
+      return getAllStaffStatusHistory();
     }),
 
   /** Bulk initialize staff statuses (admin only) - seed from hardcoded data */

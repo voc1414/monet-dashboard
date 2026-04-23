@@ -1,6 +1,6 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, staffStatus, type StaffStatus } from "../drizzle/schema";
+import { InsertUser, users, staffStatus, type StaffStatus, staffStatusHistory, type StaffStatusHistory } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -130,4 +130,49 @@ export async function upsertStaffStatus(input: {
       updatedAt: new Date(),
     },
   });
+}
+
+// ─── Staff Status History helpers ───
+
+/** Insert a new history record for a staff status change */
+export async function insertStaffStatusHistory(input: {
+  staffName: string;
+  storeName: string;
+  previousStatus: "active" | "retired";
+  newStatus: "active" | "retired";
+  changeMonth?: string | null;
+  changedBy?: string;
+  note?: string | null;
+}): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.insert(staffStatusHistory).values({
+    staffName: input.staffName,
+    storeName: input.storeName,
+    previousStatus: input.previousStatus,
+    newStatus: input.newStatus,
+    changeMonth: input.changeMonth ?? null,
+    changedBy: input.changedBy ?? "admin",
+    note: input.note ?? null,
+  });
+}
+
+/** Get all history records, ordered by newest first */
+export async function getAllStaffStatusHistory(): Promise<StaffStatusHistory[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(staffStatusHistory).orderBy(desc(staffStatusHistory.createdAt));
+}
+
+/** Get history records for a specific staff member */
+export async function getStaffStatusHistoryByStaff(
+  staffName: string,
+  storeName: string
+): Promise<StaffStatusHistory[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(staffStatusHistory)
+    .where(and(eq(staffStatusHistory.staffName, staffName), eq(staffStatusHistory.storeName, storeName)))
+    .orderBy(desc(staffStatusHistory.createdAt));
 }
