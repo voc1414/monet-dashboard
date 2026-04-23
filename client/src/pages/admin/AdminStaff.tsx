@@ -304,16 +304,22 @@ export default function AdminStaff() {
   const filterMonthsResult = getFilterMonths(periodSelection, allMonths);
 
   // 新入社数: 選択期間内に初めて報告書を提出したスタッフ
+  // ※ スプレッドシートに1ヶ月分しかデータがない場合、全員がその月の「新入社」になるため、
+  //    利用可能な月が1つしかない場合は「—」（判定不可）を返す
   const newHireCount = useMemo(() => {
+    // 利用可能な月データが1つ以下の場合は正確な新入社判定ができない
+    if (allMonths.length <= 1) return null;
+
     if (filterMonthsResult === "all") {
-      // 全期間の場合は全スタッフ数を返す（全員が「新入社」）
+      // 全期間の場合: 最も古い月に初めて登場したスタッフ = 判定不可（全員が「初回」になる）
+      // → 全スタッフ数を返す
       return dynamicStaffData.length;
     }
     return dynamicStaffData.filter((s) => {
       if (!s.firstMonth) return false;
       return (filterMonthsResult as string[]).includes(s.firstMonth);
     }).length;
-  }, [dynamicStaffData, filterMonthsResult]);
+  }, [dynamicStaffData, filterMonthsResult, allMonths.length]);
 
   // Filter staff for list display
   const filteredStaff = useMemo(() => {
@@ -339,9 +345,11 @@ export default function AdminStaff() {
     return map;
   }, [filteredStaff]);
 
-  // Stats from backend (period-aware)
-  const activeCount = statsQuery.data?.totalActive ?? staffList.filter((s) => s.status === "active").length;
-  const retiredCount = statsQuery.data?.totalRetired ?? staffList.filter((s) => s.status === "retired").length;
+  // ─── KPI計算（staffList = スプレッドシート+DBマージ後の統一リストから算出） ───
+  // 総スタッフ数・在籍数はフロントエンドのstaffListから計算（データソース統一）
+  const activeCount = staffList.filter((s) => s.status === "active").length;
+  const retiredCount = staffList.filter((s) => s.status === "retired").length;
+  // 退社数・復帰数はDB変更履歴から取得（期間フィルタ対応）
   const periodRetirements = statsQuery.data?.periodRetirements ?? 0;
   const periodReactivations = statsQuery.data?.periodReactivations ?? 0;
 
@@ -438,7 +446,7 @@ export default function AdminStaff() {
             icon: UserPlus,
             color: "text-blue-600",
             bgColor: "bg-blue-50",
-            sub: periodLabel,
+            sub: newHireCount === null ? "※ 複数月のデータが必要" : periodLabel,
           },
           {
             label: "退社",
@@ -471,7 +479,7 @@ export default function AdminStaff() {
                   </div>
                 </div>
                 <div className="font-mono-data text-2xl font-bold text-foreground">
-                  {loading || statsQuery.isLoading ? "..." : stat.value}
+                  {loading || statsQuery.isLoading ? "..." : stat.value === null ? "—" : stat.value}
                 </div>
                 <div className="text-[10px] text-muted-foreground leading-tight mt-1">{stat.label}</div>
                 {stat.sub && (
@@ -520,7 +528,7 @@ export default function AdminStaff() {
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>{allStores.length}店舗</span>
           <span>·</span>
-          <span>{staffList.filter(s => s.status === "active").length}名在籍</span>
+          <span>{activeCount}名在籍</span>
         </div>
       </div>
 
