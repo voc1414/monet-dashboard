@@ -9,6 +9,8 @@ import {
   Sparkles,
   UserCheck,
   UserX,
+  UserPlus,
+  UserMinus,
   Loader2,
   RefreshCw,
   Database,
@@ -16,6 +18,8 @@ import {
   ChevronDown,
   ArrowRight,
   MessageSquare,
+  TrendingUp,
+  TrendingDown,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -36,6 +40,13 @@ import { isNewStaff } from "@/lib/newBadge";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
+import {
+  PeriodSelector,
+  PeriodSelection,
+  getDefaultPeriodSelection,
+  getFilterMonths,
+  getPeriodLabel,
+} from "@/components/PeriodSelector";
 
 // ─── スタッフ名正規化 ───
 
@@ -93,11 +104,37 @@ function formatDateTime(date: Date | string): string {
   });
 }
 
+/** 期間選択から開始日・終了日のISO文字列を生成 */
+function periodToDateRange(
+  selection: PeriodSelection,
+  allMonths: string[]
+): { startDate: string | null; endDate: string | null } {
+  const filterMonths = getFilterMonths(selection, allMonths);
+  if (filterMonths === "all") {
+    return { startDate: null, endDate: null };
+  }
+  if (filterMonths.length === 0) {
+    return { startDate: null, endDate: null };
+  }
+  const sorted = [...filterMonths].sort();
+  const startYM = sorted[0];
+  const endYM = sorted[sorted.length - 1];
+  // Start of first month
+  const startDate = `${startYM}-01T00:00:00.000Z`;
+  // End of last month (first day of next month)
+  const [ey, em] = endYM.split("-").map(Number);
+  const nextMonth = em === 12 ? `${ey + 1}-01` : `${ey}-${String(em + 1).padStart(2, "0")}`;
+  const endDate = `${nextMonth}-01T00:00:00.000Z`;
+  return { startDate, endDate };
+}
+
 type StaffWithStatus = {
   name: string;
   store: string;
   status: "active" | "retired";
   retiredMonth: string | null;
+  /** スタッフの最初の報告月 (YYYY-MM) — 新入社判定に使用 */
+  firstReportMonth: string | null;
 };
 
 export default function AdminStaff() {
@@ -105,6 +142,7 @@ export default function AdminStaff() {
   const [filterStore, setFilterStore] = useState("all");
   const [showRetired, setShowRetired] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [periodSelection, setPeriodSelection] = useState<PeriodSelection>(getDefaultPeriodSelection());
 
   // Dialog state for status toggle confirmation
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -118,11 +156,11 @@ export default function AdminStaff() {
   // ─── スプレッドシートからスタッフ一覧を動的取得 ───
   const { rawData, loading: reportLoading } = useMonthlyReport();
 
-  // rawDataからユニークなスタッフ一覧を抽出（正規化済み）
+  // rawDataからユニークなスタッフ一覧を抽出（正規化済み）+ 初回報告月を記録
   const dynamicStaffData = useMemo(() => {
     if (!rawData.length) return [];
 
-    const seen = new Map<string, { name: string; store: string }>();
+    const seen = new Map<string, { name: string; store: string; firstMonth: string | null }>();
     for (const r of rawData) {
       const normalizedName = normalizeStaffName(r.name);
       const store = r.storeNormalized;
@@ -131,14 +169,30 @@ export default function AdminStaff() {
       if (!normalizedName || !store) continue;
 
       const key = `${normalizedName}|${store}`;
+      const reportMonth = r.reportMonth || null;
+
       if (!seen.has(key)) {
-        seen.set(key, { name: normalizedName, store });
+        seen.set(key, { name: normalizedName, store, firstMonth: reportMonth });
+      } else {
+        const existing = seen.get(key)!;
+        if (reportMonth && (!existing.firstMonth || reportMonth < existing.firstMonth)) {
+          existing.firstMonth = reportMonth;
+        }
       }
     }
 
     return Array.from(seen.values()).sort((a, b) =>
       a.store.localeCompare(b.store, "ja") || a.name.localeCompare(b.name, "ja")
     );
+  }, [rawData]);
+
+  // 利用可能な月一覧（期間セレクタ用）
+  const allMonths = useMemo(() => {
+    const months = new Set<string>();
+    for (const r of rawData) {
+      if (r.reportMonth) months.add(r.reportMonth);
+    }
+    return Array.from(months).sort().reverse();
   }, [rawData]);
 
   // 動的に取得された店舗一覧
@@ -160,9 +214,20 @@ export default function AdminStaff() {
     enabled: showHistory,
   });
 
+  // Fetch period-based staff stats from backend
+  const { startDate: statsStartDate, endDate: statsEndDate } = periodToDateRange(periodSelection, allMonths);
+  const statsQuery = trpc.admin.getStaffStats.useQuery(
+    { startDate: statsStartDate, endDate: statsEndDate },
+    {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    }
+  );
+
   const updateStatusMutation = trpc.admin.updateStaffStatus.useMutation({
     onSuccess: () => {
       statusQuery.refetch();
+      statsQuery.refetch();
       if (showHistory) historyQuery.refetch();
       toast.success("ステータスを更新しました");
       setConfirmDialog({ open: false, staff: null, targetStatus: "active", retiredMonth: getCurrentYearMonth(), note: "" });
@@ -175,6 +240,7 @@ export default function AdminStaff() {
   const bulkInitMutation = trpc.admin.bulkInitStaffStatuses.useMutation({
     onSuccess: (data) => {
       statusQuery.refetch();
+      statsQuery.refetch();
       toast.success(`${data.count}名のステータスを初期化しました`);
     },
     onError: (err) => {
@@ -211,6 +277,7 @@ export default function AdminStaff() {
         store: staff.store,
         status: dbStatus?.status || "active",
         retiredMonth: dbStatus?.retiredMonth || null,
+        firstReportMonth: staff.firstMonth,
       };
     });
 
@@ -223,6 +290,7 @@ export default function AdminStaff() {
           store: s.storeName,
           status: s.status,
           retiredMonth: s.retiredMonth,
+          firstReportMonth: null,
         });
       }
     }
@@ -232,7 +300,22 @@ export default function AdminStaff() {
 
   const isDbInitialized = (statusQuery.data?.length || 0) > 0;
 
-  // Filter staff
+  // ─── 期間フィルタリング ───
+  const filterMonthsResult = getFilterMonths(periodSelection, allMonths);
+
+  // 新入社数: 選択期間内に初めて報告書を提出したスタッフ
+  const newHireCount = useMemo(() => {
+    if (filterMonthsResult === "all") {
+      // 全期間の場合は全スタッフ数を返す（全員が「新入社」）
+      return dynamicStaffData.length;
+    }
+    return dynamicStaffData.filter((s) => {
+      if (!s.firstMonth) return false;
+      return (filterMonthsResult as string[]).includes(s.firstMonth);
+    }).length;
+  }, [dynamicStaffData, filterMonthsResult]);
+
+  // Filter staff for list display
   const filteredStaff = useMemo(() => {
     return staffList.filter((s) => {
       if (!showRetired && s.status === "retired") return false;
@@ -256,9 +339,11 @@ export default function AdminStaff() {
     return map;
   }, [filteredStaff]);
 
-  // Stats
-  const activeCount = staffList.filter((s) => s.status === "active").length;
-  const retiredCount = staffList.filter((s) => s.status === "retired").length;
+  // Stats from backend (period-aware)
+  const activeCount = statsQuery.data?.totalActive ?? staffList.filter((s) => s.status === "active").length;
+  const retiredCount = statsQuery.data?.totalRetired ?? staffList.filter((s) => s.status === "retired").length;
+  const periodRetirements = statsQuery.data?.periodRetirements ?? 0;
+  const periodReactivations = statsQuery.data?.periodReactivations ?? 0;
 
   // Open confirm dialog
   const openToggleDialog = (staff: StaffWithStatus) => {
@@ -301,19 +386,102 @@ export default function AdminStaff() {
   };
 
   const loading = reportLoading || statusQuery.isLoading;
+  const periodLabel = getPeriodLabel(periodSelection);
 
   return (
     <AdminLayout
       title="スタッフ情報管理"
       breadcrumbs={[{ label: "スタッフ情報" }]}
     >
-      <p className="text-sm text-muted-foreground mb-6">
+      <p className="text-sm text-muted-foreground mb-4">
         スタッフの在籍・退社ステータスを管理します。ステータスの変更は全ページに即時反映されます。
         <br />
         <span className="text-xs text-muted-foreground/70">
           スタッフ一覧は月末報告書スプレッドシートから自動取得されます。新しいスタッフが報告書を提出すると自動的に表示されます。
         </span>
       </p>
+
+      {/* ─── 期間セレクタ ─── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+          <TrendingUp className="w-5 h-5 text-primary" />
+          人事サマリー
+          <span className="text-xs font-normal text-muted-foreground">— {periodLabel}</span>
+        </h2>
+        <PeriodSelector
+          allMonths={allMonths}
+          selection={periodSelection}
+          onChange={setPeriodSelection}
+        />
+      </div>
+
+      {/* ─── KPIカード ─── */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
+        {[
+          {
+            label: "総スタッフ数",
+            value: activeCount + retiredCount,
+            icon: Users,
+            color: "text-primary",
+            bgColor: "bg-primary/5",
+          },
+          {
+            label: "在籍スタッフ",
+            value: activeCount,
+            icon: UserCheck,
+            color: "text-green-600",
+            bgColor: "bg-green-50",
+          },
+          {
+            label: "新入社",
+            value: newHireCount,
+            icon: UserPlus,
+            color: "text-blue-600",
+            bgColor: "bg-blue-50",
+            sub: periodLabel,
+          },
+          {
+            label: "退社",
+            value: periodRetirements,
+            icon: UserMinus,
+            color: "text-red-600",
+            bgColor: "bg-red-50",
+            sub: periodLabel,
+          },
+          {
+            label: "復帰",
+            value: periodReactivations,
+            icon: Sparkles,
+            color: "text-amber-600",
+            bgColor: "bg-amber-50",
+            sub: periodLabel,
+          },
+        ].map((stat, i) => (
+          <motion.div
+            key={stat.label}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 * i }}
+          >
+            <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow h-full">
+              <CardContent className="p-3 lg:p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${stat.bgColor}`}>
+                    <stat.icon className={`w-4 h-4 ${stat.color}`} />
+                  </div>
+                </div>
+                <div className="font-mono-data text-2xl font-bold text-foreground">
+                  {loading || statsQuery.isLoading ? "..." : stat.value}
+                </div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-1">{stat.label}</div>
+                {stat.sub && (
+                  <div className="text-[9px] text-muted-foreground/60 mt-0.5">{stat.sub}</div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        ))}
+      </div>
 
       {/* DB initialization prompt */}
       {!statusQuery.isLoading && !isDbInitialized && !reportLoading && dynamicStaffData.length > 0 && (
@@ -345,6 +513,16 @@ export default function AdminStaff() {
           </CardContent>
         </Card>
       )}
+
+      {/* ─── スタッフ一覧セクション ─── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+        <h2 className="text-lg font-bold text-foreground">スタッフ一覧</h2>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span>{allStores.length}店舗</span>
+          <span>·</span>
+          <span>{staffList.filter(s => s.status === "active").length}名在籍</span>
+        </div>
+      </div>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
@@ -383,34 +561,15 @@ export default function AdminStaff() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => statusQuery.refetch()}
+          onClick={() => {
+            statusQuery.refetch();
+            statsQuery.refetch();
+          }}
           disabled={statusQuery.isFetching}
           className="shrink-0"
         >
           <RefreshCw className={`w-4 h-4 ${statusQuery.isFetching ? "animate-spin" : ""}`} />
         </Button>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
-        <Card className="border-border/50">
-          <CardContent className="p-3">
-            <div className="text-xl font-bold font-mono-data">{activeCount}</div>
-            <div className="text-[10px] text-muted-foreground">在籍スタッフ</div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-3">
-            <div className="text-xl font-bold font-mono-data">{retiredCount}</div>
-            <div className="text-[10px] text-muted-foreground">退社スタッフ</div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-3">
-            <div className="text-xl font-bold font-mono-data">{allStores.length}</div>
-            <div className="text-[10px] text-muted-foreground">店舗数</div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Staff List by Store */}

@@ -1,4 +1,4 @@
-import { and, eq, desc } from "drizzle-orm";
+import { and, eq, desc, gte, lte, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users, staffStatus, type StaffStatus, staffStatusHistory, type StaffStatusHistory } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -175,4 +175,47 @@ export async function getStaffStatusHistoryByStaff(
   return db.select().from(staffStatusHistory)
     .where(and(eq(staffStatusHistory.staffName, staffName), eq(staffStatusHistory.storeName, storeName)))
     .orderBy(desc(staffStatusHistory.createdAt));
+}
+
+/** Get retirement count within a date range (based on createdAt of history records where newStatus='retired') */
+export async function getRetirementCountByPeriod(
+  startDate?: Date,
+  endDate?: Date
+): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+
+  const conditions = [eq(staffStatusHistory.newStatus, "retired")];
+  if (startDate) conditions.push(gte(staffStatusHistory.createdAt, startDate));
+  if (endDate) conditions.push(lte(staffStatusHistory.createdAt, endDate));
+
+  const result = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(staffStatusHistory)
+    .where(and(...conditions));
+
+  return Number(result[0]?.count ?? 0);
+}
+
+/** Get reactivation (rehire) count within a date range */
+export async function getReactivationCountByPeriod(
+  startDate?: Date,
+  endDate?: Date
+): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+
+  const conditions = [
+    eq(staffStatusHistory.newStatus, "active"),
+    eq(staffStatusHistory.previousStatus, "retired"),
+  ];
+  if (startDate) conditions.push(gte(staffStatusHistory.createdAt, startDate));
+  if (endDate) conditions.push(lte(staffStatusHistory.createdAt, endDate));
+
+  const result = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(staffStatusHistory)
+    .where(and(...conditions));
+
+  return Number(result[0]?.count ?? 0);
 }

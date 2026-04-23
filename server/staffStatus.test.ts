@@ -33,6 +33,22 @@ vi.mock("./db", () => ({
   getStaffStatusByKey: vi.fn(async (staffName: string, storeName: string) => {
     return store.get(`${staffName}|${storeName}`) || undefined;
   }),
+  getRetirementCountByPeriod: vi.fn(async (startDate?: Date, endDate?: Date) => {
+    return historyStore.filter((h) => {
+      if (h.newStatus !== "retired") return false;
+      if (startDate && h.createdAt < startDate) return false;
+      if (endDate && h.createdAt > endDate) return false;
+      return true;
+    }).length;
+  }),
+  getReactivationCountByPeriod: vi.fn(async (startDate?: Date, endDate?: Date) => {
+    return historyStore.filter((h) => {
+      if (h.newStatus !== "active" || h.previousStatus !== "retired") return false;
+      if (startDate && h.createdAt < startDate) return false;
+      if (endDate && h.createdAt > endDate) return false;
+      return true;
+    }).length;
+  }),
   upsertStaffStatus: vi.fn(
     async (input: {
       staffName: string;
@@ -358,6 +374,102 @@ describe("admin.getStaffStatusHistory", () => {
     expect(retiredEntry?.note).toBe("退社");
     expect(activeEntry).toBeDefined();
     expect(activeEntry?.note).toBe("復帰");
+  });
+});
+
+describe("admin.getStaffStats", () => {
+  beforeEach(() => {
+    store.clear();
+    historyStore.length = 0;
+    historyIdCounter = 0;
+  });
+
+  it("rejects unauthenticated requests", async () => {
+    const ctx = createPublicContext();
+    const caller = appRouter.createCaller(ctx);
+
+    await expect(caller.admin.getStaffStats()).rejects.toThrow(
+      "管理者認証が必要です"
+    );
+  });
+
+  it("returns zero counts when no data exists", async () => {
+    const ctx = await createAdminContext();
+    const caller = appRouter.createCaller(ctx);
+
+    const result = await caller.admin.getStaffStats();
+    expect(result.totalActive).toBe(0);
+    expect(result.totalRetired).toBe(0);
+    expect(result.totalAll).toBe(0);
+    expect(result.periodRetirements).toBe(0);
+    expect(result.periodReactivations).toBe(0);
+  });
+
+  it("returns correct counts after status changes", async () => {
+    const ctx = await createAdminContext();
+    const caller = appRouter.createCaller(ctx);
+
+    // Create some staff
+    await caller.admin.bulkInitStaffStatuses({
+      staffList: [
+        { staffName: "Staff1", storeName: "堀江院", status: "active" },
+        { staffName: "Staff2", storeName: "福島院", status: "active" },
+        { staffName: "Staff3", storeName: "高槻院", status: "active" },
+      ],
+    });
+
+    // Retire one staff
+    await caller.admin.updateStaffStatus({
+      staffName: "Staff2",
+      storeName: "福島院",
+      status: "retired",
+      retiredMonth: "2026-04",
+    });
+
+    const result = await caller.admin.getStaffStats();
+    expect(result.totalActive).toBe(2);
+    expect(result.totalRetired).toBe(1);
+    expect(result.totalAll).toBe(3);
+    expect(result.periodRetirements).toBe(1);
+    expect(result.periodReactivations).toBe(0);
+  });
+
+  it("counts reactivations correctly", async () => {
+    const ctx = await createAdminContext();
+    const caller = appRouter.createCaller(ctx);
+
+    // Create and retire a staff member
+    await caller.admin.updateStaffStatus({
+      staffName: "Staff1",
+      storeName: "堀江院",
+      status: "retired",
+      retiredMonth: "2026-03",
+    });
+
+    // Reactivate
+    await caller.admin.updateStaffStatus({
+      staffName: "Staff1",
+      storeName: "堀江院",
+      status: "active",
+    });
+
+    const result = await caller.admin.getStaffStats();
+    expect(result.periodRetirements).toBe(1);
+    expect(result.periodReactivations).toBe(1);
+  });
+
+  it("accepts optional date range parameters", async () => {
+    const ctx = await createAdminContext();
+    const caller = appRouter.createCaller(ctx);
+
+    const result = await caller.admin.getStaffStats({
+      startDate: "2026-01-01T00:00:00.000Z",
+      endDate: "2026-12-31T23:59:59.999Z",
+    });
+
+    expect(result.totalActive).toBe(0);
+    expect(result.periodRetirements).toBe(0);
+    expect(result.periodReactivations).toBe(0);
   });
 });
 

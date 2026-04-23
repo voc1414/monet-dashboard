@@ -3,7 +3,7 @@ import { z } from "zod";
 import { publicProcedure, router } from "../_core/trpc";
 import { ENV } from "../_core/env";
 import { SignJWT, jwtVerify } from "jose";
-import { getAllStaffStatus, upsertStaffStatus, insertStaffStatusHistory, getAllStaffStatusHistory, getStaffStatusByKey } from "../db";
+import { getAllStaffStatus, upsertStaffStatus, insertStaffStatusHistory, getAllStaffStatusHistory, getStaffStatusByKey, getRetirementCountByPeriod, getReactivationCountByPeriod } from "../db";
 
 const JWT_SECRET_KEY = new TextEncoder().encode(ENV.cookieSecret || "monet-admin-secret-key");
 
@@ -130,6 +130,37 @@ export const adminRouter = router({
     .query(async ({ ctx }) => {
       await requireAdminFromCtx(ctx);
       return getAllStaffStatusHistory();
+    }),
+
+  /** Get staff HR stats for a given period (admin only) */
+  getStaffStats: publicProcedure
+    .input(z.object({
+      /** Start date as ISO string (inclusive). Omit for "all time". */
+      startDate: z.string().optional().nullable(),
+      /** End date as ISO string (inclusive). Omit for "all time". */
+      endDate: z.string().optional().nullable(),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      await requireAdminFromCtx(ctx);
+
+      const allStatuses = await getAllStaffStatus();
+      const totalActive = allStatuses.filter(s => s.status === "active").length;
+      const totalRetired = allStatuses.filter(s => s.status === "retired").length;
+      const totalAll = allStatuses.length;
+
+      const startDate = input?.startDate ? new Date(input.startDate) : undefined;
+      const endDate = input?.endDate ? new Date(input.endDate) : undefined;
+
+      const retirementCount = await getRetirementCountByPeriod(startDate, endDate);
+      const reactivationCount = await getReactivationCountByPeriod(startDate, endDate);
+
+      return {
+        totalActive,
+        totalRetired,
+        totalAll,
+        periodRetirements: retirementCount,
+        periodReactivations: reactivationCount,
+      };
     }),
 
   /** Bulk initialize staff statuses (admin only) - seed from hardcoded data */
