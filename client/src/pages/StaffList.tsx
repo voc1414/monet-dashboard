@@ -436,12 +436,18 @@ export default function StaffList() {
                         <div className="col-span-2 text-right">
                           {utilRate !== null ? (
                             <div className="flex flex-col items-end">
-                              <span className={`font-mono-data text-base font-bold ${getUtilizationColor(utilRate)}`}>
+                              <span className={`font-mono-data text-base font-bold flex items-center justify-end gap-1 ${getUtilizationColor(utilRate)}`}>
+                                {utilRate < 90 && (
+                                  <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5" title="要改善">
+                                    <AlertTriangle className="w-3 h-3" />
+                                    要改善
+                                  </span>
+                                )}
                                 {utilRate}%
                               </span>
-                              <span className={`text-[10px] ${getUtilizationColor(utilRate)}`}>
-                                {getUtilizationLabel(utilRate)}
-                              </span>
+                              {utilRate >= 90 && (
+                                <span className="text-[10px] text-[#2D9C8F]">適正</span>
+                              )}
                             </div>
                           ) : (
                             <span className="text-xs text-muted-foreground">—</span>
@@ -497,9 +503,16 @@ export default function StaffList() {
                               <div className="flex items-center gap-2 shrink-0">
                                 {/* 稼働率（モバイル） */}
                                 {utilRate !== null && (
-                                  <span className={`text-[11px] font-mono-data font-bold ${getUtilizationColor(utilRate)}`}>
-                                    <Activity className="w-3 h-3 inline mr-0.5" />
-                                    {utilRate}%
+                                  <span className={`text-[11px] font-mono-data font-bold flex items-center gap-1 ${getUtilizationColor(utilRate)}`}>
+                                    {utilRate < 90 ? (
+                                      <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1 py-0.5">
+                                        <AlertTriangle className="w-2.5 h-2.5" />
+                                        要改善
+                                      </span>
+                                    ) : (
+                                      <Activity className="w-3 h-3 inline mr-0.5" />
+                                    )}
+                                    稼働 {utilRate}%
                                   </span>
                                 )}
                                 {/* 次回予約率（モバイル） */}
