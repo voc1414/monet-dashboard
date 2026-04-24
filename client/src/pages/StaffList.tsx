@@ -1,7 +1,7 @@
 /**
  * Design: monet Brand Identity — 水彩ブルー × コンクリートモダン
  * Page: スタッフ一覧（全店舗横断・ソート機能付き）
- * Columns: 氏名、総売上、配属店舗、雇用形態、次回予約率
+ * Columns: 氏名、総売上、配属店舗、雇用形態、稼働率、次回予約率
  * Feature: カード全体クリックでスタッフ個人ページへ遷移
  */
 import { useState, useMemo, useEffect } from "react";
@@ -9,7 +9,7 @@ import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import {
   Users, Building2, AlertTriangle, Search, Store,
-  ChevronRight, ArrowUpDown, ArrowUp, ArrowDown
+  ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Activity
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,7 @@ import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { useNpsData, filterByMonth } from "@/hooks/useNpsData";
 import type { StaffReport } from "@/hooks/useMonthlyReport";
 import { isNewStaff } from "@/lib/newBadge";
+import { calculateUtilizationRate, getUtilizationColor, getUtilizationLabel } from "@/lib/utilizationRate";
 
 const formatCurrency = (n: number) => {
   return `¥${n.toLocaleString()}`;
@@ -46,13 +47,14 @@ interface StaffNpsInfo {
   detractors: number;
 }
 
-type SortField = "totalSales" | "storeNormalized" | "employmentType" | "nextReservationRate";
+type SortField = "totalSales" | "storeNormalized" | "employmentType" | "utilizationRate" | "nextReservationRate";
 type SortDirection = "asc" | "desc";
 
 const SORT_LABELS: Record<SortField, string> = {
   totalSales: "総売上",
   storeNormalized: "配属店舗",
   employmentType: "雇用形態",
+  utilizationRate: "稼働率",
   nextReservationRate: "次回予約率",
 };
 
@@ -163,6 +165,11 @@ export default function StaffList() {
           return a.storeNormalized.localeCompare(b.storeNormalized, "ja") * dir;
         case "employmentType":
           return a.employmentType.localeCompare(b.employmentType, "ja") * dir;
+        case "utilizationRate": {
+          const rateA = calculateUtilizationRate(a.totalCustomers, a.employmentType) ?? -1;
+          const rateB = calculateUtilizationRate(b.totalCustomers, b.employmentType) ?? -1;
+          return (rateA - rateB) * dir;
+        }
         case "nextReservationRate":
           return (a.nextReservationRate - b.nextReservationRate) * dir;
         default:
@@ -289,7 +296,7 @@ export default function StaffList() {
 
       {/* Mobile Sort Controls */}
       <div className="md:hidden flex items-center gap-2 mb-4 overflow-x-auto pb-1">
-        {(["nextReservationRate", "totalSales", "storeNormalized", "employmentType"] as SortField[]).map((field) => (
+        {(["nextReservationRate", "utilizationRate", "totalSales", "storeNormalized", "employmentType"] as SortField[]).map((field) => (
           <button
             key={field}
             onClick={() => handleSort(field)}
@@ -347,10 +354,10 @@ export default function StaffList() {
       {!loading && staffList.length > 0 && (
         <>
           {/* Table Header (desktop) — clickable for sorting */}
-          <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-2 text-[10px] text-muted-foreground font-medium uppercase tracking-wider border-b border-border/40 mb-2">
+          <div className="hidden md:grid grid-cols-14 gap-3 px-4 py-2 text-[10px] text-muted-foreground font-medium uppercase tracking-wider border-b border-border/40 mb-2">
             <div className="col-span-3">氏名</div>
             <div
-              className="col-span-3 text-right flex items-center justify-end gap-1 cursor-pointer hover:text-foreground transition-colors select-none"
+              className="col-span-2 text-right flex items-center justify-end gap-1 cursor-pointer hover:text-foreground transition-colors select-none"
               onClick={() => handleSort("totalSales")}
             >
               総売上 {getSortIcon("totalSales")}
@@ -369,6 +376,12 @@ export default function StaffList() {
             </div>
             <div
               className="col-span-2 text-right flex items-center justify-end gap-1 cursor-pointer hover:text-foreground transition-colors select-none"
+              onClick={() => handleSort("utilizationRate")}
+            >
+              稼働率 {getSortIcon("utilizationRate")}
+            </div>
+            <div
+              className="col-span-3 text-right flex items-center justify-end gap-1 cursor-pointer hover:text-foreground transition-colors select-none"
               onClick={() => handleSort("nextReservationRate")}
             >
               次回予約率 {getSortIcon("nextReservationRate")}
@@ -378,6 +391,7 @@ export default function StaffList() {
           <div className="space-y-2">
             {staffList.map((staff, i) => {
               const staffKey = `${staff.answerId}-${i}`;
+              const utilRate = calculateUtilizationRate(staff.totalCustomers, staff.employmentType);
 
               return (
                 <motion.div
@@ -392,7 +406,7 @@ export default function StaffList() {
                   >
                     <CardContent className="p-0">
                       {/* Desktop Layout */}
-                      <div className="hidden md:grid grid-cols-12 gap-4 items-center p-4">
+                      <div className="hidden md:grid grid-cols-14 gap-3 items-center p-4">
                         <div className="col-span-3 flex items-center gap-3">
                           {staff.photoUrl2 ? (
                             <img src={staff.photoUrl2} alt={staff.name} className="w-9 h-9 rounded-full object-cover object-center shrink-0" />
@@ -407,7 +421,7 @@ export default function StaffList() {
                           )}
                           <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
-                        <div className="col-span-3 text-right">
+                        <div className="col-span-2 text-right">
                           <span className="font-mono-data text-base font-bold text-foreground">{formatCurrency(staff.totalSales)}</span>
                         </div>
                         <div className="col-span-2">
@@ -416,9 +430,25 @@ export default function StaffList() {
                           </span>
                         </div>
                         <div className="col-span-2">
-                          <span className="text-sm text-muted-foreground">{staff.employmentType}</span>
+                          <span className="text-xs text-muted-foreground">{staff.employmentType}</span>
                         </div>
+                        {/* 稼働率 */}
                         <div className="col-span-2 text-right">
+                          {utilRate !== null ? (
+                            <div className="flex flex-col items-end">
+                              <span className={`font-mono-data text-base font-bold ${getUtilizationColor(utilRate)}`}>
+                                {utilRate}%
+                              </span>
+                              <span className={`text-[10px] ${getUtilizationColor(utilRate)}`}>
+                                {getUtilizationLabel(utilRate)}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </div>
+                        {/* 次回予約率 */}
+                        <div className="col-span-3 text-right">
                           <span className={`font-mono-data text-base font-bold flex items-center justify-end gap-1 ${
                             staff.nextReservationRate >= 80 ? "text-[#2D9C8F]" :
                             staff.nextReservationRate >= 60 ? "text-[#E5B85C]" :
@@ -464,19 +494,29 @@ export default function StaffList() {
                                 <Building2 className="w-3 h-3" />
                                 {staff.storeNormalized}
                               </span>
-                              <span className={`text-[11px] font-mono-data font-bold shrink-0 flex items-center gap-1 ${
-                                staff.nextReservationRate >= 80 ? "text-[#2D9C8F]" :
-                                staff.nextReservationRate >= 60 ? "text-[#E5B85C]" :
-                                "text-[#C75C5C]"
-                              }`}>
-                                {staff.nextReservationRate <= 60 && (
-                                  <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1 py-0.5">
-                                    <AlertTriangle className="w-2.5 h-2.5" />
-                                    要改善
+                              <div className="flex items-center gap-2 shrink-0">
+                                {/* 稼働率（モバイル） */}
+                                {utilRate !== null && (
+                                  <span className={`text-[11px] font-mono-data font-bold ${getUtilizationColor(utilRate)}`}>
+                                    <Activity className="w-3 h-3 inline mr-0.5" />
+                                    {utilRate}%
                                   </span>
                                 )}
-                                次回予約 {staff.nextReservationRate}%
-                              </span>
+                                {/* 次回予約率（モバイル） */}
+                                <span className={`text-[11px] font-mono-data font-bold flex items-center gap-1 ${
+                                  staff.nextReservationRate >= 80 ? "text-[#2D9C8F]" :
+                                  staff.nextReservationRate >= 60 ? "text-[#E5B85C]" :
+                                  "text-[#C75C5C]"
+                                }`}>
+                                  {staff.nextReservationRate <= 60 && (
+                                    <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1 py-0.5">
+                                      <AlertTriangle className="w-2.5 h-2.5" />
+                                      要改善
+                                    </span>
+                                  )}
+                                  予約 {staff.nextReservationRate}%
+                                </span>
+                              </div>
                             </div>
                           </div>
                         </div>
