@@ -852,11 +852,11 @@ export default function StaffDetail() {
                         return [`${value}%`, name];
                       }}
                     />
-                    {/* 60%基準線 */}
+                    {/* 69%基準線（要改善ライン） */}
                     <Line
                       type="monotone"
-                      dataKey={() => 60}
-                      name="基準線 (60%)"
+                      dataKey={() => 69}
+                      name="基準線 (69%)"
                       stroke={CHART_COLORS.warning}
                       strokeWidth={1}
                       strokeDasharray="6 4"

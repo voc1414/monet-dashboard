@@ -424,10 +424,10 @@ export default function Home() {
                                       {st.hasReportData ? (
                                         st.nextReservationRate > 0 ? (
                                           <>
-                                            <span className={st.nextReservationRate >= 80 ? "text-[#2D9C8F]" : st.nextReservationRate >= 60 ? "text-[#E5B85C]" : "text-[#C75C5C]"}>
+                                            <span className={st.nextReservationRate >= 85 ? "text-[#2D9C8F]" : st.nextReservationRate >= 70 ? "text-[#E5B85C]" : "text-[#C75C5C]"}>
                                               {st.nextReservationRate}%
                                             </span>
-                                            {st.nextReservationRate <= 60 && (
+                                            {st.nextReservationRate <= 69 && (
                                               <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1 py-0.5" title="要改善">
                                                 <AlertTriangle className="w-2.5 h-2.5" />
                                                 要改善

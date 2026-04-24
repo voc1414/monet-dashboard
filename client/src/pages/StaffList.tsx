@@ -437,7 +437,7 @@ export default function StaffList() {
                           {utilRate !== null ? (
                             <div className="flex flex-col items-end">
                               <span className={`font-mono-data text-base font-bold flex items-center justify-end gap-1 ${getUtilizationColor(utilRate)}`}>
-                                {utilRate < 90 && (
+                                {utilRate <= 89 && (
                                   <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5" title="要改善">
                                     <AlertTriangle className="w-3 h-3" />
                                     要改善
@@ -445,8 +445,11 @@ export default function StaffList() {
                                 )}
                                 {utilRate}%
                               </span>
-                              {utilRate >= 90 && (
-                                <span className="text-[10px] text-[#2D9C8F]">適正</span>
+                              {utilRate >= 95 && (
+                                <span className="text-[10px] text-[#2D9C8F]">エクセレント！</span>
+                              )}
+                              {utilRate >= 90 && utilRate < 95 && (
+                                <span className="text-[10px] text-[#E5B85C]">適正</span>
                               )}
                             </div>
                           ) : (
@@ -456,15 +459,21 @@ export default function StaffList() {
                         {/* 次回予約率 */}
                         <div className="col-span-3 text-right">
                           <span className={`font-mono-data text-base font-bold flex items-center justify-end gap-1 ${
-                            staff.nextReservationRate >= 80 ? "text-[#2D9C8F]" :
-                            staff.nextReservationRate >= 60 ? "text-[#E5B85C]" :
+                            staff.nextReservationRate >= 85 ? "text-[#2D9C8F]" :
+                            staff.nextReservationRate >= 70 ? "text-[#E5B85C]" :
                             "text-[#C75C5C]"
                           }`}>
-                            {staff.nextReservationRate <= 60 && (
+                            {staff.nextReservationRate <= 69 && (
                               <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5" title="要改善">
                                 <AlertTriangle className="w-3 h-3" />
                                 要改善
                               </span>
+                            )}
+                            {staff.nextReservationRate >= 85 && (
+                              <span className="text-[10px] text-[#2D9C8F]">エクセレント！</span>
+                            )}
+                            {staff.nextReservationRate >= 70 && staff.nextReservationRate <= 84 && (
+                              <span className="text-[10px] text-[#E5B85C]">適正</span>
                             )}
                             {staff.nextReservationRate}%
                           </span>
@@ -504,7 +513,7 @@ export default function StaffList() {
                                 {/* 稼働率（モバイル） */}
                                 {utilRate !== null && (
                                   <span className={`text-[11px] font-mono-data font-bold flex items-center gap-1 ${getUtilizationColor(utilRate)}`}>
-                                    {utilRate < 90 ? (
+                                    {utilRate <= 89 ? (
                                       <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1 py-0.5">
                                         <AlertTriangle className="w-2.5 h-2.5" />
                                         要改善
@@ -517,11 +526,11 @@ export default function StaffList() {
                                 )}
                                 {/* 次回予約率（モバイル） */}
                                 <span className={`text-[11px] font-mono-data font-bold flex items-center gap-1 ${
-                                  staff.nextReservationRate >= 80 ? "text-[#2D9C8F]" :
-                                  staff.nextReservationRate >= 60 ? "text-[#E5B85C]" :
+                                  staff.nextReservationRate >= 85 ? "text-[#2D9C8F]" :
+                                  staff.nextReservationRate >= 70 ? "text-[#E5B85C]" :
                                   "text-[#C75C5C]"
                                 }`}>
-                                  {staff.nextReservationRate <= 60 && (
+                                  {staff.nextReservationRate <= 69 && (
                                     <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1 py-0.5">
                                       <AlertTriangle className="w-2.5 h-2.5" />
                                       要改善

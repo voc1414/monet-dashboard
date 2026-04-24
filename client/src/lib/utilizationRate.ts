@@ -80,19 +80,23 @@ export function calculateUtilizationRate(
 }
 /**
  * 稼働率に応じた色クラスを返す
- * - 90%以上: 緑（適正）
+ * - 95%以上: 緑（エクセレント！）
+ * - 90〜94%: 黄（適正）
  * - 89%以下: 赤（要改善）
  */
 export function getUtilizationColor(rate: number): string {
-  if (rate >= 90) return "text-[#2D9C8F]";
+  if (rate >= 95) return "text-[#2D9C8F]";
+  if (rate >= 90) return "text-[#E5B85C]";
   return "text-[#C75C5C]";
 }
 /**
  * 稼働率に応じたラベルを返す
- * - 90%以上: 適正
+ * - 95%以上: エクセレント！
+ * - 90〜94%: 適正
  * - 89%以下: 要改善
  */
 export function getUtilizationLabel(rate: number): string {
+  if (rate >= 95) return "エクセレント！";
   if (rate >= 90) return "適正";
   return "要改善";
 }
