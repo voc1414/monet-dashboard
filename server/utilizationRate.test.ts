@@ -104,42 +104,32 @@ describe("utilizationRate", () => {
   });
 
   describe("getUtilizationColor", () => {
-    it("90%以上は緑", () => {
+    it("90%以上は緑（適正）", () => {
       expect(getUtilizationColor(95)).toBe("text-[#2D9C8F]");
+      expect(getUtilizationColor(90)).toBe("text-[#2D9C8F]");
+      expect(getUtilizationColor(100)).toBe("text-[#2D9C8F]");
     });
 
-    it("70-89%は青", () => {
-      expect(getUtilizationColor(75)).toBe("text-[#3B82F6]");
-    });
-
-    it("50-69%は黄", () => {
-      expect(getUtilizationColor(55)).toBe("text-[#E5B85C]");
-    });
-
-    it("50%未満は赤", () => {
+    it("89%以下は赤（要改善）", () => {
+      expect(getUtilizationColor(89)).toBe("text-[#C75C5C]");
+      expect(getUtilizationColor(75)).toBe("text-[#C75C5C]");
+      expect(getUtilizationColor(50)).toBe("text-[#C75C5C]");
       expect(getUtilizationColor(30)).toBe("text-[#C75C5C]");
     });
   });
 
   describe("getUtilizationLabel", () => {
-    it("100%以上はフル稼働", () => {
-      expect(getUtilizationLabel(105)).toBe("フル稼働");
+    it("90%以上は適正", () => {
+      expect(getUtilizationLabel(105)).toBe("適正");
+      expect(getUtilizationLabel(95)).toBe("適正");
+      expect(getUtilizationLabel(90)).toBe("適正");
     });
 
-    it("90-99%は高稼働", () => {
-      expect(getUtilizationLabel(95)).toBe("高稼働");
-    });
-
-    it("70-89%は適正", () => {
-      expect(getUtilizationLabel(75)).toBe("適正");
-    });
-
-    it("50-69%はやや低め", () => {
-      expect(getUtilizationLabel(55)).toBe("やや低め");
-    });
-
-    it("50%未満は低稼働", () => {
-      expect(getUtilizationLabel(30)).toBe("低稼働");
+    it("89%以下は要改善", () => {
+      expect(getUtilizationLabel(89)).toBe("要改善");
+      expect(getUtilizationLabel(75)).toBe("要改善");
+      expect(getUtilizationLabel(50)).toBe("要改善");
+      expect(getUtilizationLabel(30)).toBe("要改善");
     });
   });
 });
