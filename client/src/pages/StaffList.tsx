@@ -9,7 +9,8 @@ import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import {
   Users, Building2, AlertTriangle, Search, Store,
-  ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Activity
+  ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Activity,
+  Sparkles, Trophy
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -446,7 +447,11 @@ export default function StaffList() {
                                 {utilRate}%
                               </span>
                               {utilRate >= 95 && (
-                                <span className="text-[10px] text-[#2D9C8F]">エクセレント！</span>
+                                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-2 py-0.5 shadow-sm">
+                                  <Trophy className="w-3 h-3 text-amber-500" />
+                                  エクセレント！
+                                  <Sparkles className="w-3 h-3 text-amber-400" />
+                                </span>
                               )}
                               {utilRate >= 90 && utilRate < 95 && (
                                 <span className="text-[10px] text-[#E5B85C]">適正</span>
@@ -470,7 +475,11 @@ export default function StaffList() {
                               </span>
                             )}
                             {staff.nextReservationRate >= 85 && (
-                              <span className="text-[10px] text-[#2D9C8F]">エクセレント！</span>
+                              <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-2 py-0.5 shadow-sm">
+                                <Trophy className="w-3 h-3 text-amber-500" />
+                                エクセレント！
+                                <Sparkles className="w-3 h-3 text-amber-400" />
+                              </span>
                             )}
                             {staff.nextReservationRate >= 70 && staff.nextReservationRate <= 84 && (
                               <span className="text-[10px] text-[#E5B85C]">適正</span>
@@ -518,6 +527,11 @@ export default function StaffList() {
                                         <AlertTriangle className="w-2.5 h-2.5" />
                                         要改善
                                       </span>
+                                    ) : utilRate >= 95 ? (
+                                      <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-1.5 py-0.5 shadow-sm">
+                                        <Trophy className="w-2.5 h-2.5 text-amber-500" />
+                                        <Sparkles className="w-2.5 h-2.5 text-amber-400" />
+                                      </span>
                                     ) : (
                                       <Activity className="w-3 h-3 inline mr-0.5" />
                                     )}
@@ -530,12 +544,17 @@ export default function StaffList() {
                                   staff.nextReservationRate >= 70 ? "text-[#E5B85C]" :
                                   "text-[#C75C5C]"
                                 }`}>
-                                  {staff.nextReservationRate <= 69 && (
+                                  {staff.nextReservationRate <= 69 ? (
                                     <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1 py-0.5">
                                       <AlertTriangle className="w-2.5 h-2.5" />
                                       要改善
                                     </span>
-                                  )}
+                                  ) : staff.nextReservationRate >= 85 ? (
+                                    <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-1.5 py-0.5 shadow-sm">
+                                      <Trophy className="w-2.5 h-2.5 text-amber-500" />
+                                      <Sparkles className="w-2.5 h-2.5 text-amber-400" />
+                                    </span>
+                                  ) : null}
                                   予約 {staff.nextReservationRate}%
                                 </span>
                               </div>
