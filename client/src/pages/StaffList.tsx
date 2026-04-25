@@ -10,7 +10,7 @@ import { motion } from "framer-motion";
 import {
   Users, Building2, AlertTriangle, Search, Store,
   ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Activity,
-  Sparkles, Trophy
+  Sparkles, Trophy, CircleCheck
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -454,7 +454,10 @@ export default function StaffList() {
                                 </span>
                               )}
                               {utilRate >= 90 && utilRate < 95 && (
-                                <span className="text-[10px] text-[#E5B85C]">適正</span>
+                                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-[#E5B85C] bg-amber-50/60 border border-amber-200/60 rounded-full px-2 py-0.5">
+                                  <CircleCheck className="w-3 h-3 text-[#E5B85C]" />
+                                  適正
+                                </span>
                               )}
                             </div>
                           ) : (
@@ -482,7 +485,10 @@ export default function StaffList() {
                               </span>
                             )}
                             {staff.nextReservationRate >= 70 && staff.nextReservationRate <= 84 && (
-                              <span className="text-[10px] text-[#E5B85C]">適正</span>
+                              <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-[#E5B85C] bg-amber-50/60 border border-amber-200/60 rounded-full px-2 py-0.5">
+                                <CircleCheck className="w-3 h-3 text-[#E5B85C]" />
+                                適正
+                              </span>
                             )}
                             {staff.nextReservationRate}%
                           </span>
@@ -532,6 +538,10 @@ export default function StaffList() {
                                         <Trophy className="w-2.5 h-2.5 text-amber-500" />
                                         <Sparkles className="w-2.5 h-2.5 text-amber-400" />
                                       </span>
+                                    ) : utilRate >= 90 ? (
+                                      <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-[#E5B85C] bg-amber-50/60 border border-amber-200/60 rounded-full px-1.5 py-0.5">
+                                        <CircleCheck className="w-2.5 h-2.5 text-[#E5B85C]" />
+                                      </span>
                                     ) : (
                                       <Activity className="w-3 h-3 inline mr-0.5" />
                                     )}
@@ -553,6 +563,10 @@ export default function StaffList() {
                                     <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-1.5 py-0.5 shadow-sm">
                                       <Trophy className="w-2.5 h-2.5 text-amber-500" />
                                       <Sparkles className="w-2.5 h-2.5 text-amber-400" />
+                                    </span>
+                                  ) : staff.nextReservationRate >= 70 ? (
+                                    <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-[#E5B85C] bg-amber-50/60 border border-amber-200/60 rounded-full px-1.5 py-0.5">
+                                      <CircleCheck className="w-2.5 h-2.5 text-[#E5B85C]" />
                                     </span>
                                   ) : null}
                                   予約 {staff.nextReservationRate}%

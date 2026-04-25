@@ -11,7 +11,8 @@ import {
   DollarSign, Scissors, Star, MessageSquare, ChevronDown,
   Trophy, ThumbsUp, Target, AlertTriangle, AlertCircle,
   Lightbulb, CheckCircle2, ArrowUpRight,
-  FileText, ExternalLink, Loader2, FolderOpen, Eye
+  FileText, ExternalLink, Loader2, FolderOpen, Eye,
+  CircleCheck, Sparkles
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PeriodSelector, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
@@ -504,6 +505,17 @@ export default function StoreDetail() {
                               <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1 py-0.5" title="要改善">
                                 <AlertTriangle className="w-2.5 h-2.5" />
                                 要改善
+                              </span>
+                            )}
+                            {sr.nextReservationRate >= 85 && (
+                              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-1.5 py-0.5 shadow-sm">
+                                <Trophy className="w-2.5 h-2.5 text-amber-500" />
+                                <Sparkles className="w-2.5 h-2.5 text-amber-400" />
+                              </span>
+                            )}
+                            {sr.nextReservationRate >= 70 && sr.nextReservationRate <= 84 && (
+                              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-[#E5B85C] bg-amber-50/60 border border-amber-200/60 rounded-full px-1.5 py-0.5">
+                                <CircleCheck className="w-2.5 h-2.5 text-[#E5B85C]" />
                               </span>
                             )}
                           </div>
@@ -1094,7 +1106,7 @@ export default function StoreDetail() {
                   { label: "総売上", value: formatCurrency(storeTotalSales), sub: `技術: ${formatCurrency(storeTechSales)} / 店販: ${formatCurrency(storeRetailSales)}`, icon: DollarSign },
                   { label: "客単価", value: formatCurrency(storeUnitPrice), sub: `総売上 ÷ 総客数`, icon: Scissors },
                   { label: "総客数", value: `${storeTotalCustomers}名`, sub: `新規: ${storeNewCustomers} / 再来: ${storeReturnCustomers}`, icon: Users },
-                  { label: "次回予約率", value: `${nextReservationRate}%`, sub: `予約: ${nextReservation} / 総客: ${storeTotalCustomers}`, icon: TrendingUp, warn: nextReservationRate <= 69 },
+                  { label: "次回予約率", value: `${nextReservationRate}%`, sub: `予約: ${nextReservation} / 総客: ${storeTotalCustomers}`, icon: TrendingUp, warn: nextReservationRate <= 69, excellent: nextReservationRate >= 85, adequate: nextReservationRate >= 70 && nextReservationRate <= 84 },
                 ].map((item, i) => (
                   <motion.div key={item.label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.04 }}>
                     <Card className="border-border/50 shadow-sm">
@@ -1107,6 +1119,19 @@ export default function StoreDetail() {
                           <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 mt-1.5" title="要改善">
                             <AlertTriangle className="w-2.5 h-2.5" />
                             要改善
+                          </span>
+                        )}
+                        {('excellent' in item) && item.excellent && (
+                          <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-1.5 py-0.5 shadow-sm mt-1.5">
+                            <Trophy className="w-2.5 h-2.5 text-amber-500" />
+                            エクセレント！
+                            <Sparkles className="w-2.5 h-2.5 text-amber-400" />
+                          </span>
+                        )}
+                        {('adequate' in item) && item.adequate && (
+                          <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-[#E5B85C] bg-amber-50/60 border border-amber-200/60 rounded-full px-1.5 py-0.5 mt-1.5">
+                            <CircleCheck className="w-2.5 h-2.5 text-[#E5B85C]" />
+                            適正
                           </span>
                         )}
                       </CardContent>

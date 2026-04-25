@@ -6,7 +6,7 @@
 import { Link } from "wouter";
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { MapPin, Users, TrendingUp, BarChart3, ArrowRight, DollarSign, Scissors, ShoppingBag, ChevronDown, AlertTriangle } from "lucide-react";
+import { MapPin, Users, TrendingUp, BarChart3, ArrowRight, DollarSign, Scissors, ShoppingBag, ChevronDown, AlertTriangle, CircleCheck, Trophy, Sparkles } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PeriodSelector, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
 import type { PeriodSelection } from "@/components/PeriodSelector";
@@ -431,6 +431,17 @@ export default function Home() {
                                               <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1 py-0.5" title="要改善">
                                                 <AlertTriangle className="w-2.5 h-2.5" />
                                                 要改善
+                                              </span>
+                                            )}
+                                            {st.nextReservationRate >= 85 && (
+                                              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-1.5 py-0.5 shadow-sm">
+                                                <Trophy className="w-2.5 h-2.5 text-amber-500" />
+                                                <Sparkles className="w-2.5 h-2.5 text-amber-400" />
+                                              </span>
+                                            )}
+                                            {st.nextReservationRate >= 70 && st.nextReservationRate <= 84 && (
+                                              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-[#E5B85C] bg-amber-50/60 border border-amber-200/60 rounded-full px-1.5 py-0.5">
+                                                <CircleCheck className="w-2.5 h-2.5 text-[#E5B85C]" />
                                               </span>
                                             )}
                                           </>
