@@ -6,13 +6,16 @@
 import { Link } from "wouter";
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { MapPin, Users, TrendingUp, BarChart3, ArrowRight, DollarSign, Scissors, ShoppingBag, ChevronDown, AlertTriangle, CircleCheck, Trophy, Sparkles } from "lucide-react";
+import { MapPin, Users, TrendingUp, BarChart3, ArrowRight, DollarSign, Scissors, ShoppingBag, ChevronDown, AlertTriangle, CircleCheck, Trophy, Sparkles, Award, Star } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PeriodSelector, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
 import type { PeriodSelection } from "@/components/PeriodSelector";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useNpsData, calculateStoreStats, getAvailableMonths } from "@/hooks/useNpsData";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
+import type { StaffReport } from "@/hooks/useMonthlyReport";
+import { calculateUtilizationRate } from "@/lib/utilizationRate";
+import { isRetiredStaff } from "@/lib/newBadge";
 import { useSalonBoardData } from "@/hooks/useSalonBoardData";
 import { getNpsClass, NPS_INDUSTRY_AVERAGE } from "@/lib/npsClass";
 import { isNewStore } from "@/lib/newBadge";
@@ -60,7 +63,7 @@ const ALL_STORES = AREA_STORES.flatMap((a) => a.stores);
 
 export default function Home() {
   const { records, loading: npsLoading, error: npsError, lastUpdated, refresh } = useNpsData();
-  const { loading: reportLoading, error: reportError, getStoreMonthlyStats, availableMonths: reportMonths } = useMonthlyReport();
+  const { rawData: reportRawData, loading: reportLoading, error: reportError, getStoreMonthlyStats, availableMonths: reportMonths } = useMonthlyReport();
   const { loading: sbLoading, error: sbError, getStoreMonth, getStoreMonthsAggregated, availableMonths: sbMonths, hasData: hasSbData } = useSalonBoardData();
 
   const loading = npsLoading || reportLoading || sbLoading;
@@ -208,6 +211,57 @@ export default function Home() {
   const overallUnitPrice = totalAllCustomers > 0 ? Math.round(totalAllSales / totalAllCustomers) : 0;
   const storeCount = Math.max(storesWithNps.length, storesWithReport.length, ALL_STORES.length);
 
+  /* エクセレント！達成スタッフの表彰データ */
+  const excellentStaff = useMemo(() => {
+    if (!reportRawData.length) return [];
+
+    // 選択期間のスタッフデータを取得（各スタッフの最新月）
+    let filtered: StaffReport[];
+    if (activeFilterMonths === "all") {
+      const map = new Map<string, StaffReport>();
+      for (const r of reportRawData) {
+        if (isRetiredStaff(r.name, r.storeNormalized, r.reportMonth)) continue;
+        const key = `${r.name}__${r.storeNormalized}`;
+        const existing = map.get(key);
+        if (!existing || r.reportMonth > existing.reportMonth) map.set(key, r);
+      }
+      filtered = Array.from(map.values());
+    } else if (activeFilterMonths.length === 1) {
+      filtered = reportRawData.filter((r) => r.reportMonth === activeFilterMonths[0] && !isRetiredStaff(r.name, r.storeNormalized, r.reportMonth));
+    } else {
+      const monthSet = new Set(activeFilterMonths);
+      const inRange = reportRawData.filter((r) => monthSet.has(r.reportMonth) && !isRetiredStaff(r.name, r.storeNormalized, r.reportMonth));
+      const map = new Map<string, StaffReport>();
+      for (const r of inRange) {
+        const key = `${r.name}__${r.storeNormalized}`;
+        const existing = map.get(key);
+        if (!existing || r.reportMonth > existing.reportMonth) map.set(key, r);
+      }
+      filtered = Array.from(map.values());
+    }
+
+    // エクセレント！判定: 次回予約率85%以上 OR 稼働率95%以上
+    return filtered
+      .map((r) => {
+        const utilRate = calculateUtilizationRate(r.totalCustomers, r.employmentType);
+        const reservationExcellent = r.nextReservationRate >= 85;
+        const utilizationExcellent = utilRate !== null && utilRate >= 95;
+        if (!reservationExcellent && !utilizationExcellent) return null;
+        return {
+          name: r.name,
+          store: r.storeNormalized,
+          employmentType: r.employmentType,
+          nextReservationRate: r.nextReservationRate,
+          utilizationRate: utilRate,
+          totalSales: r.totalSales,
+          reservationExcellent,
+          utilizationExcellent,
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null)
+      .sort((a, b) => b.nextReservationRate - a.nextReservationRate);
+  }, [reportRawData, activeFilterMonths]);
+
   /* エリアトグル状態（デフォルト全開） */
   const [openAreas, setOpenAreas] = useState<Set<string>>(new Set(AREA_STORES.map((a) => a.area)));
   const toggleArea = (area: string) => {
@@ -295,6 +349,86 @@ export default function Home() {
           </motion.div>
         ))}
       </div>
+
+      {/* 月間表彰セクション */}
+      {!loading && excellentStaff.length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-md">
+              <Trophy className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-foreground">
+                月間表彰
+              </h2>
+              <p className="text-[10px] text-muted-foreground">
+                エクセレント！達成スタッフ（{getPeriodLabel(periodSelection)}）— {excellentStaff.length}名
+              </p>
+            </div>
+          </div>
+
+          <div className="relative">
+            {/* 装飾的な背景 */}
+            <div className="absolute inset-0 bg-gradient-to-r from-amber-50/50 via-yellow-50/30 to-amber-50/50 rounded-2xl" />
+            <div className="relative border border-amber-200/60 rounded-2xl p-4 md:p-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {excellentStaff.map((staff, i) => (
+                  <motion.div
+                    key={`${staff.name}-${staff.store}`}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.05 * i }}
+                  >
+                    <Link href={`/staff/${encodeURIComponent(staff.store)}/${encodeURIComponent(staff.name)}`}>
+                      <Card className="border-amber-200/40 bg-white/80 hover:shadow-md hover:border-amber-300/60 transition-all cursor-pointer group h-full">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-100 to-yellow-100 border border-amber-200/60 flex items-center justify-center shrink-0">
+                                <Star className="w-4 h-4 text-amber-500" />
+                              </div>
+                              <div>
+                                <div className="font-bold text-sm text-foreground group-hover:text-primary transition-colors leading-tight">
+                                  {staff.name}
+                                </div>
+                                <div className="text-[10px] text-muted-foreground">{staff.store}</div>
+                              </div>
+                            </div>
+                            <ArrowRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors shrink-0 mt-1" />
+                          </div>
+
+                          {/* 達成バッジ */}
+                          <div className="flex flex-wrap gap-1.5 mt-3">
+                            {staff.reservationExcellent && (
+                              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-2 py-0.5 shadow-sm">
+                                <Trophy className="w-2.5 h-2.5 text-amber-500" />
+                                予約率 {staff.nextReservationRate}%
+                                <Sparkles className="w-2.5 h-2.5 text-amber-400" />
+                              </span>
+                            )}
+                            {staff.utilizationExcellent && (
+                              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-2 py-0.5 shadow-sm">
+                                <Trophy className="w-2.5 h-2.5 text-amber-500" />
+                                稼働率 {staff.utilizationRate}%
+                                <Sparkles className="w-2.5 h-2.5 text-amber-400" />
+                              </span>
+                            )}
+                          </div>
+
+                          {/* 売上 */}
+                          <div className="mt-2 text-[10px] text-muted-foreground">
+                            総売上: <span className="font-mono-data font-bold text-foreground">{formatCurrency(staff.totalSales)}</span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Store List Header */}
       <div className="mb-4">
