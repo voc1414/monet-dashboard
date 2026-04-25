@@ -10,7 +10,7 @@ import { motion } from "framer-motion";
 import {
   Users, Building2, AlertTriangle, Search, Store,
   ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Activity,
-  Sparkles, Trophy, CircleCheck
+  Sparkles, Trophy, CircleCheck, CalendarCheck, Gauge
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { useNpsData, filterByMonth } from "@/hooks/useNpsData";
 import type { StaffReport } from "@/hooks/useMonthlyReport";
-import { isNewStaff } from "@/lib/newBadge";
+import { isNewStaff, isRetiredStaff } from "@/lib/newBadge";
 import { calculateUtilizationRate, getUtilizationColor, getUtilizationLabel } from "@/lib/utilizationRate";
 
 const formatCurrency = (n: number) => {
@@ -233,6 +233,34 @@ export default function StaffList() {
   // ソートラベル表示
   const sortLabel = `${SORT_LABELS[sortField]}${sortDirection === "asc" ? "↑" : "↓"}`;
 
+  // 月間表彰: エクセレント！達成スタッフ
+  const { reservationExcellentList, utilizationExcellentList } = useMemo(() => {
+    if (!staffListUnsorted.length) return { reservationExcellentList: [] as { name: string; store: string; nextReservationRate: number; utilizationRate: number | null; employmentType: string }[], utilizationExcellentList: [] as { name: string; store: string; nextReservationRate: number; utilizationRate: number | null; employmentType: string }[] };
+
+    const staffWithRates = staffListUnsorted
+      .filter((r) => !isRetiredStaff(r.name, r.storeNormalized, r.reportMonth))
+      .map((r) => {
+        const utilRate = calculateUtilizationRate(r.totalCustomers, r.employmentType);
+        return {
+          name: r.name,
+          store: r.storeNormalized,
+          employmentType: r.employmentType,
+          nextReservationRate: r.nextReservationRate,
+          utilizationRate: utilRate,
+        };
+      });
+
+    const reservationList = staffWithRates
+      .filter((s) => s.nextReservationRate >= 85)
+      .sort((a, b) => b.nextReservationRate - a.nextReservationRate);
+
+    const utilizationList = staffWithRates
+      .filter((s) => s.utilizationRate !== null && s.utilizationRate >= 95)
+      .sort((a, b) => (b.utilizationRate ?? 0) - (a.utilizationRate ?? 0));
+
+    return { reservationExcellentList: reservationList, utilizationExcellentList: utilizationList };
+  }, [staffListUnsorted]);
+
   return (
     <DashboardLayout
       breadcrumbs={[{ label: "スタッフ一覧" }]}
@@ -267,6 +295,79 @@ export default function StaffList() {
           />
         </div>
       </div>
+
+      {/* 月間表彰セクション */}
+      {!loading && (reservationExcellentList.length > 0 || utilizationExcellentList.length > 0) && (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-sm">
+              <Trophy className="w-3 h-3 text-white" />
+            </div>
+            <h2 className="text-base font-bold text-foreground">月間表彰</h2>
+            <span className="text-[10px] text-muted-foreground">エクセレント！達成（{getPeriodLabel(periodSelection)}）</span>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {/* 次回予約部門 */}
+            {reservationExcellentList.length > 0 && (
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-amber-50/40 via-yellow-50/20 to-amber-50/40 rounded-xl" />
+                <div className="relative border border-amber-200/50 rounded-xl p-3">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <CalendarCheck className="w-3.5 h-3.5 text-amber-500" />
+                    <span className="font-bold text-xs text-foreground">次回予約部門</span>
+                    <span className="text-[9px] text-muted-foreground ml-0.5">{reservationExcellentList.length}名</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-3 gap-y-0.5">
+                    {reservationExcellentList.map((staff, i) => (
+                      <Link key={`res-${staff.name}-${staff.store}`} href={`/staff/${encodeURIComponent(staff.store)}/${encodeURIComponent(staff.name)}`}>
+                        <div className="flex items-center gap-1.5 py-1 px-1.5 rounded-md hover:bg-amber-100/40 transition-colors cursor-pointer group">
+                          <span className="w-4 text-[10px] font-bold text-amber-500 text-center shrink-0">{i + 1}</span>
+                          <span className="text-xs font-medium text-foreground group-hover:text-primary transition-colors truncate flex-1">{staff.name}</span>
+                          <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300/80 rounded-full px-1.5 py-px shadow-sm shrink-0">
+                            <Trophy className="w-2 h-2 text-amber-500" />
+                            {staff.nextReservationRate}%
+                            <Sparkles className="w-2 h-2 text-amber-400" />
+                          </span>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 稼働率部門 */}
+            {utilizationExcellentList.length > 0 && (
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/40 via-teal-50/20 to-emerald-50/40 rounded-xl" />
+                <div className="relative border border-emerald-200/50 rounded-xl p-3">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Gauge className="w-3.5 h-3.5 text-emerald-500" />
+                    <span className="font-bold text-xs text-foreground">稼働率部門</span>
+                    <span className="text-[9px] text-muted-foreground ml-0.5">{utilizationExcellentList.length}名</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-3 gap-y-0.5">
+                    {utilizationExcellentList.map((staff, i) => (
+                      <Link key={`util-${staff.name}-${staff.store}`} href={`/staff/${encodeURIComponent(staff.store)}/${encodeURIComponent(staff.name)}`}>
+                        <div className="flex items-center gap-1.5 py-1 px-1.5 rounded-md hover:bg-emerald-100/40 transition-colors cursor-pointer group">
+                          <span className="w-4 text-[10px] font-bold text-emerald-500 text-center shrink-0">{i + 1}</span>
+                          <span className="text-xs font-medium text-foreground group-hover:text-primary transition-colors truncate flex-1">{staff.name}</span>
+                          <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-600 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-300/80 rounded-full px-1.5 py-px shadow-sm shrink-0">
+                            <Trophy className="w-2 h-2 text-emerald-500" />
+                            {staff.utilizationRate}%
+                            <Sparkles className="w-2 h-2 text-emerald-400" />
+                          </span>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Search & Store Filter */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
