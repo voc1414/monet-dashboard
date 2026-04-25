@@ -6,7 +6,7 @@
 import { Link } from "wouter";
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { MapPin, Users, TrendingUp, BarChart3, ArrowRight, DollarSign, Scissors, ShoppingBag, ChevronDown, AlertTriangle, CircleCheck, Trophy, Sparkles, Award, Star } from "lucide-react";
+import { MapPin, Users, TrendingUp, BarChart3, ArrowRight, DollarSign, Scissors, ShoppingBag, ChevronDown, AlertTriangle, CircleCheck, Trophy, Sparkles, Award, Star, CalendarCheck, Gauge } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PeriodSelector, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
 import type { PeriodSelection } from "@/components/PeriodSelector";
@@ -211,9 +211,9 @@ export default function Home() {
   const overallUnitPrice = totalAllCustomers > 0 ? Math.round(totalAllSales / totalAllCustomers) : 0;
   const storeCount = Math.max(storesWithNps.length, storesWithReport.length, ALL_STORES.length);
 
-  /* エクセレント！達成スタッフの表彰データ */
-  const excellentStaff = useMemo(() => {
-    if (!reportRawData.length) return [];
+  /* エクセレント！達成スタッフの表彰データ（2部門） */
+  const { reservationExcellentList, utilizationExcellentList } = useMemo(() => {
+    if (!reportRawData.length) return { reservationExcellentList: [], utilizationExcellentList: [] };
 
     // 選択期間のスタッフデータを取得（各スタッフの最新月）
     let filtered: StaffReport[];
@@ -240,26 +240,30 @@ export default function Home() {
       filtered = Array.from(map.values());
     }
 
-    // エクセレント！判定: 次回予約率85%以上 OR 稼働率95%以上
-    return filtered
-      .map((r) => {
-        const utilRate = calculateUtilizationRate(r.totalCustomers, r.employmentType);
-        const reservationExcellent = r.nextReservationRate >= 85;
-        const utilizationExcellent = utilRate !== null && utilRate >= 95;
-        if (!reservationExcellent && !utilizationExcellent) return null;
-        return {
-          name: r.name,
-          store: r.storeNormalized,
-          employmentType: r.employmentType,
-          nextReservationRate: r.nextReservationRate,
-          utilizationRate: utilRate,
-          totalSales: r.totalSales,
-          reservationExcellent,
-          utilizationExcellent,
-        };
-      })
-      .filter((x): x is NonNullable<typeof x> => x !== null)
+    // 各スタッフの稼働率を計算
+    const staffWithRates = filtered.map((r) => {
+      const utilRate = calculateUtilizationRate(r.totalCustomers, r.employmentType);
+      return {
+        name: r.name,
+        store: r.storeNormalized,
+        employmentType: r.employmentType,
+        nextReservationRate: r.nextReservationRate,
+        utilizationRate: utilRate,
+        totalSales: r.totalSales,
+      };
+    });
+
+    // 次回予約部門: 85%以上（予約率の降順）
+    const reservationList = staffWithRates
+      .filter((s) => s.nextReservationRate >= 85)
       .sort((a, b) => b.nextReservationRate - a.nextReservationRate);
+
+    // 稼働率部門: 95%以上（稼働率の降順）
+    const utilizationList = staffWithRates
+      .filter((s) => s.utilizationRate !== null && s.utilizationRate >= 95)
+      .sort((a, b) => (b.utilizationRate ?? 0) - (a.utilizationRate ?? 0));
+
+    return { reservationExcellentList: reservationList, utilizationExcellentList: utilizationList };
   }, [reportRawData, activeFilterMonths]);
 
   /* エリアトグル状態（デフォルト全開） */
@@ -351,9 +355,9 @@ export default function Home() {
       </div>
 
       {/* 月間表彰セクション */}
-      {!loading && excellentStaff.length > 0 && (
+      {!loading && (reservationExcellentList.length > 0 || utilizationExcellentList.length > 0) && (
         <div className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-5">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-md">
               <Trophy className="w-4 h-4 text-white" />
             </div>
@@ -362,70 +366,107 @@ export default function Home() {
                 月間表彰
               </h2>
               <p className="text-[10px] text-muted-foreground">
-                エクセレント！達成スタッフ（{getPeriodLabel(periodSelection)}）— {excellentStaff.length}名
+                エクセレント！達成スタッフ（{getPeriodLabel(periodSelection)}）
               </p>
             </div>
           </div>
 
-          <div className="relative">
-            {/* 装飾的な背景 */}
-            <div className="absolute inset-0 bg-gradient-to-r from-amber-50/50 via-yellow-50/30 to-amber-50/50 rounded-2xl" />
-            <div className="relative border border-amber-200/60 rounded-2xl p-4 md:p-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {excellentStaff.map((staff, i) => (
-                  <motion.div
-                    key={`${staff.name}-${staff.store}`}
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.05 * i }}
-                  >
-                    <Link href={`/staff/${encodeURIComponent(staff.store)}/${encodeURIComponent(staff.name)}`}>
-                      <Card className="border-amber-200/40 bg-white/80 hover:shadow-md hover:border-amber-300/60 transition-all cursor-pointer group h-full">
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-100 to-yellow-100 border border-amber-200/60 flex items-center justify-center shrink-0">
-                                <Star className="w-4 h-4 text-amber-500" />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* 次回予約部門 */}
+            {reservationExcellentList.length > 0 && (
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-amber-50/50 via-yellow-50/30 to-amber-50/50 rounded-2xl" />
+                <div className="relative border border-amber-200/60 rounded-2xl p-4 md:p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <CalendarCheck className="w-4 h-4 text-amber-500" />
+                    <h3 className="font-bold text-sm text-foreground">次回予約部門</h3>
+                    <span className="text-[10px] text-muted-foreground">— {reservationExcellentList.length}名</span>
+                  </div>
+                  <div className="space-y-2">
+                    {reservationExcellentList.map((staff, i) => (
+                      <motion.div
+                        key={`res-${staff.name}-${staff.store}`}
+                        initial={{ opacity: 0, x: -8 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.04 * i }}
+                      >
+                        <Link href={`/staff/${encodeURIComponent(staff.store)}/${encodeURIComponent(staff.name)}`}>
+                          <Card className="border-amber-200/40 bg-white/80 hover:shadow-md hover:border-amber-300/60 transition-all cursor-pointer group">
+                            <CardContent className="p-3 flex items-center gap-3">
+                              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-100 to-yellow-100 border border-amber-200/60 flex items-center justify-center shrink-0">
+                                <span className="text-xs font-bold text-amber-600">{i + 1}</span>
                               </div>
-                              <div>
-                                <div className="font-bold text-sm text-foreground group-hover:text-primary transition-colors leading-tight">
+                              <div className="flex-1 min-w-0">
+                                <div className="font-bold text-sm text-foreground group-hover:text-primary transition-colors leading-tight truncate">
                                   {staff.name}
                                 </div>
                                 <div className="text-[10px] text-muted-foreground">{staff.store}</div>
                               </div>
-                            </div>
-                            <ArrowRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors shrink-0 mt-1" />
-                          </div>
-
-                          {/* 達成バッジ */}
-                          <div className="flex flex-wrap gap-1.5 mt-3">
-                            {staff.reservationExcellent && (
-                              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-2 py-0.5 shadow-sm">
-                                <Trophy className="w-2.5 h-2.5 text-amber-500" />
-                                予約率 {staff.nextReservationRate}%
-                                <Sparkles className="w-2.5 h-2.5 text-amber-400" />
-                              </span>
-                            )}
-                            {staff.utilizationExcellent && (
-                              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-2 py-0.5 shadow-sm">
-                                <Trophy className="w-2.5 h-2.5 text-amber-500" />
-                                稼働率 {staff.utilizationRate}%
-                                <Sparkles className="w-2.5 h-2.5 text-amber-400" />
-                              </span>
-                            )}
-                          </div>
-
-                          {/* 売上 */}
-                          <div className="mt-2 text-[10px] text-muted-foreground">
-                            総売上: <span className="font-mono-data font-bold text-foreground">{formatCurrency(staff.totalSales)}</span>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  </motion.div>
-                ))}
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-2 py-0.5 shadow-sm">
+                                  <Trophy className="w-2.5 h-2.5 text-amber-500" />
+                                  {staff.nextReservationRate}%
+                                  <Sparkles className="w-2.5 h-2.5 text-amber-400" />
+                                </span>
+                              </div>
+                              <ArrowRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors shrink-0" />
+                            </CardContent>
+                          </Card>
+                        </Link>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* 稼働率部門 */}
+            {utilizationExcellentList.length > 0 && (
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/50 via-teal-50/30 to-emerald-50/50 rounded-2xl" />
+                <div className="relative border border-emerald-200/60 rounded-2xl p-4 md:p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Gauge className="w-4 h-4 text-emerald-500" />
+                    <h3 className="font-bold text-sm text-foreground">稼働率部門</h3>
+                    <span className="text-[10px] text-muted-foreground">— {utilizationExcellentList.length}名</span>
+                  </div>
+                  <div className="space-y-2">
+                    {utilizationExcellentList.map((staff, i) => (
+                      <motion.div
+                        key={`util-${staff.name}-${staff.store}`}
+                        initial={{ opacity: 0, x: -8 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.04 * i }}
+                      >
+                        <Link href={`/staff/${encodeURIComponent(staff.store)}/${encodeURIComponent(staff.name)}`}>
+                          <Card className="border-emerald-200/40 bg-white/80 hover:shadow-md hover:border-emerald-300/60 transition-all cursor-pointer group">
+                            <CardContent className="p-3 flex items-center gap-3">
+                              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-100 to-teal-100 border border-emerald-200/60 flex items-center justify-center shrink-0">
+                                <span className="text-xs font-bold text-emerald-600">{i + 1}</span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-bold text-sm text-foreground group-hover:text-primary transition-colors leading-tight truncate">
+                                  {staff.name}
+                                </div>
+                                <div className="text-[10px] text-muted-foreground">{staff.store}・{staff.employmentType}</div>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-600 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-300 rounded-full px-2 py-0.5 shadow-sm">
+                                  <Trophy className="w-2.5 h-2.5 text-emerald-500" />
+                                  {staff.utilizationRate}%
+                                  <Sparkles className="w-2.5 h-2.5 text-emerald-400" />
+                                </span>
+                              </div>
+                              <ArrowRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors shrink-0" />
+                            </CardContent>
+                          </Card>
+                        </Link>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
