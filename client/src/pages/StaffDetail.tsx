@@ -11,7 +11,8 @@ import {
   TrendingUp, FileText, ExternalLink, Loader2, FolderOpen, Eye,
   Lightbulb, CheckCircle2, Target, ArrowUpRight,
   Trophy, ThumbsUp, AlertTriangle, AlertCircle,
-  ChevronDown, ChevronUp, Users, Quote, Star, MessageSquare, Building2, ClipboardCheck
+  ChevronDown, ChevronUp, Users, Quote, Star, MessageSquare, Building2, ClipboardCheck,
+  Sparkles, CalendarCheck, Gauge, CircleCheck
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PeriodSelector, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
@@ -28,6 +29,7 @@ import { useFankuruDataByStaff } from "@/hooks/useFankuruData";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import type { StaffReport } from "@/hooks/useMonthlyReport";
 import { isNewStaff } from "@/lib/newBadge";
+import { calculateUtilizationRate, getUtilizationColor } from "@/lib/utilizationRate";
 import type { FankuruPdf } from "@/hooks/useFankuruData";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -495,6 +497,107 @@ export default function StaffDetail() {
               </span>
             )}
           </div>
+        );
+      })()}
+
+      {/* ===== 0. 次回予約率・稼働率 ===== */}
+      {staffReport && (() => {
+        const utilRate = calculateUtilizationRate(staffReport.totalCustomers, staffReport.employmentType);
+        return (
+          <section className="mb-6 pt-6 border-t-2 border-primary/20">
+            <div className="grid grid-cols-2 gap-3">
+              {/* 次回予約率 */}
+              <div className={`rounded-xl px-5 py-4 border ${
+                staffReport.nextReservationRate >= 85
+                  ? "bg-gradient-to-r from-amber-50/60 to-yellow-50/40 border-amber-200/60"
+                  : staffReport.nextReservationRate >= 70
+                    ? "bg-amber-50/30 border-amber-200/40"
+                    : "bg-red-50/40 border-red-200/50"
+              }`}>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <CalendarCheck className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground">次回予約率</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className={`font-mono-data text-3xl font-bold ${
+                    staffReport.nextReservationRate >= 85 ? "text-[#2D9C8F]" :
+                    staffReport.nextReservationRate >= 70 ? "text-[#E5B85C]" :
+                    "text-[#C75C5C]"
+                  }`}>
+                    {staffReport.nextReservationRate}%
+                  </span>
+                  <div>
+                    {staffReport.nextReservationRate >= 85 && (
+                      <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-2.5 py-1 shadow-sm">
+                        <Trophy className="w-3.5 h-3.5 text-amber-500" />
+                        エクセレント！
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      </span>
+                    )}
+                    {staffReport.nextReservationRate >= 70 && staffReport.nextReservationRate <= 84 && (
+                      <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-[#E5B85C] bg-amber-50/60 border border-amber-200/60 rounded-full px-2.5 py-1">
+                        <CircleCheck className="w-3.5 h-3.5 text-[#E5B85C]" />
+                        適正
+                      </span>
+                    )}
+                    {staffReport.nextReservationRate <= 69 && (
+                      <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        要改善
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              {/* 稼働率 */}
+              <div className={`rounded-xl px-5 py-4 border ${
+                utilRate === null
+                  ? "bg-muted/20 border-border/40"
+                  : utilRate >= 95
+                    ? "bg-gradient-to-r from-emerald-50/60 to-teal-50/40 border-emerald-200/60"
+                    : utilRate >= 90
+                      ? "bg-amber-50/30 border-amber-200/40"
+                      : "bg-red-50/40 border-red-200/50"
+              }`}>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Gauge className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground">稼働率</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  {utilRate !== null ? (
+                    <>
+                      <span className={`font-mono-data text-3xl font-bold ${getUtilizationColor(utilRate)}`}>
+                        {utilRate}%
+                      </span>
+                      <div>
+                        {utilRate >= 95 && (
+                          <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-2.5 py-1 shadow-sm">
+                            <Trophy className="w-3.5 h-3.5 text-amber-500" />
+                            エクセレント！
+                            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                          </span>
+                        )}
+                        {utilRate >= 90 && utilRate < 95 && (
+                          <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-[#E5B85C] bg-amber-50/60 border border-amber-200/60 rounded-full px-2.5 py-1">
+                            <CircleCheck className="w-3.5 h-3.5 text-[#E5B85C]" />
+                            適正
+                          </span>
+                        )}
+                        {utilRate <= 89 && (
+                          <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1">
+                            <AlertTriangle className="w-3.5 h-3.5" />
+                            要改善
+                          </span>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">— (パート)</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
         );
       })()}
 
