@@ -356,64 +356,40 @@ export default function Home() {
 
       {/* 月間表彰セクション */}
       {!loading && (reservationExcellentList.length > 0 || utilizationExcellentList.length > 0) && (
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-5">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-md">
-              <Trophy className="w-4 h-4 text-white" />
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-sm">
+              <Trophy className="w-3 h-3 text-white" />
             </div>
-            <div>
-              <h2 className="text-xl font-bold text-foreground">
-                月間表彰
-              </h2>
-              <p className="text-[10px] text-muted-foreground">
-                エクセレント！達成スタッフ（{getPeriodLabel(periodSelection)}）
-              </p>
-            </div>
+            <h2 className="text-base font-bold text-foreground">月間表彰</h2>
+            <span className="text-[10px] text-muted-foreground">エクセレント！達成（{getPeriodLabel(periodSelection)}）</span>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {/* 次回予約部門 */}
             {reservationExcellentList.length > 0 && (
               <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-br from-amber-50/50 via-yellow-50/30 to-amber-50/50 rounded-2xl" />
-                <div className="relative border border-amber-200/60 rounded-2xl p-4 md:p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <CalendarCheck className="w-4 h-4 text-amber-500" />
-                    <h3 className="font-bold text-sm text-foreground">次回予約部門</h3>
-                    <span className="text-[10px] text-muted-foreground">— {reservationExcellentList.length}名</span>
+                <div className="absolute inset-0 bg-gradient-to-br from-amber-50/40 via-yellow-50/20 to-amber-50/40 rounded-xl" />
+                <div className="relative border border-amber-200/50 rounded-xl p-3">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <CalendarCheck className="w-3.5 h-3.5 text-amber-500" />
+                    <span className="font-bold text-xs text-foreground">次回予約部門</span>
+                    <span className="text-[9px] text-muted-foreground ml-0.5">{reservationExcellentList.length}名</span>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-0.5">
                     {reservationExcellentList.map((staff, i) => (
-                      <motion.div
-                        key={`res-${staff.name}-${staff.store}`}
-                        initial={{ opacity: 0, x: -8 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.04 * i }}
-                      >
-                        <Link href={`/staff/${encodeURIComponent(staff.store)}/${encodeURIComponent(staff.name)}`}>
-                          <Card className="border-amber-200/40 bg-white/80 hover:shadow-md hover:border-amber-300/60 transition-all cursor-pointer group">
-                            <CardContent className="p-3 flex items-center gap-3">
-                              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-100 to-yellow-100 border border-amber-200/60 flex items-center justify-center shrink-0">
-                                <span className="text-xs font-bold text-amber-600">{i + 1}</span>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="font-bold text-sm text-foreground group-hover:text-primary transition-colors leading-tight truncate">
-                                  {staff.name}
-                                </div>
-                                <div className="text-[10px] text-muted-foreground">{staff.store}</div>
-                              </div>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-2 py-0.5 shadow-sm">
-                                  <Trophy className="w-2.5 h-2.5 text-amber-500" />
-                                  {staff.nextReservationRate}%
-                                  <Sparkles className="w-2.5 h-2.5 text-amber-400" />
-                                </span>
-                              </div>
-                              <ArrowRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors shrink-0" />
-                            </CardContent>
-                          </Card>
-                        </Link>
-                      </motion.div>
+                      <Link key={`res-${staff.name}-${staff.store}`} href={`/staff/${encodeURIComponent(staff.store)}/${encodeURIComponent(staff.name)}`}>
+                        <div className="flex items-center gap-2 py-1 px-1.5 rounded-md hover:bg-amber-100/40 transition-colors cursor-pointer group">
+                          <span className="w-4 text-[10px] font-bold text-amber-500 text-center shrink-0">{i + 1}</span>
+                          <span className="text-xs font-medium text-foreground group-hover:text-primary transition-colors truncate flex-1">{staff.name}</span>
+                          <span className="text-[9px] text-muted-foreground shrink-0 hidden sm:inline">{staff.store}</span>
+                          <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300/80 rounded-full px-1.5 py-px shadow-sm shrink-0">
+                            <Trophy className="w-2 h-2 text-amber-500" />
+                            {staff.nextReservationRate}%
+                            <Sparkles className="w-2 h-2 text-amber-400" />
+                          </span>
+                        </div>
+                      </Link>
                     ))}
                   </div>
                 </div>
@@ -423,45 +399,27 @@ export default function Home() {
             {/* 稼働率部門 */}
             {utilizationExcellentList.length > 0 && (
               <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/50 via-teal-50/30 to-emerald-50/50 rounded-2xl" />
-                <div className="relative border border-emerald-200/60 rounded-2xl p-4 md:p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Gauge className="w-4 h-4 text-emerald-500" />
-                    <h3 className="font-bold text-sm text-foreground">稼働率部門</h3>
-                    <span className="text-[10px] text-muted-foreground">— {utilizationExcellentList.length}名</span>
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/40 via-teal-50/20 to-emerald-50/40 rounded-xl" />
+                <div className="relative border border-emerald-200/50 rounded-xl p-3">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Gauge className="w-3.5 h-3.5 text-emerald-500" />
+                    <span className="font-bold text-xs text-foreground">稼働率部門</span>
+                    <span className="text-[9px] text-muted-foreground ml-0.5">{utilizationExcellentList.length}名</span>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-0.5">
                     {utilizationExcellentList.map((staff, i) => (
-                      <motion.div
-                        key={`util-${staff.name}-${staff.store}`}
-                        initial={{ opacity: 0, x: -8 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.04 * i }}
-                      >
-                        <Link href={`/staff/${encodeURIComponent(staff.store)}/${encodeURIComponent(staff.name)}`}>
-                          <Card className="border-emerald-200/40 bg-white/80 hover:shadow-md hover:border-emerald-300/60 transition-all cursor-pointer group">
-                            <CardContent className="p-3 flex items-center gap-3">
-                              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-100 to-teal-100 border border-emerald-200/60 flex items-center justify-center shrink-0">
-                                <span className="text-xs font-bold text-emerald-600">{i + 1}</span>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="font-bold text-sm text-foreground group-hover:text-primary transition-colors leading-tight truncate">
-                                  {staff.name}
-                                </div>
-                                <div className="text-[10px] text-muted-foreground">{staff.store}・{staff.employmentType}</div>
-                              </div>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-600 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-300 rounded-full px-2 py-0.5 shadow-sm">
-                                  <Trophy className="w-2.5 h-2.5 text-emerald-500" />
-                                  {staff.utilizationRate}%
-                                  <Sparkles className="w-2.5 h-2.5 text-emerald-400" />
-                                </span>
-                              </div>
-                              <ArrowRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors shrink-0" />
-                            </CardContent>
-                          </Card>
-                        </Link>
-                      </motion.div>
+                      <Link key={`util-${staff.name}-${staff.store}`} href={`/staff/${encodeURIComponent(staff.store)}/${encodeURIComponent(staff.name)}`}>
+                        <div className="flex items-center gap-2 py-1 px-1.5 rounded-md hover:bg-emerald-100/40 transition-colors cursor-pointer group">
+                          <span className="w-4 text-[10px] font-bold text-emerald-500 text-center shrink-0">{i + 1}</span>
+                          <span className="text-xs font-medium text-foreground group-hover:text-primary transition-colors truncate flex-1">{staff.name}</span>
+                          <span className="text-[9px] text-muted-foreground shrink-0 hidden sm:inline">{staff.store}</span>
+                          <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-600 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-300/80 rounded-full px-1.5 py-px shadow-sm shrink-0">
+                            <Trophy className="w-2 h-2 text-emerald-500" />
+                            {staff.utilizationRate}%
+                            <Sparkles className="w-2 h-2 text-emerald-400" />
+                          </span>
+                        </div>
+                      </Link>
                     ))}
                   </div>
                 </div>
