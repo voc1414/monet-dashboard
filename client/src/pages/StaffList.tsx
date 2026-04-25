@@ -307,7 +307,7 @@ export default function StaffList() {
             <span className="text-[10px] text-muted-foreground">エクセレント！達成（{getPeriodLabel(periodSelection)}）</span>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             {/* 次回予約部門 */}
             {reservationExcellentList.length > 0 && (
               <div className="relative">
@@ -318,7 +318,7 @@ export default function StaffList() {
                     <span className="font-bold text-xs text-foreground">次回予約部門</span>
                     <span className="text-[9px] text-muted-foreground ml-0.5">{reservationExcellentList.length}名</span>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-3 gap-y-0.5">
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
                     {reservationExcellentList.map((staff, i) => (
                       <Link key={`res-${staff.name}-${staff.store}`} href={`/staff/${encodeURIComponent(staff.store)}/${encodeURIComponent(staff.name)}`}>
                         <div className="flex items-center gap-1.5 py-1 px-1.5 rounded-md hover:bg-amber-100/40 transition-colors cursor-pointer group">
@@ -347,7 +347,7 @@ export default function StaffList() {
                     <span className="font-bold text-xs text-foreground">稼働率部門</span>
                     <span className="text-[9px] text-muted-foreground ml-0.5">{utilizationExcellentList.length}名</span>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-3 gap-y-0.5">
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
                     {utilizationExcellentList.map((staff, i) => (
                       <Link key={`util-${staff.name}-${staff.store}`} href={`/staff/${encodeURIComponent(staff.store)}/${encodeURIComponent(staff.name)}`}>
                         <div className="flex items-center gap-1.5 py-1 px-1.5 rounded-md hover:bg-emerald-100/40 transition-colors cursor-pointer group">
