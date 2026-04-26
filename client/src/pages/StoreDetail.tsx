@@ -12,7 +12,7 @@ import {
   Trophy, ThumbsUp, Target, AlertTriangle, AlertCircle,
   Lightbulb, CheckCircle2, ArrowUpRight,
   FileText, ExternalLink, Loader2, FolderOpen, Eye,
-  CircleCheck, Sparkles
+  CircleCheck, Sparkles, CalendarCheck, Gauge
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PeriodSelector, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
@@ -29,7 +29,8 @@ import {
   PieChart, Pie, Cell, Legend, LineChart, Line
 } from "recharts";
 import { useFankuruData } from "@/hooks/useFankuruData";
-import { isNewStore, isNewStaff } from "@/lib/newBadge";
+import { isNewStore, isNewStaff, isRetiredStaff } from "@/lib/newBadge";
+import { calculateUtilizationRate } from "@/lib/utilizationRate";
 import type { FankuruPdf } from "@/hooks/useFankuruData";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { useSalonBoardData } from "@/hooks/useSalonBoardData";
@@ -215,7 +216,7 @@ export default function StoreDetail() {
   const params = useParams<{ storeId: string }>();
   const storeId = decodeURIComponent(params.storeId || "");
   const { records, loading: npsLoading, error: npsError, lastUpdated, refresh } = useNpsData();
-  const { loading: reportLoading, error: reportError, getStoreMonthlyStats, availableMonths: reportMonths, getStaffTrend } = useMonthlyReport();
+  const { rawData, loading: reportLoading, error: reportError, getStoreMonthlyStats, availableMonths: reportMonths, getStaffTrend } = useMonthlyReport();
   const { loading: sbLoading, error: sbError, getStoreMonth, getStoreMonthsAggregated, hasData: hasSbData } = useSalonBoardData();
   const loading = npsLoading || reportLoading || sbLoading;
   const error = npsError || reportError || sbError;
@@ -446,6 +447,128 @@ export default function StoreDetail() {
           )}
         </section>
       )}
+
+      {/* 店舗内月間表彰セクション */}
+      {(() => {
+        // この店舗のスタッフのみフィルタ
+        const storeRawData = rawData.filter(r => r.storeNormalized === storeId);
+        if (storeRawData.length === 0 || loading) return null;
+
+        let filtered: typeof storeRawData;
+        if (activeFilterMonths === "all") {
+          const map = new Map<string, typeof storeRawData[0]>();
+          for (const r of storeRawData) {
+            const existing = map.get(r.name);
+            if (!existing || r.reportMonth > existing.reportMonth) {
+              map.set(r.name, r);
+            }
+          }
+          filtered = Array.from(map.values());
+        } else if (activeFilterMonths.length === 1) {
+          filtered = storeRawData.filter(r => r.reportMonth === activeFilterMonths[0]);
+        } else {
+          const monthSet = new Set(activeFilterMonths);
+          const inRange = storeRawData.filter(r => monthSet.has(r.reportMonth));
+          const map = new Map<string, typeof storeRawData[0]>();
+          for (const r of inRange) {
+            const existing = map.get(r.name);
+            if (!existing || r.reportMonth > existing.reportMonth) {
+              map.set(r.name, r);
+            }
+          }
+          filtered = Array.from(map.values());
+        }
+
+        const staffWithRates = filtered
+          .filter(r => !isRetiredStaff(r.name, r.storeNormalized, r.reportMonth))
+          .map(r => ({
+            name: r.name,
+            store: r.storeNormalized,
+            employmentType: r.employmentType,
+            nextReservationRate: r.nextReservationRate,
+            utilizationRate: calculateUtilizationRate(r.totalCustomers, r.employmentType),
+          }));
+
+        const resExcellent = staffWithRates
+          .filter(s => s.nextReservationRate >= 85)
+          .sort((a, b) => b.nextReservationRate - a.nextReservationRate);
+
+        const utilExcellent = staffWithRates
+          .filter(s => s.utilizationRate !== null && s.utilizationRate >= 95)
+          .sort((a, b) => (b.utilizationRate ?? 0) - (a.utilizationRate ?? 0));
+
+        if (resExcellent.length === 0 && utilExcellent.length === 0) return null;
+
+        return (
+          <section className="mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-sm">
+                <Trophy className="w-3 h-3 text-white" />
+              </div>
+              <h2 className="text-base font-bold text-foreground">月間表彰</h2>
+              <span className="text-[10px] text-muted-foreground">エクセレント！達成（{getPeriodLabel(periodSelection)}）</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {resExcellent.length > 0 && (
+                <div className="relative">
+                  <div className="absolute inset-0 bg-gradient-to-br from-amber-50/40 via-yellow-50/20 to-amber-50/40 rounded-xl" />
+                  <div className="relative border border-amber-200/50 rounded-xl p-3">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <CalendarCheck className="w-3.5 h-3.5 text-amber-500" />
+                      <span className="font-bold text-xs text-foreground">次回予約部門</span>
+                      <span className="text-[9px] text-muted-foreground ml-0.5">{resExcellent.length}名</span>
+                    </div>
+                    <div className="space-y-0.5">
+                      {resExcellent.map((staff, i) => (
+                        <Link key={`res-${staff.name}`} href={`/staff/${encodeURIComponent(staff.store)}/${encodeURIComponent(staff.name)}`}>
+                          <div className="flex items-center gap-1.5 py-1 px-1.5 rounded-md hover:bg-amber-100/40 transition-colors cursor-pointer group">
+                            <span className="w-4 text-[10px] font-bold text-amber-500 text-center shrink-0">{i + 1}</span>
+                            <span className="text-xs font-medium text-foreground group-hover:text-primary transition-colors truncate flex-1">{staff.name}</span>
+                            <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300/80 rounded-full px-1.5 py-px shadow-sm shrink-0">
+                              <Trophy className="w-2 h-2 text-amber-500" />
+                              {staff.nextReservationRate}%
+                              <Sparkles className="w-2 h-2 text-amber-400" />
+                            </span>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {utilExcellent.length > 0 && (
+                <div className="relative">
+                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/40 via-teal-50/20 to-emerald-50/40 rounded-xl" />
+                  <div className="relative border border-emerald-200/50 rounded-xl p-3">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <Gauge className="w-3.5 h-3.5 text-emerald-500" />
+                      <span className="font-bold text-xs text-foreground">稼働率部門</span>
+                      <span className="text-[9px] text-muted-foreground ml-0.5">{utilExcellent.length}名</span>
+                    </div>
+                    <div className="space-y-0.5">
+                      {utilExcellent.map((staff, i) => (
+                        <Link key={`util-${staff.name}`} href={`/staff/${encodeURIComponent(staff.store)}/${encodeURIComponent(staff.name)}`}>
+                          <div className="flex items-center gap-1.5 py-1 px-1.5 rounded-md hover:bg-emerald-100/40 transition-colors cursor-pointer group">
+                            <span className="w-4 text-[10px] font-bold text-emerald-500 text-center shrink-0">{i + 1}</span>
+                            <span className="text-xs font-medium text-foreground group-hover:text-primary transition-colors truncate flex-1">{staff.name}</span>
+                            <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-600 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-300/80 rounded-full px-1.5 py-px shadow-sm shrink-0">
+                              <Trophy className="w-2 h-2 text-emerald-500" />
+                              {staff.utilizationRate}%
+                              <Sparkles className="w-2 h-2 text-emerald-400" />
+                            </span>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        );
+      })()}
 
       {/* スタッフ個人実績 */}
       <section className="mb-8 pt-6 border-t-2 border-primary/20">
