@@ -547,6 +547,10 @@ export default function StaffList() {
                           <div className="col-span-2 text-right">
                             {utilRate !== null ? (
                               <div className="flex flex-col items-end">
+                                <div className="flex items-center justify-end gap-1 mb-0.5">
+                                  <Gauge className="w-3 h-3 text-muted-foreground" />
+                                  <span className="text-[10px] font-medium text-muted-foreground">稼働率</span>
+                                </div>
                                 <span className={`font-mono-data text-base font-bold flex items-center justify-end gap-1 ${getUtilizationColor(utilRate)}`}>
                                   {utilRate <= 89 && (
                                     <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5" title="要改善">
@@ -576,6 +580,10 @@ export default function StaffList() {
                           </div>
                           {/* 次回予約率 */}
                           <div className="col-span-3 text-right">
+                            <div className="flex items-center justify-end gap-1 mb-0.5">
+                              <CalendarCheck className="w-3 h-3 text-muted-foreground" />
+                              <span className="text-[10px] font-medium text-muted-foreground">次回予約率</span>
+                            </div>
                             <span className={`font-mono-data text-base font-bold flex items-center justify-end gap-1 ${
                               staff.nextReservationRate >= 85 ? "text-[#2D9C8F]" :
                               staff.nextReservationRate >= 70 ? "text-[#E5B85C]" :
