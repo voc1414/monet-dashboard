@@ -616,20 +616,21 @@ export default function StaffList() {
 
                       {/* Mobile Layout */}
                       <div className="md:hidden p-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-start gap-2">
                           {staff.photoUrl2 ? (
-                            <img src={staff.photoUrl2} alt={staff.name} className="w-8 h-8 rounded-full object-cover object-center shrink-0" />
+                            <img src={staff.photoUrl2} alt={staff.name} className="w-8 h-8 rounded-full object-cover object-center shrink-0 mt-0.5" />
                           ) : (
-                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
                               <span className="text-primary font-bold text-xs">{staff.name.charAt(0)}</span>
                             </div>
                           )}
                           <div className="flex-1 min-w-0">
+                            {/* 1行目: 名前 + 売上 */}
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-1">
-                                <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">{staff.name}</span>
+                              <div className="flex items-center gap-1 min-w-0">
+                                <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors truncate">{staff.name}</span>
                                 {isNewStaff(staff.name, staff.storeNormalized) && (
-                                  <span className="text-[9px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none">NEW</span>
+                                  <span className="text-[9px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none shrink-0">NEW</span>
                                 )}
                               </div>
                               <div className="flex items-center gap-1 shrink-0 ml-2">
@@ -637,59 +638,62 @@ export default function StaffList() {
                                 <ChevronRight className="w-4 h-4 text-muted-foreground" />
                               </div>
                             </div>
-                            <div className="flex items-center justify-between mt-1">
-                              <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                                <Building2 className="w-3 h-3" />
-                                {staff.storeNormalized}
+                            {/* 2行目: 店舗名 + 雇用形態 */}
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-[11px] text-muted-foreground flex items-center gap-1 truncate">
+                                <Building2 className="w-3 h-3 shrink-0" />
+                                <span className="truncate">{staff.storeNormalized}</span>
                               </span>
-                              <div className="flex items-center gap-2 shrink-0">
-                                {/* 稼働率（モバイル） */}
-                                {utilRate !== null && (
-                                  <span className={`text-[11px] font-mono-data font-bold flex items-center gap-1 ${getUtilizationColor(utilRate)}`}>
-                                    {utilRate <= 89 ? (
-                                      <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1 py-0.5">
-                                        <AlertTriangle className="w-2.5 h-2.5" />
-                                        要改善
-                                      </span>
-                                    ) : utilRate >= 95 ? (
-                                      <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-1.5 py-0.5 shadow-sm">
-                                        <Trophy className="w-2.5 h-2.5 text-amber-500" />
-                                        <Sparkles className="w-2.5 h-2.5 text-amber-400" />
-                                      </span>
-                                    ) : utilRate >= 90 ? (
-                                      <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-[#E5B85C] bg-amber-50/60 border border-amber-200/60 rounded-full px-1.5 py-0.5">
-                                        <CircleCheck className="w-2.5 h-2.5 text-[#E5B85C]" />
-                                      </span>
-                                    ) : (
-                                      <Activity className="w-3 h-3 inline mr-0.5" />
-                                    )}
-                                    稼働率 {utilRate}%
-                                  </span>
-                                )}
-                                {/* 次回予約率（モバイル） */}
-                                <span className={`text-[11px] font-mono-data font-bold flex items-center gap-1 ${
-                                  staff.nextReservationRate >= 85 ? "text-[#2D9C8F]" :
-                                  staff.nextReservationRate >= 70 ? "text-[#E5B85C]" :
-                                  "text-[#C75C5C]"
-                                }`}>
-                                  {staff.nextReservationRate <= 69 ? (
+                              <span className="text-[10px] text-muted-foreground/70 shrink-0">{staff.employmentType}</span>
+                            </div>
+                            {/* 3行目: 稼働率 + 次回予約率 */}
+                            <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                              {/* 稼働率（モバイル） */}
+                              {utilRate !== null && (
+                                <span className={`text-[11px] font-mono-data font-bold flex items-center gap-1 ${getUtilizationColor(utilRate)}`}>
+                                  {utilRate <= 89 ? (
                                     <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1 py-0.5">
                                       <AlertTriangle className="w-2.5 h-2.5" />
                                       要改善
                                     </span>
-                                  ) : staff.nextReservationRate >= 85 ? (
+                                  ) : utilRate >= 95 ? (
                                     <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-1.5 py-0.5 shadow-sm">
                                       <Trophy className="w-2.5 h-2.5 text-amber-500" />
                                       <Sparkles className="w-2.5 h-2.5 text-amber-400" />
                                     </span>
-                                  ) : staff.nextReservationRate >= 70 ? (
+                                  ) : utilRate >= 90 ? (
                                     <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-[#E5B85C] bg-amber-50/60 border border-amber-200/60 rounded-full px-1.5 py-0.5">
                                       <CircleCheck className="w-2.5 h-2.5 text-[#E5B85C]" />
                                     </span>
-                                  ) : null}
-                                  予約率 {staff.nextReservationRate}%
+                                  ) : (
+                                    <Activity className="w-3 h-3 inline mr-0.5" />
+                                  )}
+                                  稼働率 {utilRate}%
                                 </span>
-                              </div>
+                              )}
+                              {/* 次回予約率（モバイル） */}
+                              <span className={`text-[11px] font-mono-data font-bold flex items-center gap-1 ${
+                                staff.nextReservationRate >= 85 ? "text-[#2D9C8F]" :
+                                staff.nextReservationRate >= 70 ? "text-[#E5B85C]" :
+                                "text-[#C75C5C]"
+                              }`}>
+                                {staff.nextReservationRate <= 69 ? (
+                                  <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1 py-0.5">
+                                    <AlertTriangle className="w-2.5 h-2.5" />
+                                    要改善
+                                  </span>
+                                ) : staff.nextReservationRate >= 85 ? (
+                                  <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-1.5 py-0.5 shadow-sm">
+                                    <Trophy className="w-2.5 h-2.5 text-amber-500" />
+                                    <Sparkles className="w-2.5 h-2.5 text-amber-400" />
+                                  </span>
+                                ) : staff.nextReservationRate >= 70 ? (
+                                  <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-[#E5B85C] bg-amber-50/60 border border-amber-200/60 rounded-full px-1.5 py-0.5">
+                                    <CircleCheck className="w-2.5 h-2.5 text-[#E5B85C]" />
+                                  </span>
+                                ) : null}
+                                予約率 {staff.nextReservationRate}%
+                              </span>
                             </div>
                           </div>
                         </div>
