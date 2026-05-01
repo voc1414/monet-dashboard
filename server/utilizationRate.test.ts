@@ -61,6 +61,43 @@ describe("utilizationRate", () => {
     it("「パート」のみの場合はnullを返す（週数不明）", () => {
       expect(getMaxCustomers("パート")).toBeNull();
     });
+
+    // スプレッドシートの実際の表記揺れパターン
+    it("時短社員 (7時間) — 名称と括弧の間にスペースあり", () => {
+      expect(getMaxCustomers("時短社員 (7時間)")).toBe(60);
+    });
+
+    it("時短社員(7時間) — スペースなし半角括弧", () => {
+      expect(getMaxCustomers("時短社員(7時間)")).toBe(60);
+    });
+
+    it("時短社員(6時間) — スペースなし半角括弧", () => {
+      expect(getMaxCustomers("時短社員(6時間)")).toBe(44);
+    });
+
+    it("日短社員(週休2日+公休2日) — 半角括弧・半角プラス", () => {
+      expect(getMaxCustomers("日短社員(週休2日+公休2日)")).toBe(60);
+    });
+
+    it("日短社員 (週休2日+公休2日) — スペースあり半角括弧", () => {
+      expect(getMaxCustomers("日短社員 (週休2日+公休2日)")).toBe(60);
+    });
+
+    it("日短社員(週休3日) — 半角括弧", () => {
+      expect(getMaxCustomers("日短社員(週休3日)")).toBe(54);
+    });
+
+    it("日短社員 (週休3日) — スペースあり半角括弧", () => {
+      expect(getMaxCustomers("日短社員 (週休3日)")).toBe(54);
+    });
+
+    it("日短社員(週休2日+2日) — 公休省略・半角括弧", () => {
+      expect(getMaxCustomers("日短社員(週休2日+2日)")).toBe(60);
+    });
+
+    it("パート　週2前後 — 全角スペース", () => {
+      expect(getMaxCustomers("パート　週2前後")).toBe(16);
+    });
   });
 
   describe("calculateUtilizationRate", () => {

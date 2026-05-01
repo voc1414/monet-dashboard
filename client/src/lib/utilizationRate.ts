@@ -4,7 +4,7 @@
  * 稼働率 = (実客数 / 最大客数) × 100
  * 雇用形態が不明な場合は null を返す
  */
-/** 雇用形態ごとの月間最大客数 */
+/** 雇用形態ごとの月間最大客数（正規化済みキー） */
 export const EMPLOYMENT_MAX_CUSTOMERS: Record<string, number> = {
   "フルタイム社員": 66,
   "時短社員（6時間）": 44,
@@ -15,35 +15,53 @@ export const EMPLOYMENT_MAX_CUSTOMERS: Record<string, number> = {
   "パート 週2前後": 16,
   "パート 週3前後": 24,
 };
+
 /**
- * スプレッドシートの省略表記に対応するエイリアスマッピング
- * 正規化後の文字列 → 正式名称
+ * スプレッドシートの省略表記・表記揺れに対応するエイリアスマッピング
+ * 正規化後の文字列 → 正式名称（EMPLOYMENT_MAX_CUSTOMERSのキー）
  */
 const EMPLOYMENT_ALIASES: Record<string, string> = {
+  // 「公休」省略パターン
   "日短社員（週休2日＋2日）": "日短社員（週休2日＋公休2日）",
-  "日短社員 （週休2日＋2日）": "日短社員（週休2日＋公休2日）",
+  // パートのみ（週数なし）→ 判定不可のためマッチさせない
 };
+
 /**
- * 雇用形態文字列を正規化して最大客数を取得する
- * スプレッドシートの表記揺れ（全角/半角スペース、括弧の違い等）に対応
+ * 雇用形態文字列を正規化する
+ * スプレッドシートの表記揺れ（全角/半角括弧・スペース・プラス記号等）に対応
+ *
+ * 正規化ルール:
+ * 1. 前後の空白を除去
+ * 2. 全角スペース→半角スペース
+ * 3. 連続スペースを1つに
+ * 4. 半角括弧→全角括弧
+ * 5. 半角プラス→全角プラス
+ * 6. 名称と括弧の間のスペースを除去（例: "時短社員 （7時間）" → "時短社員（7時間）"）
  */
 function normalizeEmploymentType(raw: string): string {
   return raw
     .trim()
-    .replace(/\s+/g, " ")           // 連続スペースを1つに
     .replace(/　/g, " ")             // 全角スペース→半角
+    .replace(/\s+/g, " ")           // 連続スペースを1つに
     .replace(/\(/g, "（")            // 半角括弧→全角
     .replace(/\)/g, "）")
-    .replace(/\+/g, "＋");           // 半角プラス→全角
+    .replace(/\+/g, "＋")            // 半角プラス→全角
+    .replace(/ （/g, "（")           // 名称と括弧の間のスペースを除去
+    .replace(/ ＋/g, "＋")           // プラス前のスペースを除去
+    .replace(/＋ /g, "＋");          // プラス後のスペースを除去
 }
+
 /**
  * 雇用形態から最大客数を取得する
  * @returns 最大客数。不明な雇用形態の場合は null
  */
 export function getMaxCustomers(employmentType: string): number | null {
+  if (!employmentType) return null;
+
   // まず直接マッチ
   const direct = EMPLOYMENT_MAX_CUSTOMERS[employmentType];
   if (direct !== undefined) return direct;
+
   // 正規化してマッチ
   const normalized = normalizeEmploymentType(employmentType);
   for (const [key, value] of Object.entries(EMPLOYMENT_MAX_CUSTOMERS)) {
@@ -51,6 +69,7 @@ export function getMaxCustomers(employmentType: string): number | null {
       return value;
     }
   }
+
   // エイリアスマッチ（省略表記対応）
   const aliasKey = EMPLOYMENT_ALIASES[normalized];
   if (aliasKey) {
@@ -61,9 +80,12 @@ export function getMaxCustomers(employmentType: string): number | null {
       }
     }
   }
-  // 部分マッチは行わない。「パート」のみの場合は週数が不明のためnullを返す
+
+  // 部分マッチ: 「パート」のみの場合は週数が不明のためnullを返す
+  // ただし「パート 週N前後」パターンは上でマッチ済み
   return null;
 }
+
 /**
  * 稼働率を計算する
  * @param totalCustomers 実客数（新規 + リピーター）
@@ -78,6 +100,7 @@ export function calculateUtilizationRate(
   if (maxCustomers === null || maxCustomers === 0) return null;
   return Math.round((totalCustomers / maxCustomers) * 1000) / 10; // 小数点1桁
 }
+
 /**
  * 稼働率に応じた色クラスを返す
  * - 95%以上: 緑（エクセレント！）
@@ -89,6 +112,7 @@ export function getUtilizationColor(rate: number): string {
   if (rate >= 90) return "text-[#E5B85C]";
   return "text-[#C75C5C]";
 }
+
 /**
  * 稼働率に応じたラベルを返す
  * - 95%以上: エクセレント！
