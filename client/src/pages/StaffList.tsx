@@ -660,84 +660,93 @@ export default function StaffList() {
                               </span>
                               <span className="text-[10px] text-muted-foreground/70 shrink-0">{staff.employmentType}</span>
                             </div>
-                            {/* 3行目: 稼働率 + 次回予約率（均等配置） */}
-                            <div className="grid grid-cols-2 gap-2 mt-1.5">
-                              {/* 稼働率（モバイル） */}
-                              <div className="flex items-center gap-1">
-                                {utilRate !== null ? (
-                                  <span className={`text-[11px] font-mono-data font-bold flex items-center gap-1 ${getUtilizationColor(utilRate)}`}>
-                                    {utilRate <= 89 ? (
+                            {/* 3行目: 稼働率・予約率（左）+ 総合点（右大きめ） */}
+                            <div className="flex items-center justify-between mt-2">
+                              {/* 左側: 稼働率・次回予約率 */}
+                              <div className="flex flex-col gap-1">
+                                {/* 稼働率 */}
+                                <div className="flex items-center gap-1">
+                                  {utilRate !== null ? (
+                                    <span className={`text-[11px] font-mono-data font-bold flex items-center gap-1 ${getUtilizationColor(utilRate)}`}>
+                                      {utilRate <= 89 ? (
+                                        <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1 py-0.5">
+                                          <AlertTriangle className="w-2.5 h-2.5" />
+                                          要改善
+                                        </span>
+                                      ) : utilRate >= 95 ? (
+                                        <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-1.5 py-0.5 shadow-sm">
+                                          <Trophy className="w-2.5 h-2.5 text-amber-500" />
+                                          <Sparkles className="w-2.5 h-2.5 text-amber-400" />
+                                        </span>
+                                      ) : utilRate >= 90 ? (
+                                        <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-[#E5B85C] bg-amber-50/60 border border-amber-200/60 rounded-full px-1.5 py-0.5">
+                                          <CircleCheck className="w-2.5 h-2.5 text-[#E5B85C]" />
+                                        </span>
+                                      ) : (
+                                        <Activity className="w-3 h-3 inline mr-0.5" />
+                                      )}
+                                      稼働率 {utilRate}%
+                                    </span>
+                                  ) : (
+                                    <span className="text-[11px] text-muted-foreground">稼働率 —</span>
+                                  )}
+                                </div>
+                                {/* 次回予約率 */}
+                                <div className="flex items-center gap-1">
+                                  <span className={`text-[11px] font-mono-data font-bold flex items-center gap-1 ${
+                                    staff.nextReservationRate >= 85 ? "text-[#2D9C8F]" :
+                                    staff.nextReservationRate >= 70 ? "text-[#E5B85C]" :
+                                    "text-[#C75C5C]"
+                                  }`}>
+                                    {staff.nextReservationRate <= 69 ? (
                                       <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1 py-0.5">
                                         <AlertTriangle className="w-2.5 h-2.5" />
                                         要改善
                                       </span>
-                                    ) : utilRate >= 95 ? (
+                                    ) : staff.nextReservationRate >= 85 ? (
                                       <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-1.5 py-0.5 shadow-sm">
                                         <Trophy className="w-2.5 h-2.5 text-amber-500" />
                                         <Sparkles className="w-2.5 h-2.5 text-amber-400" />
                                       </span>
-                                    ) : utilRate >= 90 ? (
+                                    ) : staff.nextReservationRate >= 70 ? (
                                       <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-[#E5B85C] bg-amber-50/60 border border-amber-200/60 rounded-full px-1.5 py-0.5">
                                         <CircleCheck className="w-2.5 h-2.5 text-[#E5B85C]" />
                                       </span>
-                                    ) : (
-                                      <Activity className="w-3 h-3 inline mr-0.5" />
-                                    )}
-                                    稼働率 {utilRate}%
+                                    ) : null}
+                                    予約率 {staff.nextReservationRate}%
                                   </span>
-                                ) : (
-                                  <span className="text-[11px] text-muted-foreground">稼働率 —</span>
-                                )}
+                                </div>
                               </div>
-                              {/* 次回予約率（モバイル） */}
-                              <div className="flex items-center gap-1">
-                                <span className={`text-[11px] font-mono-data font-bold flex items-center gap-1 ${
-                                  staff.nextReservationRate >= 85 ? "text-[#2D9C8F]" :
-                                  staff.nextReservationRate >= 70 ? "text-[#E5B85C]" :
-                                  "text-[#C75C5C]"
-                                }`}>
-                                  {staff.nextReservationRate <= 69 ? (
-                                    <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1 py-0.5">
-                                      <AlertTriangle className="w-2.5 h-2.5" />
-                                      要改善
-                                    </span>
-                                  ) : staff.nextReservationRate >= 85 ? (
-                                    <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-1.5 py-0.5 shadow-sm">
-                                      <Trophy className="w-2.5 h-2.5 text-amber-500" />
-                                      <Sparkles className="w-2.5 h-2.5 text-amber-400" />
-                                    </span>
-                                  ) : staff.nextReservationRate >= 70 ? (
-                                    <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-[#E5B85C] bg-amber-50/60 border border-amber-200/60 rounded-full px-1.5 py-0.5">
-                                      <CircleCheck className="w-2.5 h-2.5 text-[#E5B85C]" />
-                                    </span>
-                                  ) : null}
-                                  予約率 {staff.nextReservationRate}%
-                                </span>
+                              {/* 右側: 総合点（大きめ） */}
+                              <div className="flex flex-col items-end shrink-0 ml-3">
+                                {(() => {
+                                  const scoreKey = `${staff.name}__${staff.storeNormalized}`;
+                                  const scoreResult = compositeScoreMap.get(scoreKey);
+                                  if (!scoreResult) return null;
+                                  return (
+                                    <div className="flex flex-col items-end">
+                                      <span
+                                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-sm font-mono-data font-bold border"
+                                        style={{ backgroundColor: scoreResult.rank.bgColor, color: scoreResult.rank.color, borderColor: scoreResult.rank.borderColor }}
+                                      >
+                                        <Sparkles className="w-3 h-3" />
+                                        {scoreResult.total}点
+                                      </span>
+                                      <span className="text-[9px] mt-0.5" style={{ color: scoreResult.rank.color }}>
+                                        {scoreResult.rank.label}
+                                      </span>
+                                    </div>
+                                  );
+                                })()}
                               </div>
                             </div>
-                            {/* 4行目: 総合点 + NPS（モバイル） */}
-                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                              {(() => {
-                                const scoreKey = `${staff.name}__${staff.storeNormalized}`;
-                                const scoreResult = compositeScoreMap.get(scoreKey);
-                                if (!scoreResult) return null;
-                                return (
-                                  <span
-                                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-mono-data font-bold border"
-                                    style={{ backgroundColor: scoreResult.rank.bgColor, color: scoreResult.rank.color, borderColor: scoreResult.rank.borderColor }}
-                                  >
-                                    <Sparkles className="w-2.5 h-2.5" />
-                                    総合 {scoreResult.total}点 {scoreResult.rank.label}
-                                  </span>
-                                );
-                              })()}
-                              {npsInfo && npsInfo.totalResponses > 0 && (
-                                <>
-                                  <StaffNpsBadgeMobile npsInfo={npsInfo} />
-                                  <span className="text-[9px] text-muted-foreground">({npsInfo.totalResponses}件)</span>
-                                </>
-                              )}
-                            </div>
+                            {/* NPS（モバイル） */}
+                            {npsInfo && npsInfo.totalResponses > 0 && (
+                              <div className="flex items-center gap-2 mt-1.5">
+                                <StaffNpsBadgeMobile npsInfo={npsInfo} />
+                                <span className="text-[9px] text-muted-foreground">({npsInfo.totalResponses}件)</span>
+                              </div>
+                            )}
 
                           </div>
                         </div>
