@@ -26,8 +26,7 @@ import { calculateUtilizationRate, getUtilizationColor, getUtilizationLabel } fr
 import { getNpsClass } from "@/lib/npsClass";
 import { calculateCompositeScore, getCompositeRank } from "@/lib/compositeScore";
 import type { CompositeScoreResult } from "@/lib/compositeScore";
-import { fetchPdfData, matchesStylist } from "@/hooks/useFankuruData";
-import type { FankuruPdf } from "@/hooks/useFankuruData";
+
 
 const formatCurrency = (n: number) => {
   return `¥${n.toLocaleString()}`;
@@ -109,11 +108,7 @@ export default function StaffList() {
   const { records: npsRecords, loading: npsLoading } = useNpsData();
   const [, navigate] = useLocation();
 
-  // ファンくるデータ取得
-  const [fankuruAllData, setFankuruAllData] = useState<Record<string, FankuruPdf[]>>({});
-  useEffect(() => {
-    fetchPdfData().then(setFankuruAllData).catch(() => {});
-  }, []);
+
 
   // 検索・フィルタ状態
   const [searchQuery, setSearchQuery] = useState("");
@@ -255,31 +250,19 @@ export default function StaffList() {
       const utilRate = calculateUtilizationRate(staff.totalCustomers, staff.employmentType);
       const npsInfo = staffNpsMap.get(staff.name);
 
-      // ファンくるPDF件数をカウント
-      let fankuruPdfCount = 0;
-      let fankuruCommentCount = 0;
-      const staffStore = staff.storeNormalized;
-      const storePdfs = fankuruAllData[staffStore] || [];
-      for (const pdf of storePdfs) {
-        if (pdf.stylist && matchesStylist(pdf.stylist, staff.name)) {
-          fankuruPdfCount++;
-          if (pdf.displayName) fankuruCommentCount++;
-        }
-      }
+
 
       const result = calculateCompositeScore({
         npsScore: npsInfo && npsInfo.totalResponses > 0 ? npsInfo.npsScore : null,
         npsResponseCount: npsInfo?.totalResponses || 0,
         nextReservationRate: staff.nextReservationRate,
         utilizationRate: utilRate,
-        fankuruPdfCount,
-        fankuruCommentCount,
       });
       const key = `${staff.name}__${staff.storeNormalized}`;
       map.set(key, result);
     }
     return map;
-  }, [staffFiltered, staffNpsMap, fankuruAllData]);
+  }, [staffFiltered, staffNpsMap]);
 
   // ソート適用
   const staffList = useMemo(() => {

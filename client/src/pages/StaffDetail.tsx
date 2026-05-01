@@ -439,10 +439,8 @@ export default function StaffDetail() {
       npsResponseCount: staffNpsStats?.totalResponses ?? 0,
       nextReservationRate: staffReport?.nextReservationRate ?? null,
       utilizationRate: utilRate,
-      fankuruPdfCount: filteredFankuruPdfs.length,
-      fankuruCommentCount: filteredFankuruComments.length,
     });
-  }, [staffNpsStats, staffReport, hasFankuruData, filteredFankuruPdfs.length, filteredFankuruComments.length]);
+  }, [staffNpsStats, staffReport, hasFankuruData]);
 
   const breadcrumbs = [
     { label: "スタッフ一覧", href: "/staff" },
@@ -578,14 +576,14 @@ export default function StaffDetail() {
                         <BarChart3 className="w-3 h-3" /> NPS評価
                       </span>
                       <span className="text-xs font-mono-data font-bold text-foreground">
-                        {compositeScore.available.nps ? `${compositeScore.npsComponent}/40` : "—"}
+                        {compositeScore.available.nps ? `NPS ${compositeScore.rawValues.npsScore! > 0 ? "+" : ""}${compositeScore.rawValues.npsScore}（${compositeScore.rawValues.npsResponseCount}件）` : "—"}
                       </span>
                     </div>
                     <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all duration-500"
                         style={{
-                          width: `${(compositeScore.npsComponent / 40) * 100}%`,
+                          width: `${(compositeScore.npsComponent / 50) * 100}%`,
                           backgroundColor: compositeScore.available.nps ? "#2D9C8F" : "#d4d4d4",
                         }}
                       />
@@ -599,36 +597,15 @@ export default function StaffDetail() {
                         <CalendarCheck className="w-3 h-3" /> 次回予約率
                       </span>
                       <span className="text-xs font-mono-data font-bold text-foreground">
-                        {compositeScore.available.reservation ? `${compositeScore.reservationComponent}/25` : "—"}
+                        {compositeScore.available.reservation ? `${compositeScore.rawValues.nextReservationRate!.toFixed(1)}%` : "—"}
                       </span>
                     </div>
                     <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all duration-500"
                         style={{
-                          width: `${(compositeScore.reservationComponent / 25) * 100}%`,
+                          width: `${(compositeScore.reservationComponent / 30) * 100}%`,
                           backgroundColor: compositeScore.available.reservation ? "#E5B85C" : "#d4d4d4",
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* ファンくる */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                        <FolderOpen className="w-3 h-3" /> ファンくる調査
-                      </span>
-                      <span className="text-xs font-mono-data font-bold text-foreground">
-                        {compositeScore.available.fankuru ? `${compositeScore.fankuruComponent}/20` : "—"}
-                      </span>
-                    </div>
-                    <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{
-                          width: `${(compositeScore.fankuruComponent / 20) * 100}%`,
-                          backgroundColor: compositeScore.available.fankuru ? "#3B82F6" : "#d4d4d4",
                         }}
                       />
                     </div>
@@ -641,14 +618,14 @@ export default function StaffDetail() {
                         <Gauge className="w-3 h-3" /> 稼働率
                       </span>
                       <span className="text-xs font-mono-data font-bold text-foreground">
-                        {compositeScore.available.utilization ? `${compositeScore.utilizationComponent}/15` : "—"}
+                        {compositeScore.available.utilization ? `${compositeScore.rawValues.utilizationRate!.toFixed(1)}%` : "—"}
                       </span>
                     </div>
                     <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all duration-500"
                         style={{
-                          width: `${(compositeScore.utilizationComponent / 15) * 100}%`,
+                          width: `${(compositeScore.utilizationComponent / 20) * 100}%`,
                           backgroundColor: compositeScore.available.utilization ? "#8B5CF6" : "#d4d4d4",
                         }}
                       />

@@ -28,7 +28,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line
 } from "recharts";
-import { useFankuruData, matchesStylist } from "@/hooks/useFankuruData";
+import { useFankuruData } from "@/hooks/useFankuruData";
 import { isNewStore, isNewStaff, isRetiredStaff } from "@/lib/newBadge";
 import { calculateUtilizationRate } from "@/lib/utilizationRate";
 import { calculateCompositeScore, getCompositeRank } from "@/lib/compositeScore";
@@ -591,22 +591,12 @@ export default function StoreDetail() {
               const detractors = staffNpsRecords.filter((r: any) => r.npsScore <= 6).length;
               npsScore = Math.round(((promoters - detractors) / npsResponseCount) * 100);
             }
-            // ファンくる: fankuruPdfsからスタッフ名でフィルタ
-            let fankuruPdfCount = 0;
-            let fankuruCommentCount = 0;
-            for (const pdf of fankuruPdfs) {
-              if (pdf.stylist && matchesStylist(pdf.stylist, sr.name)) {
-                fankuruPdfCount++;
-                if (pdf.displayName) fankuruCommentCount++;
-              }
-            }
+
             const scoreResult = calculateCompositeScore({
               npsScore,
               npsResponseCount,
               nextReservationRate: sr.nextReservationRate,
               utilizationRate: utilRate,
-              fankuruPdfCount,
-              fankuruCommentCount,
             });
             return { staff: sr, scoreResult };
           })
@@ -667,14 +657,13 @@ export default function StoreDetail() {
                         {/* スコア内訳（コンパクト） */}
                         <div className="flex items-center gap-2 mt-2 ml-10 flex-wrap">
                           {scoreResult.available.nps && (
-                            <span className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">NPS {scoreResult.npsComponent}/{40}点</span>
+                            <span className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">NPS {scoreResult.rawValues.npsScore! > 0 ? "+" : ""}{scoreResult.rawValues.npsScore}</span>
                           )}
-                          <span className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">予約率 {scoreResult.reservationComponent}/{25}点</span>
-                          {scoreResult.available.fankuru && (
-                            <span className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">ファンくる {scoreResult.fankuruComponent}/{20}点</span>
+                          {scoreResult.available.reservation && (
+                            <span className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">予約率 {scoreResult.rawValues.nextReservationRate!.toFixed(1)}%</span>
                           )}
                           {scoreResult.available.utilization && (
-                            <span className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">稼働率 {scoreResult.utilizationComponent}/{15}点</span>
+                            <span className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">稼働率 {scoreResult.rawValues.utilizationRate!.toFixed(1)}%</span>
                           )}
                         </div>
                       </CardContent>
