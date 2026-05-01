@@ -173,15 +173,20 @@ export default function StaffList() {
     return filtered;
   }, [rawData, filterMonthsResult]);
 
+  // 退社スタッフを除外
+  const staffListActive = useMemo(() => {
+    return staffListUnsorted.filter((s) => !isRetiredStaff(s.name, s.storeNormalized, s.reportMonth));
+  }, [staffListUnsorted]);
+
   // 店舗一覧（フィルタ用）
   const storeList = useMemo(() => {
-    const stores = new Set(staffListUnsorted.map((s) => s.storeNormalized));
+    const stores = new Set(staffListActive.map((s) => s.storeNormalized));
     return Array.from(stores).sort((a, b) => a.localeCompare(b, "ja"));
-  }, [staffListUnsorted]);
+  }, [staffListActive]);
 
   // 検索・店舗フィルタ適用
   const staffFiltered = useMemo(() => {
-    return staffListUnsorted.filter((s) => {
+    return staffListActive.filter((s) => {
       // 店舗フィルタ
       if (filterStore !== "all" && s.storeNormalized !== filterStore) return false;
       // 名前検索
@@ -191,7 +196,7 @@ export default function StaffList() {
       }
       return true;
     });
-  }, [staffListUnsorted, filterStore, searchQuery]);
+  }, [staffListActive, filterStore, searchQuery]);
 
   // スタッフごとのNPS情報を計算
   const staffNpsMap = useMemo(() => {
@@ -342,25 +347,27 @@ export default function StaffList() {
       </div>
 
       {/* Mobile Sort Controls */}
-      <div className="md:hidden flex items-center gap-2 mb-4 overflow-x-auto pb-1">
-        {(["nextReservationRate", "utilizationRate", "npsScore", "totalSales", "storeNormalized", "employmentType"] as SortField[]).map((field) => (
-          <button
-            key={field}
-            onClick={() => handleSort(field)}
-            className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border ${
-              sortField === field
-                ? "bg-primary/10 text-primary border-primary/30"
-                : "bg-card text-muted-foreground border-border/50 hover:bg-accent/50"
-            }`}
-          >
-            {SORT_LABELS[field]}
-            {sortField === field && (
-              sortDirection === "asc"
-                ? <ArrowUp className="w-3 h-3" />
-                : <ArrowDown className="w-3 h-3" />
-            )}
-          </button>
-        ))}
+      <div className="md:hidden mb-4">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {(["nextReservationRate", "utilizationRate", "npsScore", "totalSales", "storeNormalized", "employmentType"] as SortField[]).map((field) => (
+            <button
+              key={field}
+              onClick={() => handleSort(field)}
+              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-medium transition-colors border ${
+                sortField === field
+                  ? "bg-primary/10 text-primary border-primary/30"
+                  : "bg-card text-muted-foreground border-border/50 hover:bg-accent/50"
+              }`}
+            >
+              {SORT_LABELS[field]}
+              {sortField === field && (
+                sortDirection === "asc"
+                  ? <ArrowUp className="w-3 h-3 shrink-0" />
+                  : <ArrowDown className="w-3 h-3 shrink-0" />
+                )}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Loading */}
@@ -401,7 +408,7 @@ export default function StaffList() {
       {!loading && staffList.length > 0 && (
         <>
           {/* Table Header (desktop) */}
-          <div className="hidden md:grid grid-cols-[minmax(0,2.5fr)_minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1fr)] gap-3 items-center px-5 py-2 text-[10px] text-muted-foreground font-medium uppercase tracking-wider border-b border-border/40 mb-2">
+          <div className="hidden md:grid grid-cols-[minmax(0,2.5fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.5fr)] gap-3 items-center px-5 py-2 text-[10px] text-muted-foreground font-medium uppercase tracking-wider border-b border-border/40 mb-2">
             <span>氏名</span>
             <span
               className="flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors select-none"
@@ -414,6 +421,12 @@ export default function StaffList() {
               onClick={() => handleSort("storeNormalized")}
             >
               店舗 {getSortIcon("storeNormalized")}
+            </span>
+            <span
+              className="flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors select-none"
+              onClick={() => handleSort("employmentType")}
+            >
+              勤務形態 {getSortIcon("employmentType")}
             </span>
             <span
               className="flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors select-none justify-end"
@@ -455,7 +468,7 @@ export default function StaffList() {
                   >
                     <CardContent className="p-0">
                       {/* Desktop Layout */}
-                      <div className="hidden md:grid grid-cols-[minmax(0,2.5fr)_minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1fr)] gap-3 items-center px-5 py-3">
+                      <div className="hidden md:grid grid-cols-[minmax(0,2.5fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.5fr)] gap-3 items-center px-5 py-3">
                         {/* 氏名 */}
                         <div className="flex items-center gap-3">
                           {staff.photoUrl2 ? (
@@ -472,16 +485,19 @@ export default function StaffList() {
                                 <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none shrink-0">NEW</span>
                               )}
                             </div>
-                            <span className="text-[10px] text-muted-foreground">{staff.employmentType}</span>
                           </div>
                         </div>
                         {/* 総売上 */}
                         <div>
-                          <span className="font-mono-data text-base font-bold text-foreground">{formatCurrency(staff.totalSales)}</span>
+                          <span className="font-mono-data text-sm font-bold text-foreground">{formatCurrency(staff.totalSales)}</span>
                         </div>
                         {/* 店舗 */}
                         <div>
-                          <span className="text-sm text-muted-foreground truncate">{staff.storeNormalized}</span>
+                          <span className="text-xs text-muted-foreground truncate">{staff.storeNormalized}</span>
+                        </div>
+                        {/* 勤務形態 */}
+                        <div>
+                          <span className="text-xs text-muted-foreground">{staff.employmentType}</span>
                         </div>
                         {/* 稼働率 */}
                         <div className="text-right">
