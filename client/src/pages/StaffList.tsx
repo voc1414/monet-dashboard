@@ -661,79 +661,84 @@ export default function StaffList() {
                               <span className="text-[10px] text-muted-foreground/70 shrink-0">{staff.employmentType}</span>
                             </div>
                             {/* 3行目: 稼働率・予約率（左）+ 総合点（右大きめ） */}
-                            <div className="flex items-center justify-between mt-2">
+                            <div className="flex items-start justify-between mt-2.5 gap-3">
                               {/* 左側: 稼働率・次回予約率 */}
-                              <div className="flex flex-col gap-1">
+                              <div className="flex flex-col gap-2 min-w-0">
                                 {/* 稼働率 */}
-                                <div className="flex items-center gap-1">
-                                  {utilRate !== null ? (
-                                    <span className={`text-[11px] font-mono-data font-bold flex items-center gap-1 ${getUtilizationColor(utilRate)}`}>
-                                      {utilRate <= 89 ? (
-                                        <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1 py-0.5">
-                                          <AlertTriangle className="w-2.5 h-2.5" />
-                                          要改善
+                                <div className="flex flex-col gap-0.5">
+                                  <span className="text-[9px] text-muted-foreground leading-none">稼働率</span>
+                                  <div className="flex items-center gap-1.5">
+                                    {utilRate !== null ? (
+                                      <>
+                                        <span className={`text-sm font-mono-data font-bold ${getUtilizationColor(utilRate)}`}>
+                                          {utilRate}%
                                         </span>
-                                      ) : utilRate >= 95 ? (
-                                        <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-1.5 py-0.5 shadow-sm">
-                                          <Trophy className="w-2.5 h-2.5 text-amber-500" />
-                                          <Sparkles className="w-2.5 h-2.5 text-amber-400" />
-                                        </span>
-                                      ) : utilRate >= 90 ? (
-                                        <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-[#E5B85C] bg-amber-50/60 border border-amber-200/60 rounded-full px-1.5 py-0.5">
-                                          <CircleCheck className="w-2.5 h-2.5 text-[#E5B85C]" />
-                                        </span>
-                                      ) : (
-                                        <Activity className="w-3 h-3 inline mr-0.5" />
-                                      )}
-                                      稼働率 {utilRate}%
-                                    </span>
-                                  ) : (
-                                    <span className="text-[11px] text-muted-foreground">稼働率 —</span>
-                                  )}
+                                        {utilRate <= 89 ? (
+                                          <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1 py-0.5 leading-none">
+                                            <AlertTriangle className="w-2.5 h-2.5" />
+                                            要改善
+                                          </span>
+                                        ) : utilRate >= 95 ? (
+                                          <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-1 py-0.5 leading-none shadow-sm">
+                                            <Trophy className="w-2.5 h-2.5 text-amber-500" />
+                                          </span>
+                                        ) : utilRate >= 90 ? (
+                                          <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-[#E5B85C] bg-amber-50/60 border border-amber-200/60 rounded-full px-1 py-0.5 leading-none">
+                                            <CircleCheck className="w-2.5 h-2.5 text-[#E5B85C]" />
+                                            適正
+                                          </span>
+                                        ) : null}
+                                      </>
+                                    ) : (
+                                      <span className="text-sm text-muted-foreground">—</span>
+                                    )}
+                                  </div>
                                 </div>
                                 {/* 次回予約率 */}
-                                <div className="flex items-center gap-1">
-                                  <span className={`text-[11px] font-mono-data font-bold flex items-center gap-1 ${
-                                    staff.nextReservationRate >= 85 ? "text-[#2D9C8F]" :
-                                    staff.nextReservationRate >= 70 ? "text-[#E5B85C]" :
-                                    "text-[#C75C5C]"
-                                  }`}>
+                                <div className="flex flex-col gap-0.5">
+                                  <span className="text-[9px] text-muted-foreground leading-none">次回予約率</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className={`text-sm font-mono-data font-bold ${
+                                      staff.nextReservationRate >= 85 ? "text-[#2D9C8F]" :
+                                      staff.nextReservationRate >= 70 ? "text-[#E5B85C]" :
+                                      "text-[#C75C5C]"
+                                    }`}>
+                                      {staff.nextReservationRate}%
+                                    </span>
                                     {staff.nextReservationRate <= 69 ? (
-                                      <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1 py-0.5">
+                                      <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1 py-0.5 leading-none">
                                         <AlertTriangle className="w-2.5 h-2.5" />
                                         要改善
                                       </span>
                                     ) : staff.nextReservationRate >= 85 ? (
-                                      <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-1.5 py-0.5 shadow-sm">
+                                      <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-1 py-0.5 leading-none shadow-sm">
                                         <Trophy className="w-2.5 h-2.5 text-amber-500" />
-                                        <Sparkles className="w-2.5 h-2.5 text-amber-400" />
                                       </span>
                                     ) : staff.nextReservationRate >= 70 ? (
-                                      <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-[#E5B85C] bg-amber-50/60 border border-amber-200/60 rounded-full px-1.5 py-0.5">
+                                      <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-[#E5B85C] bg-amber-50/60 border border-amber-200/60 rounded-full px-1 py-0.5 leading-none">
                                         <CircleCheck className="w-2.5 h-2.5 text-[#E5B85C]" />
+                                        適正
                                       </span>
                                     ) : null}
-                                    予約率 {staff.nextReservationRate}%
-                                  </span>
+                                  </div>
                                 </div>
                               </div>
                               {/* 右側: 総合点（大きめ） */}
-                              <div className="flex flex-col items-end shrink-0 ml-3">
+                              <div className="flex flex-col items-center shrink-0">
                                 {(() => {
                                   const scoreKey = `${staff.name}__${staff.storeNormalized}`;
                                   const scoreResult = compositeScoreMap.get(scoreKey);
                                   if (!scoreResult) return null;
                                   return (
-                                    <div className="flex flex-col items-end">
-                                      <span className="text-[9px] text-muted-foreground mb-0.5">総合点</span>
+                                    <div className="flex flex-col items-center">
+                                      <span className="text-[9px] text-muted-foreground mb-1 leading-none">総合点</span>
                                       <span
-                                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-sm font-mono-data font-bold border"
+                                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-base font-mono-data font-bold border"
                                         style={{ backgroundColor: scoreResult.rank.bgColor, color: scoreResult.rank.color, borderColor: scoreResult.rank.borderColor }}
                                       >
-                                        <Sparkles className="w-3 h-3" />
-                                        {scoreResult.total}点
+                                        {scoreResult.total}<span className="text-xs">点</span>
                                       </span>
-                                      <span className="text-[9px] mt-0.5" style={{ color: scoreResult.rank.color }}>
+                                      <span className="text-[9px] mt-1 font-medium" style={{ color: scoreResult.rank.color }}>
                                         {scoreResult.rank.label}
                                       </span>
                                     </div>
