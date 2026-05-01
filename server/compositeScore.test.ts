@@ -15,18 +15,18 @@ describe("calculateCompositeScore", () => {
     expect(result.rank.label).toBe("エクセレント");
   });
 
-  it("NPSデータのみの場合、データ充足率50%で正規化される", () => {
+  it("NPSデータのみの場合、データ充足率10%で正規化される", () => {
     const result = calculateCompositeScore({
       npsScore: 50,
       npsResponseCount: 10,
       nextReservationRate: null,
       utilizationRate: null,
     });
-    expect(result.dataCoverage).toBe(0.5);
+    expect(result.dataCoverage).toBe(0.1);
     expect(result.available.nps).toBe(true);
     expect(result.available.reservation).toBe(false);
     expect(result.available.utilization).toBe(false);
-    // NPS 50 → (150/200)*50 = 37.5 → 信頼度1.0 → 37.5/50 = 75%
+    // NPS 50 → (150/200)*10 = 7.5 → 信頼度1.0 → 7.5/10 = 75%
     expect(result.total).toBe(75);
   });
 
@@ -58,26 +58,26 @@ describe("calculateCompositeScore", () => {
     expect(result1.npsComponent).toBeLessThan(result10.npsComponent);
   });
 
-  it("次回予約率85%以上で満点（30点）", () => {
+  it("次回予約率85%以上で満点（50点）", () => {
     const result = calculateCompositeScore({
       npsScore: null,
       npsResponseCount: 0,
       nextReservationRate: 90,
       utilizationRate: null,
     });
-    expect(result.reservationComponent).toBe(30);
-    expect(result.total).toBe(100); // 30/30 = 100%
+    expect(result.reservationComponent).toBe(50);
+    expect(result.total).toBe(100); // 50/50 = 100%
   });
 
-  it("稼働率95%以上で満点（20点）", () => {
+  it("稼働率95%以上で満点（40点）", () => {
     const result = calculateCompositeScore({
       npsScore: null,
       npsResponseCount: 0,
       nextReservationRate: null,
       utilizationRate: 95,
     });
-    expect(result.utilizationComponent).toBe(20);
-    expect(result.total).toBe(100); // 20/20 = 100%
+    expect(result.utilizationComponent).toBe(40);
+    expect(result.total).toBe(100); // 40/40 = 100%
   });
 
   it("稼働率60%以下で0点", () => {
@@ -120,7 +120,7 @@ describe("calculateCompositeScore", () => {
     });
     expect(result.dataCoverage).toBe(1);
     expect(result.npsComponent).toBeGreaterThan(0);
-    expect(result.reservationComponent).toBe(30); // 85%で満点
+    expect(result.reservationComponent).toBe(50); // 85%で満点
     expect(result.utilizationComponent).toBeGreaterThan(0);
     expect(result.total).toBeGreaterThan(50);
     expect(result.total).toBeLessThanOrEqual(100);
@@ -151,5 +151,37 @@ describe("calculateCompositeScore", () => {
     expect(result.available.nps).toBe(true);
     expect(result.available.reservation).toBe(true);
     expect(result.available.utilization).toBe(true);
+  });
+
+  it("新配点: 次回予約率50点・稼働率40点・NPS10点の配分が正しい", () => {
+    // 次回予約率のみ100% → 50/50 = 100点
+    const reservOnly = calculateCompositeScore({
+      npsScore: null,
+      npsResponseCount: 0,
+      nextReservationRate: 100,
+      utilizationRate: null,
+    });
+    expect(reservOnly.reservationComponent).toBe(50);
+    expect(reservOnly.dataCoverage).toBe(0.5);
+
+    // 稼働率のみ100% → 40/40 = 100点
+    const utilOnly = calculateCompositeScore({
+      npsScore: null,
+      npsResponseCount: 0,
+      nextReservationRate: null,
+      utilizationRate: 100,
+    });
+    expect(utilOnly.utilizationComponent).toBe(40);
+    expect(utilOnly.dataCoverage).toBe(0.4);
+
+    // NPS最高のみ → 10/10 = 100点
+    const npsOnly = calculateCompositeScore({
+      npsScore: 100,
+      npsResponseCount: 10,
+      nextReservationRate: null,
+      utilizationRate: null,
+    });
+    expect(npsOnly.npsComponent).toBe(10);
+    expect(npsOnly.dataCoverage).toBe(0.1);
   });
 });

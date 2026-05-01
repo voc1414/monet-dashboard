@@ -1,6 +1,6 @@
 /**
  * 総合評価スコア計算ユーティリティ
- * NPS + 次回予約率 + 稼働率 の3指標で100点満点
+ * 次回予約率50点 + 稼働率40点 + NPS10点 の3指標で100点満点
  */
 
 export interface CompositeScoreInput {
@@ -17,11 +17,11 @@ export interface CompositeScoreInput {
 export interface CompositeScoreResult {
   /** 総合スコア (0〜100) */
   total: number;
-  /** NPS部分スコア (0〜50) */
+  /** NPS部分スコア (0〜10) */
   npsComponent: number;
-  /** 次回予約率部分スコア (0〜30) */
+  /** 次回予約率部分スコア (0〜50) */
   reservationComponent: number;
-  /** 稼働率部分スコア (0〜20) */
+  /** 稼働率部分スコア (0〜40) */
   utilizationComponent: number;
   /** 評価ランク */
   rank: CompositeRank;
@@ -104,42 +104,42 @@ const RANKS: { min: number; rank: CompositeRank }[] = [
 ];
 
 /**
- * NPS部分スコア (最大50点)
- * NPS -100〜+100 を 0〜50 に線形変換
+ * NPS部分スコア (最大10点)
+ * NPS -100〜+100 を 0〜10 に線形変換
  * 回答数が少ない場合は信頼度で減衰
  */
 function calcNpsComponent(npsScore: number | null, responseCount: number): number {
   if (npsScore === null || responseCount === 0) return 0;
-  // NPS -100〜+100 → 0〜50
-  const raw = ((npsScore + 100) / 200) * 50;
+  // NPS -100〜+100 → 0〜10
+  const raw = ((npsScore + 100) / 200) * 10;
   // 回答数による信頼度補正（5件以上で100%、1件で60%）
   const confidence = Math.min(1, 0.6 + (responseCount - 1) * 0.1);
   return Math.round(raw * confidence * 10) / 10;
 }
 
 /**
- * 次回予約率部分スコア (最大30点)
+ * 次回予約率部分スコア (最大50点)
  * 85%以上で満点、0%で0点
  */
 function calcReservationComponent(rate: number | null): number {
   if (rate === null) return 0;
   const clamped = Math.min(Math.max(rate, 0), 100);
-  // 85%以上で満点（30点）、線形スケール
-  const score = (clamped / 85) * 30;
-  return Math.round(Math.min(score, 30) * 10) / 10;
+  // 85%以上で満点（50点）、線形スケール
+  const score = (clamped / 85) * 50;
+  return Math.round(Math.min(score, 50) * 10) / 10;
 }
 
 /**
- * 稼働率部分スコア (最大20点)
+ * 稼働率部分スコア (最大40点)
  * 95%以上で満点、60%以下で0点
  */
 function calcUtilizationComponent(rate: number | null): number {
   if (rate === null) return 0;
   const clamped = Math.min(Math.max(rate, 0), 100);
   // 95%で満点、60%で0点
-  if (clamped >= 95) return 20;
+  if (clamped >= 95) return 40;
   if (clamped <= 60) return 0;
-  return Math.round(((clamped - 60) / 35) * 20 * 10) / 10;
+  return Math.round(((clamped - 60) / 35) * 40 * 10) / 10;
 }
 
 /**
@@ -157,7 +157,7 @@ export function calculateCompositeScore(input: CompositeScoreInput): CompositeSc
   const utilizationComponent = calcUtilizationComponent(input.utilizationRate);
 
   // データ充足率: 各指標の配点ウェイトで重み付け
-  const maxPoints = { nps: 50, reservation: 30, utilization: 20 };
+  const maxPoints = { nps: 10, reservation: 50, utilization: 40 };
   const availableWeight =
     (available.nps ? maxPoints.nps : 0) +
     (available.reservation ? maxPoints.reservation : 0) +
