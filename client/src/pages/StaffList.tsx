@@ -24,6 +24,10 @@ import type { StaffReport } from "@/hooks/useMonthlyReport";
 import { isNewStaff, isRetiredStaff } from "@/lib/newBadge";
 import { calculateUtilizationRate, getUtilizationColor, getUtilizationLabel } from "@/lib/utilizationRate";
 import { getNpsClass } from "@/lib/npsClass";
+import { calculateCompositeScore, getCompositeRank } from "@/lib/compositeScore";
+import type { CompositeScoreResult } from "@/lib/compositeScore";
+import { fetchPdfData, matchesStylist } from "@/hooks/useFankuruData";
+import type { FankuruPdf } from "@/hooks/useFankuruData";
 
 const formatCurrency = (n: number) => {
   return `¥${n.toLocaleString()}`;
@@ -49,10 +53,11 @@ interface StaffNpsInfo {
   detractors: number;
 }
 
-type SortField = "totalSales" | "storeNormalized" | "employmentType" | "utilizationRate" | "nextReservationRate" | "npsScore";
+type SortField = "totalSales" | "storeNormalized" | "employmentType" | "utilizationRate" | "nextReservationRate" | "npsScore" | "compositeScore";
 type SortDirection = "asc" | "desc";
 
 const SORT_LABELS: Record<SortField, string> = {
+  compositeScore: "総合評価",
   totalSales: "総売上",
   storeNormalized: "配属店舗",
   employmentType: "雇用形態",
@@ -103,6 +108,12 @@ export default function StaffList() {
   const { rawData, loading, error, availableMonths } = useMonthlyReport();
   const { records: npsRecords, loading: npsLoading } = useNpsData();
   const [, navigate] = useLocation();
+
+  // ファンくるデータ取得
+  const [fankuruAllData, setFankuruAllData] = useState<Record<string, FankuruPdf[]>>({});
+  useEffect(() => {
+    fetchPdfData().then(setFankuruAllData).catch(() => {});
+  }, []);
 
   // 検索・フィルタ状態
   const [searchQuery, setSearchQuery] = useState("");
@@ -237,6 +248,39 @@ export default function StaffList() {
     return map;
   }, [npsRecords, filterMonthsResult]);
 
+  // スタッフごとの総合評価スコアを計算
+  const compositeScoreMap = useMemo(() => {
+    const map = new Map<string, CompositeScoreResult>();
+    for (const staff of staffFiltered) {
+      const utilRate = calculateUtilizationRate(staff.totalCustomers, staff.employmentType);
+      const npsInfo = staffNpsMap.get(staff.name);
+
+      // ファンくるPDF件数をカウント
+      let fankuruPdfCount = 0;
+      let fankuruCommentCount = 0;
+      const staffStore = staff.storeNormalized;
+      const storePdfs = fankuruAllData[staffStore] || [];
+      for (const pdf of storePdfs) {
+        if (pdf.stylist && matchesStylist(pdf.stylist, staff.name)) {
+          fankuruPdfCount++;
+          if (pdf.displayName) fankuruCommentCount++;
+        }
+      }
+
+      const result = calculateCompositeScore({
+        npsScore: npsInfo && npsInfo.totalResponses > 0 ? npsInfo.npsScore : null,
+        npsResponseCount: npsInfo?.totalResponses || 0,
+        nextReservationRate: staff.nextReservationRate,
+        utilizationRate: utilRate,
+        fankuruPdfCount,
+        fankuruCommentCount,
+      });
+      const key = `${staff.name}__${staff.storeNormalized}`;
+      map.set(key, result);
+    }
+    return map;
+  }, [staffFiltered, staffNpsMap, fankuruAllData]);
+
   // ソート適用
   const staffList = useMemo(() => {
     const list = [...staffFiltered];
@@ -262,12 +306,17 @@ export default function StaffList() {
           const npsB = staffNpsMap.get(b.name)?.npsScore ?? -999;
           return (npsA - npsB) * dir;
         }
+        case "compositeScore": {
+          const scoreA = compositeScoreMap.get(`${a.name}__${a.storeNormalized}`)?.total ?? -1;
+          const scoreB = compositeScoreMap.get(`${b.name}__${b.storeNormalized}`)?.total ?? -1;
+          return (scoreA - scoreB) * dir;
+        }
         default:
           return 0;
       }
     });
     return list;
-  }, [staffFiltered, sortField, sortDirection, staffNpsMap]);
+  }, [staffFiltered, sortField, sortDirection, staffNpsMap, compositeScoreMap]);
 
   const monthLabel = getPeriodLabel(periodSelection);
 
@@ -349,7 +398,7 @@ export default function StaffList() {
       {/* Mobile Sort Controls */}
       <div className="md:hidden mb-4">
         <div className="flex items-center gap-1.5 flex-wrap">
-          {(["nextReservationRate", "utilizationRate", "npsScore", "totalSales", "storeNormalized", "employmentType"] as SortField[]).map((field) => (
+          {(["compositeScore", "nextReservationRate", "utilizationRate", "npsScore", "totalSales", "storeNormalized", "employmentType"] as SortField[]).map((field) => (
             <button
               key={field}
               onClick={() => handleSort(field)}
@@ -408,8 +457,14 @@ export default function StaffList() {
       {!loading && staffList.length > 0 && (
         <>
           {/* Table Header (desktop) */}
-          <div className="hidden md:grid grid-cols-[minmax(0,2.5fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.5fr)] gap-3 items-center px-5 py-2 text-[10px] text-muted-foreground font-medium uppercase tracking-wider border-b border-border/40 mb-2">
+          <div className="hidden md:grid grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.5fr)] gap-3 items-center px-5 py-2 text-[10px] text-muted-foreground font-medium uppercase tracking-wider border-b border-border/40 mb-2">
             <span>氏名</span>
+            <span
+              className="flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors select-none justify-center"
+              onClick={() => handleSort("compositeScore")}
+            >
+              総合評価 {getSortIcon("compositeScore")}
+            </span>
             <span
               className="flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors select-none"
               onClick={() => handleSort("totalSales")}
@@ -468,7 +523,7 @@ export default function StaffList() {
                   >
                     <CardContent className="p-0">
                       {/* Desktop Layout */}
-                      <div className="hidden md:grid grid-cols-[minmax(0,2.5fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.5fr)] gap-3 items-center px-5 py-3">
+                      <div className="hidden md:grid grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.5fr)] gap-3 items-center px-5 py-3">
                         {/* 氏名 */}
                         <div className="flex items-center gap-3">
                           {staff.photoUrl2 ? (
@@ -487,6 +542,25 @@ export default function StaffList() {
                             </div>
                           </div>
                         </div>
+                        {/* 総合評価 */}
+                        {(() => {
+                          const scoreKey = `${staff.name}__${staff.storeNormalized}`;
+                          const scoreResult = compositeScoreMap.get(scoreKey);
+                          if (!scoreResult) return <div className="text-center"><span className="text-xs text-muted-foreground">—</span></div>;
+                          return (
+                            <div className="flex flex-col items-center gap-0.5">
+                              <span
+                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-mono-data font-bold border"
+                                style={{ backgroundColor: scoreResult.rank.bgColor, color: scoreResult.rank.color, borderColor: scoreResult.rank.borderColor }}
+                              >
+                                {scoreResult.total}点
+                              </span>
+                              <span className="text-[9px] font-medium" style={{ color: scoreResult.rank.color }}>
+                                {scoreResult.rank.label}
+                              </span>
+                            </div>
+                          );
+                        })()}
                         {/* 総売上 */}
                         <div>
                           <span className="font-mono-data text-sm font-bold text-foreground">{formatCurrency(staff.totalSales)}</span>
@@ -658,13 +732,30 @@ export default function StaffList() {
                                 </span>
                               </div>
                             </div>
-                            {/* 4行目: NPS（モバイル） */}
-                            {npsInfo && npsInfo.totalResponses > 0 && (
-                              <div className="flex items-center gap-1 mt-1.5">
-                                <StaffNpsBadgeMobile npsInfo={npsInfo} />
-                                <span className="text-[9px] text-muted-foreground">({npsInfo.totalResponses}件)</span>
-                              </div>
-                            )}
+                            {/* 4行目: 総合評価 + NPS（モバイル） */}
+                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                              {(() => {
+                                const scoreKey = `${staff.name}__${staff.storeNormalized}`;
+                                const scoreResult = compositeScoreMap.get(scoreKey);
+                                if (!scoreResult) return null;
+                                return (
+                                  <span
+                                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-mono-data font-bold border"
+                                    style={{ backgroundColor: scoreResult.rank.bgColor, color: scoreResult.rank.color, borderColor: scoreResult.rank.borderColor }}
+                                  >
+                                    <Sparkles className="w-2.5 h-2.5" />
+                                    総合 {scoreResult.total}点 {scoreResult.rank.label}
+                                  </span>
+                                );
+                              })()}
+                              {npsInfo && npsInfo.totalResponses > 0 && (
+                                <>
+                                  <StaffNpsBadgeMobile npsInfo={npsInfo} />
+                                  <span className="text-[9px] text-muted-foreground">({npsInfo.totalResponses}件)</span>
+                                </>
+                              )}
+                            </div>
+
                           </div>
                         </div>
                       </div>

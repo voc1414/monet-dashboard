@@ -142,7 +142,7 @@ const LEGACY_DATA: Record<string, FankuruPdf[]> = {
 let cachedData: Record<string, FankuruPdf[]> | null = null;
 let fetchPromise: Promise<Record<string, FankuruPdf[]>> | null = null;
 
-async function fetchPdfData(): Promise<Record<string, FankuruPdf[]>> {
+export async function fetchPdfData(): Promise<Record<string, FankuruPdf[]>> {
   if (cachedData) return cachedData;
   if (fetchPromise) return fetchPromise;
 
@@ -370,7 +370,7 @@ function normalizeStylistName(name: string): string {
  * スタッフ名とスタイリスト名が一致するかチェックする。
  * 直接一致、部分一致、エイリアス経由の一致をすべてチェック。
  */
-function matchesStylist(stylistRaw: string, staffName: string): boolean {
+export function matchesStylist(stylistRaw: string, staffName: string): boolean {
   if (!stylistRaw || !staffName) return false;
   const stylist = stylistRaw.trim().toLowerCase();
   const target = staffName.trim().toLowerCase();

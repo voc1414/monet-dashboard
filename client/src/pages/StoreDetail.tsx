@@ -28,9 +28,11 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line
 } from "recharts";
-import { useFankuruData } from "@/hooks/useFankuruData";
+import { useFankuruData, matchesStylist } from "@/hooks/useFankuruData";
 import { isNewStore, isNewStaff, isRetiredStaff } from "@/lib/newBadge";
 import { calculateUtilizationRate } from "@/lib/utilizationRate";
+import { calculateCompositeScore, getCompositeRank } from "@/lib/compositeScore";
+import type { CompositeScoreResult } from "@/lib/compositeScore";
 import type { FankuruPdf } from "@/hooks/useFankuruData";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { useSalonBoardData } from "@/hooks/useSalonBoardData";
@@ -565,6 +567,121 @@ export default function StoreDetail() {
                   </div>
                 </div>
               )}
+            </div>
+          </section>
+        );
+      })()}
+
+      {/* スタッフ総合評価ランキング */}
+      {reportStats && reportStats.staffReports.length > 0 && (() => {
+        const rankings = reportStats.staffReports
+          .filter((sr: StaffReport) => !isRetiredStaff(sr.name, storeId, sr.reportMonth))
+          .map((sr: StaffReport) => {
+            const utilRate = calculateUtilizationRate(sr.totalCustomers, sr.employmentType);
+            // NPS: storeRecordsからスタッフ名でフィルタ
+            const staffNpsRecords = storeRecords.filter((r: any) => {
+              const staffName = r.staff?.trim();
+              return staffName && staffName.toLowerCase() === sr.name.toLowerCase();
+            });
+            let npsScore: number | null = null;
+            let npsResponseCount = 0;
+            if (staffNpsRecords.length > 0) {
+              npsResponseCount = staffNpsRecords.length;
+              const promoters = staffNpsRecords.filter((r: any) => r.npsScore >= 9).length;
+              const detractors = staffNpsRecords.filter((r: any) => r.npsScore <= 6).length;
+              npsScore = Math.round(((promoters - detractors) / npsResponseCount) * 100);
+            }
+            // ファンくる: fankuruPdfsからスタッフ名でフィルタ
+            let fankuruPdfCount = 0;
+            let fankuruCommentCount = 0;
+            for (const pdf of fankuruPdfs) {
+              if (pdf.stylist && matchesStylist(pdf.stylist, sr.name)) {
+                fankuruPdfCount++;
+                if (pdf.displayName) fankuruCommentCount++;
+              }
+            }
+            const scoreResult = calculateCompositeScore({
+              npsScore,
+              npsResponseCount,
+              nextReservationRate: sr.nextReservationRate,
+              utilizationRate: utilRate,
+              fankuruPdfCount,
+              fankuruCommentCount,
+            });
+            return { staff: sr, scoreResult };
+          })
+          .sort((a, b) => b.scoreResult.total - a.scoreResult.total);
+
+        if (rankings.length === 0) return null;
+
+        return (
+          <section className="mb-8 pt-6 border-t-2 border-primary/20">
+            <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-amber-500" />
+              スタッフ総合評価ランキング
+            </h2>
+            <div className="space-y-2">
+              {rankings.map(({ staff: sr, scoreResult }, i) => (
+                <motion.div key={sr.answerId || i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.05 * i }}>
+                  <Link href={`/staff/${encodeURIComponent(storeId)}/${encodeURIComponent(sr.name)}`}>
+                    <Card className="border-border/50 shadow-sm hover:shadow-md hover:border-primary/30 transition-all cursor-pointer group">
+                      <CardContent className="p-3 sm:p-4">
+                        <div className="flex items-center gap-3">
+                          {/* ランク番号 */}
+                          <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 font-bold text-sm ${
+                            i === 0 ? "bg-amber-100 text-amber-700 border border-amber-300" :
+                            i === 1 ? "bg-gray-100 text-gray-600 border border-gray-300" :
+                            i === 2 ? "bg-orange-50 text-orange-600 border border-orange-200" :
+                            "bg-muted text-muted-foreground"
+                          }`}>
+                            {i + 1}
+                          </div>
+                          {/* アバター */}
+                          {sr.photoUrl2 ? (
+                            <img src={sr.photoUrl2} alt={sr.name} className="w-9 h-9 rounded-full object-cover object-center shrink-0" />
+                          ) : (
+                            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                              <span className="text-primary font-bold text-sm">{sr.name.charAt(0)}</span>
+                            </div>
+                          )}
+                          {/* 名前 */}
+                          <div className="flex-1 min-w-0">
+                            <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">{sr.name}</span>
+                            <div className="text-[10px] text-muted-foreground">{sr.employmentType}</div>
+                          </div>
+                          {/* スコアバッジ */}
+                          <div className="flex flex-col items-end gap-0.5 shrink-0">
+                            <span
+                              className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-mono-data font-bold border"
+                              style={{ backgroundColor: scoreResult.rank.bgColor, color: scoreResult.rank.color, borderColor: scoreResult.rank.borderColor }}
+                            >
+                              {scoreResult.total}点
+                            </span>
+                            <span className="text-[9px] font-medium" style={{ color: scoreResult.rank.color }}>
+                              {scoreResult.rank.label}
+                            </span>
+                          </div>
+                          {/* アロー */}
+                          <ChevronDown className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity -rotate-90 shrink-0" />
+                        </div>
+                        {/* スコア内訳（コンパクト） */}
+                        <div className="flex items-center gap-2 mt-2 ml-10 flex-wrap">
+                          {scoreResult.available.nps && (
+                            <span className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">NPS {scoreResult.npsComponent}/{40}点</span>
+                          )}
+                          <span className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">予約率 {scoreResult.reservationComponent}/{25}点</span>
+                          {scoreResult.available.fankuru && (
+                            <span className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">ファンくる {scoreResult.fankuruComponent}/{20}点</span>
+                          )}
+                          {scoreResult.available.utilization && (
+                            <span className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">稼働率 {scoreResult.utilizationComponent}/{15}点</span>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                </motion.div>
+              ))}
             </div>
           </section>
         );
