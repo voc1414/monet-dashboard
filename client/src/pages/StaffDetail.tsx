@@ -429,7 +429,7 @@ export default function StaffDetail() {
 
 
 
-  // 総合評価スコア計算
+  // 総合点スコア計算
   const compositeScore = useMemo((): CompositeScoreResult | null => {
     // データが何もない場合はnull
     if (!staffNpsStats && !staffReport && !hasFankuruData) return null;
@@ -515,12 +515,12 @@ export default function StaffDetail() {
         );
       })()}
 
-      {/* ===== 総合評価スコア ===== */}
+      {/* ===== 総合点スコア ===== */}
       {compositeScore && !loading && (
         <section className="mb-6 pt-6 border-t-2 border-primary/20">
           <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary" />
-            総合評価
+            総合点
             {!isAllPeriod && (
               <span className="text-xs font-normal text-muted-foreground">— {getPeriodLabel(periodSelection)}</span>
             )}

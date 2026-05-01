@@ -12,7 +12,7 @@ import {
   Trophy, ThumbsUp, Target, AlertTriangle, AlertCircle,
   Lightbulb, CheckCircle2, ArrowUpRight,
   FileText, ExternalLink, Loader2, FolderOpen, Eye,
-  CircleCheck, Sparkles, CalendarCheck, Gauge
+  CircleCheck, Sparkles
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PeriodSelector, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
@@ -450,7 +450,7 @@ export default function StoreDetail() {
         </section>
       )}
 
-      {/* 店舗内月間表彰セクション */}
+      {/* 店舗内月間表彰セクション — 総合点ランキング */}
       {(() => {
         // この店舗のスタッフのみフィルタ
         const storeRawData = rawData.filter(r => r.storeNormalized === storeId);
@@ -481,25 +481,43 @@ export default function StoreDetail() {
           filtered = Array.from(map.values());
         }
 
-        const staffWithRates = filtered
+        // スタッフごとに総合点を計算
+        const staffScores = filtered
           .filter(r => !isRetiredStaff(r.name, r.storeNormalized, r.reportMonth))
-          .map(r => ({
-            name: r.name,
-            store: r.storeNormalized,
-            employmentType: r.employmentType,
-            nextReservationRate: r.nextReservationRate,
-            utilizationRate: calculateUtilizationRate(r.totalCustomers, r.employmentType),
-          }));
+          .map(r => {
+            const utilRate = calculateUtilizationRate(r.totalCustomers, r.employmentType);
+            // NPS: storeRecordsからスタッフ名でフィルタ
+            const staffNpsRecords = storeRecords.filter((nr: any) => {
+              const nrStaff = nr.staff?.trim();
+              return nrStaff && nrStaff.toLowerCase() === r.name.toLowerCase();
+            });
+            let npsScore: number | null = null;
+            let npsResponseCount = 0;
+            if (staffNpsRecords.length > 0) {
+              npsResponseCount = staffNpsRecords.length;
+              const promoters = staffNpsRecords.filter((nr: any) => nr.npsScore >= 9).length;
+              const detractors = staffNpsRecords.filter((nr: any) => nr.npsScore <= 6).length;
+              npsScore = Math.round(((promoters - detractors) / npsResponseCount) * 100);
+            }
 
-        const resExcellent = staffWithRates
-          .filter(s => s.nextReservationRate >= 85)
-          .sort((a, b) => b.nextReservationRate - a.nextReservationRate);
+            const scoreResult = calculateCompositeScore({
+              npsScore,
+              npsResponseCount,
+              nextReservationRate: r.nextReservationRate,
+              utilizationRate: utilRate,
+            });
 
-        const utilExcellent = staffWithRates
-          .filter(s => s.utilizationRate !== null && s.utilizationRate >= 95)
-          .sort((a, b) => (b.utilizationRate ?? 0) - (a.utilizationRate ?? 0));
+            return {
+              name: r.name,
+              store: r.storeNormalized,
+              score: scoreResult.total,
+              rank: scoreResult.rank,
+            };
+          })
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 5);
 
-        if (resExcellent.length === 0 && utilExcellent.length === 0) return null;
+        if (staffScores.length === 0) return null;
 
         return (
           <section className="mb-6">
@@ -508,71 +526,37 @@ export default function StoreDetail() {
                 <Trophy className="w-3 h-3 text-white" />
               </div>
               <h2 className="text-base font-bold text-foreground">月間表彰</h2>
-              <span className="text-[10px] text-muted-foreground">エクセレント！達成（{getPeriodLabel(periodSelection)}）</span>
+              <span className="text-[10px] text-muted-foreground">総合点TOP5（{getPeriodLabel(periodSelection)}）</span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {resExcellent.length > 0 && (
-                <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-br from-amber-50/40 via-yellow-50/20 to-amber-50/40 rounded-xl" />
-                  <div className="relative border border-amber-200/50 rounded-xl p-3">
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <CalendarCheck className="w-3.5 h-3.5 text-amber-500" />
-                      <span className="font-bold text-xs text-foreground">次回予約部門</span>
-                      <span className="text-[9px] text-muted-foreground ml-0.5">{resExcellent.length}名</span>
-                    </div>
-                    <div className="space-y-0.5">
-                      {resExcellent.map((staff, i) => (
-                        <Link key={`res-${staff.name}`} href={`/staff/${encodeURIComponent(staff.store)}/${encodeURIComponent(staff.name)}`}>
-                          <div className="flex items-center gap-1.5 py-1 px-1.5 rounded-md hover:bg-amber-100/40 transition-colors cursor-pointer group">
-                            <span className="w-4 text-[10px] font-bold text-amber-500 text-center shrink-0">{i + 1}</span>
-                            <span className="text-xs font-medium text-foreground group-hover:text-primary transition-colors truncate flex-1">{staff.name}</span>
-                            <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300/80 rounded-full px-1.5 py-px shadow-sm shrink-0">
-                              <Trophy className="w-2 h-2 text-amber-500" />
-                              {staff.nextReservationRate}%
-                              <Sparkles className="w-2 h-2 text-amber-400" />
-                            </span>
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-50/40 via-yellow-50/20 to-amber-50/40 rounded-xl" />
+              <div className="relative border border-amber-200/50 rounded-xl p-3">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  <span className="font-bold text-xs text-foreground">総合点ランキング</span>
                 </div>
-              )}
-
-              {utilExcellent.length > 0 && (
-                <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/40 via-teal-50/20 to-emerald-50/40 rounded-xl" />
-                  <div className="relative border border-emerald-200/50 rounded-xl p-3">
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <Gauge className="w-3.5 h-3.5 text-emerald-500" />
-                      <span className="font-bold text-xs text-foreground">稼働率部門</span>
-                      <span className="text-[9px] text-muted-foreground ml-0.5">{utilExcellent.length}名</span>
-                    </div>
-                    <div className="space-y-0.5">
-                      {utilExcellent.map((staff, i) => (
-                        <Link key={`util-${staff.name}`} href={`/staff/${encodeURIComponent(staff.store)}/${encodeURIComponent(staff.name)}`}>
-                          <div className="flex items-center gap-1.5 py-1 px-1.5 rounded-md hover:bg-emerald-100/40 transition-colors cursor-pointer group">
-                            <span className="w-4 text-[10px] font-bold text-emerald-500 text-center shrink-0">{i + 1}</span>
-                            <span className="text-xs font-medium text-foreground group-hover:text-primary transition-colors truncate flex-1">{staff.name}</span>
-                            <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-600 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-300/80 rounded-full px-1.5 py-px shadow-sm shrink-0">
-                              <Trophy className="w-2 h-2 text-emerald-500" />
-                              {staff.utilizationRate}%
-                              <Sparkles className="w-2 h-2 text-emerald-400" />
-                            </span>
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
+                <div className="space-y-0.5">
+                  {staffScores.map((staff, i) => (
+                    <Link key={`award-${staff.name}`} href={`/staff/${encodeURIComponent(staff.store)}/${encodeURIComponent(staff.name)}`}>
+                      <div className="flex items-center gap-1.5 py-1 px-1.5 rounded-md hover:bg-amber-100/40 transition-colors cursor-pointer group">
+                        <span className={`w-4 text-[10px] font-bold text-center shrink-0 ${i === 0 ? "text-amber-500" : i === 1 ? "text-gray-400" : i === 2 ? "text-amber-700" : "text-muted-foreground"}`}>{i + 1}</span>
+                        <span className="text-xs font-medium text-foreground group-hover:text-primary transition-colors truncate flex-1">{staff.name}</span>
+                        <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300/80 rounded-full px-1.5 py-px shadow-sm shrink-0">
+                          {i === 0 && <Trophy className="w-2 h-2 text-amber-500" />}
+                          {staff.score}点
+                        </span>
+                      </div>
+                    </Link>
+                  ))}
                 </div>
-              )}
+              </div>
             </div>
           </section>
         );
       })()}
 
-      {/* スタッフ総合評価ランキング */}
+      {/* スタッフ総合点ランキング */}
       {reportStats && reportStats.staffReports.length > 0 && (() => {
         const rankings = reportStats.staffReports
           .filter((sr: StaffReport) => !isRetiredStaff(sr.name, storeId, sr.reportMonth))
@@ -608,7 +592,7 @@ export default function StoreDetail() {
           <section className="mb-8 pt-6 border-t-2 border-primary/20">
             <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-amber-500" />
-              スタッフ総合評価ランキング
+              スタッフ総合点ランキング
             </h2>
             <div className="space-y-2">
               {rankings.map(({ staff: sr, scoreResult }, i) => (

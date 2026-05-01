@@ -56,7 +56,7 @@ type SortField = "totalSales" | "storeNormalized" | "employmentType" | "utilizat
 type SortDirection = "asc" | "desc";
 
 const SORT_LABELS: Record<SortField, string> = {
-  compositeScore: "総合評価",
+  compositeScore: "総合点",
   totalSales: "総売上",
   storeNormalized: "配属店舗",
   employmentType: "雇用形態",
@@ -243,7 +243,7 @@ export default function StaffList() {
     return map;
   }, [npsRecords, filterMonthsResult]);
 
-  // スタッフごとの総合評価スコアを計算
+  // スタッフごとの総合点スコアを計算
   const compositeScoreMap = useMemo(() => {
     const map = new Map<string, CompositeScoreResult>();
     for (const staff of staffFiltered) {
@@ -446,7 +446,7 @@ export default function StaffList() {
               className="flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors select-none justify-center"
               onClick={() => handleSort("compositeScore")}
             >
-              総合評価 {getSortIcon("compositeScore")}
+              総合点 {getSortIcon("compositeScore")}
             </span>
             <span
               className="flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors select-none"
@@ -525,7 +525,7 @@ export default function StaffList() {
                             </div>
                           </div>
                         </div>
-                        {/* 総合評価 */}
+                        {/* 総合点 */}
                         {(() => {
                           const scoreKey = `${staff.name}__${staff.storeNormalized}`;
                           const scoreResult = compositeScoreMap.get(scoreKey);
@@ -715,7 +715,7 @@ export default function StaffList() {
                                 </span>
                               </div>
                             </div>
-                            {/* 4行目: 総合評価 + NPS（モバイル） */}
+                            {/* 4行目: 総合点 + NPS（モバイル） */}
                             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                               {(() => {
                                 const scoreKey = `${staff.name}__${staff.storeNormalized}`;
