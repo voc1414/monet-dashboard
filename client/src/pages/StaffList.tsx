@@ -725,6 +725,7 @@ export default function StaffList() {
                                   if (!scoreResult) return null;
                                   return (
                                     <div className="flex flex-col items-end">
+                                      <span className="text-[9px] text-muted-foreground mb-0.5">総合点</span>
                                       <span
                                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-sm font-mono-data font-bold border"
                                         style={{ backgroundColor: scoreResult.rank.bgColor, color: scoreResult.rank.color, borderColor: scoreResult.rank.borderColor }}
