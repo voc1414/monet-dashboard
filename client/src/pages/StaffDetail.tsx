@@ -30,6 +30,8 @@ import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import type { StaffReport } from "@/hooks/useMonthlyReport";
 import { isNewStaff } from "@/lib/newBadge";
 import { calculateUtilizationRate, getUtilizationColor } from "@/lib/utilizationRate";
+import { calculateCompositeScore } from "@/lib/compositeScore";
+import type { CompositeScoreResult } from "@/lib/compositeScore";
 import type { FankuruPdf } from "@/hooks/useFankuruData";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -427,6 +429,21 @@ export default function StaffDetail() {
 
 
 
+  // 総合評価スコア計算
+  const compositeScore = useMemo((): CompositeScoreResult | null => {
+    // データが何もない場合はnull
+    if (!staffNpsStats && !staffReport && !hasFankuruData) return null;
+    const utilRate = staffReport ? calculateUtilizationRate(staffReport.totalCustomers, staffReport.employmentType) : null;
+    return calculateCompositeScore({
+      npsScore: staffNpsStats?.npsScore ?? null,
+      npsResponseCount: staffNpsStats?.totalResponses ?? 0,
+      nextReservationRate: staffReport?.nextReservationRate ?? null,
+      utilizationRate: utilRate,
+      fankuruPdfCount: filteredFankuruPdfs.length,
+      fankuruCommentCount: filteredFankuruComments.length,
+    });
+  }, [staffNpsStats, staffReport, hasFankuruData, filteredFankuruPdfs.length, filteredFankuruComments.length]);
+
   const breadcrumbs = [
     { label: "スタッフ一覧", href: "/staff" },
     { label: staffName },
@@ -499,6 +516,150 @@ export default function StaffDetail() {
           </div>
         );
       })()}
+
+      {/* ===== 総合評価スコア ===== */}
+      {compositeScore && !loading && (
+        <section className="mb-6 pt-6 border-t-2 border-primary/20">
+          <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-primary" />
+            総合評価
+            {!isAllPeriod && (
+              <span className="text-xs font-normal text-muted-foreground">— {getPeriodLabel(periodSelection)}</span>
+            )}
+          </h2>
+
+          <Card className="border-border/50 shadow-sm overflow-hidden">
+            <CardContent className="p-0">
+              {/* メインスコア */}
+              <div className="flex flex-col sm:flex-row">
+                {/* 左: スコア円 */}
+                <div className="flex flex-col items-center justify-center p-6 sm:p-8 sm:w-56 shrink-0"
+                  style={{ backgroundColor: compositeScore.rank.bgColor }}
+                >
+                  <div
+                    className="w-24 h-24 rounded-full border-4 flex items-center justify-center mb-3"
+                    style={{ borderColor: compositeScore.rank.color }}
+                  >
+                    <div className="text-center">
+                      <div className="font-mono-data text-3xl font-bold" style={{ color: compositeScore.rank.color }}>
+                        {compositeScore.total}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wider">/100</div>
+                    </div>
+                  </div>
+                  <span
+                    className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold border"
+                    style={{
+                      color: compositeScore.rank.color,
+                      backgroundColor: compositeScore.rank.bgColor,
+                      borderColor: compositeScore.rank.borderColor,
+                    }}
+                  >
+                    {compositeScore.rank.icon === "star" && <Star className="w-3.5 h-3.5" />}
+                    {compositeScore.rank.icon === "trophy" && <Trophy className="w-3.5 h-3.5" />}
+                    {compositeScore.rank.icon === "check" && <CheckCircle2 className="w-3.5 h-3.5" />}
+                    {compositeScore.rank.icon === "target" && <Target className="w-3.5 h-3.5" />}
+                    {compositeScore.rank.icon === "alert" && <AlertTriangle className="w-3.5 h-3.5" />}
+                    {compositeScore.rank.label}
+                  </span>
+                  {compositeScore.dataCoverage < 1 && (
+                    <div className="text-[10px] text-muted-foreground mt-2 text-center">
+                      データ充足率: {Math.round(compositeScore.dataCoverage * 100)}%
+                    </div>
+                  )}
+                </div>
+
+                {/* 右: 内訳バー */}
+                <div className="flex-1 p-5 sm:p-6 space-y-3">
+                  {/* NPS */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                        <BarChart3 className="w-3 h-3" /> NPS評価
+                      </span>
+                      <span className="text-xs font-mono-data font-bold text-foreground">
+                        {compositeScore.available.nps ? `${compositeScore.npsComponent}/40` : "—"}
+                      </span>
+                    </div>
+                    <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${(compositeScore.npsComponent / 40) * 100}%`,
+                          backgroundColor: compositeScore.available.nps ? "#2D9C8F" : "#d4d4d4",
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 次回予約率 */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                        <CalendarCheck className="w-3 h-3" /> 次回予約率
+                      </span>
+                      <span className="text-xs font-mono-data font-bold text-foreground">
+                        {compositeScore.available.reservation ? `${compositeScore.reservationComponent}/25` : "—"}
+                      </span>
+                    </div>
+                    <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${(compositeScore.reservationComponent / 25) * 100}%`,
+                          backgroundColor: compositeScore.available.reservation ? "#E5B85C" : "#d4d4d4",
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* ファンくる */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                        <FolderOpen className="w-3 h-3" /> ファンくる調査
+                      </span>
+                      <span className="text-xs font-mono-data font-bold text-foreground">
+                        {compositeScore.available.fankuru ? `${compositeScore.fankuruComponent}/20` : "—"}
+                      </span>
+                    </div>
+                    <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${(compositeScore.fankuruComponent / 20) * 100}%`,
+                          backgroundColor: compositeScore.available.fankuru ? "#3B82F6" : "#d4d4d4",
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 稼働率 */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                        <Gauge className="w-3 h-3" /> 稼働率
+                      </span>
+                      <span className="text-xs font-mono-data font-bold text-foreground">
+                        {compositeScore.available.utilization ? `${compositeScore.utilizationComponent}/15` : "—"}
+                      </span>
+                    </div>
+                    <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${(compositeScore.utilizationComponent / 15) * 100}%`,
+                          backgroundColor: compositeScore.available.utilization ? "#8B5CF6" : "#d4d4d4",
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
       {/* ===== 0. 次回予約率・稼働率 ===== */}
       {staffReport && (() => {
