@@ -252,10 +252,16 @@ export default function SurveyList() {
                           <Users className="w-5 h-5 text-primary" />
                         </div>
                         <div className="min-w-0">
-                          <h3 className="font-semibold text-base flex items-center gap-1.5">
+                          <h3 className="font-semibold text-base flex items-center gap-1.5 flex-wrap">
                             {staff.name}
                             {isNewStaff(staff.name, staff.storeNormalized) && (
                               <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none">NEW</span>
+                            )}
+                            {npsInfo && npsInfo.total > 0 && (
+                              <span className="text-[10px] font-medium text-muted-foreground bg-muted/60 rounded px-1.5 py-0.5 leading-none">NPS {npsInfo.total}件</span>
+                            )}
+                            {fankuruCount > 0 && (
+                              <span className="text-[10px] font-medium text-amber-700 bg-amber-50 rounded px-1.5 py-0.5 leading-none">ファンくる {fankuruCount}件</span>
                             )}
                           </h3>
                           <div className="flex items-center gap-3 mt-1 flex-wrap">
