@@ -1,15 +1,15 @@
 /**
  * Design: Atelier Blanc — クリーンアトリエ
  * Page: スタッフ別アンケート一覧（NPS + ファンくる）
- * データソース: NPSスプレッドシート + ファンくるPDFスプレッドシート
- * 月末報告書に依存しない
+ * データソース: NPSスプレッドシート + ファンくるPDFスプレッドシート + 月末報告書（コメントのみ）
  */
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
 import {
-  ClipboardList, MapPin, ChevronRight, BarChart3, Star, Users, Search, Store
+  ClipboardList, MapPin, ChevronRight, BarChart3, Star, Users, Search, Store, MessageCircle, Loader2
 } from "lucide-react";
+import { trpc } from "@/lib/trpc";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -95,13 +95,11 @@ export default function SurveyList() {
   }, [npsRecords]);
 
   // ファンくるPDFからスタッフリストを構築（stylistフィールドが入っているレコードのみ）
-  // normalizeStylistNameで正式名に変換してから登録
   const fankuruStaffEntries = useMemo(() => {
     const map = new Map<string, StaffEntry>();
     for (const [storeName, pdfs] of Object.entries(fankuruAllData)) {
       for (const pdf of pdfs) {
         if (!pdf.stylist || pdf.stylist.trim() === "") continue;
-        // stylistの正規化名（正式名）を取得
         const canonicalName = normalizeStylistName(pdf.stylist);
         const key = `${normalizeName(canonicalName)}__${storeName}`;
         if (!map.has(key)) {
@@ -116,16 +114,13 @@ export default function SurveyList() {
   const staffList = useMemo(() => {
     const merged = new Map<string, StaffEntry>();
 
-    // NPSスタッフを追加
     for (const [key, entry] of Array.from(npsStaffEntries.entries())) {
       merged.set(key, entry);
     }
 
-    // ファンくるスタッフを追加（NPSに既にあればスキップ、なければマッチング試行）
     for (const [, entry] of Array.from(fankuruStaffEntries.entries())) {
-      // 既存のNPSスタッフとマッチするか確認（スペース除去で比較）
       let matched = false;
-      for (const [existingKey, existingEntry] of Array.from(merged.entries())) {
+      for (const [, existingEntry] of Array.from(merged.entries())) {
         if (existingEntry.store === entry.store && (
           matchesStylist(entry.name, existingEntry.name) ||
           normalizeName(entry.name) === normalizeName(existingEntry.name)
@@ -142,7 +137,6 @@ export default function SurveyList() {
       }
     }
 
-    // 退社スタッフを除外
     return Array.from(merged.values()).filter(
       (s) => !isRetiredStaff(s.name, s.store, "")
     );
@@ -157,7 +151,6 @@ export default function SurveyList() {
   // 各スタッフのNPS情報を計算（期間フィルタ連動）
   const staffNpsMap = useMemo(() => {
     const map = new Map<string, { total: number; npsScore: number }>();
-    // 期間でフィルタしたNPSレコード
     let filteredNps = npsRecords;
     if (!isAllPeriod) {
       filteredNps = npsRecords.filter(r => {
@@ -166,7 +159,6 @@ export default function SurveyList() {
         return (filterMonths as string[]).includes(ym);
       });
     }
-    // スタッフ名でグルーピング
     const groupedByStaff = new Map<string, typeof filteredNps>();
     for (const r of filteredNps) {
       if (!r.staff || r.staff.trim() === "" || r.staff.trim() === "選択しない") continue;
@@ -191,11 +183,9 @@ export default function SurveyList() {
     for (const [storeName, pdfs] of Object.entries(fankuruAllData)) {
       for (const pdf of pdfs) {
         if (!pdf.stylist || pdf.stylist.trim() === "") continue;
-        // 期間フィルタ
         if (!isAllPeriod) {
           if (!pdf.yearMonth || !(filterMonths as string[]).includes(pdf.yearMonth)) continue;
         }
-        // このPDFのstylistに該当するスタッフを見つける
         for (const staff of staffList) {
           if (staff.store !== storeName) continue;
           if (matchesStylist(pdf.stylist, staff.name)) {
@@ -208,6 +198,75 @@ export default function SurveyList() {
     }
     return map;
   }, [fankuruAllData, staffList, filterMonths, isAllPeriod]);
+
+  // 各スタッフの最新ファンくるPDF（期間内で最新1件ずつ）のdriveFileIdを収集
+  const latestFankuruPdfs = useMemo(() => {
+    const map = new Map<string, { driveFileId: string; stylist: string; date: string; store: string }>();
+    for (const [storeName, pdfs] of Object.entries(fankuruAllData)) {
+      // 日付降順にソート済みなので最初にマッチしたものが最新
+      for (const pdf of pdfs) {
+        if (!pdf.stylist || pdf.stylist.trim() === "") continue;
+        if (!pdf.driveFileId) continue;
+        if (!isAllPeriod) {
+          if (!pdf.yearMonth || !(filterMonths as string[]).includes(pdf.yearMonth)) continue;
+        }
+        for (const staff of staffList) {
+          if (staff.store !== storeName) continue;
+          if (matchesStylist(pdf.stylist, staff.name)) {
+            const key = `${normalizeName(staff.name)}__${staff.store}`;
+            if (!map.has(key)) {
+              map.set(key, {
+                driveFileId: pdf.driveFileId,
+                stylist: pdf.stylist,
+                date: pdf.date || pdf.yearMonth,
+                store: storeName,
+              });
+            }
+            break;
+          }
+        }
+      }
+    }
+    return Array.from(map.entries());
+  }, [fankuruAllData, staffList, filterMonths, isAllPeriod]);
+
+  // tRPC経由でファンくるPDFコメントを取得
+  const pdfInputs = useMemo(() => {
+    return latestFankuruPdfs.map(([, pdf]) => pdf);
+  }, [latestFankuruPdfs]);
+
+  const { data: fankuruComments, isLoading: commentsLoading } = trpc.fankuru.getComments.useQuery(
+    { pdfs: pdfInputs },
+    {
+      enabled: pdfInputs.length > 0 && !loading,
+      staleTime: 10 * 60 * 1000, // 10分キャッシュ
+      retry: 1,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  // コメントデータをスタッフキーでマッピング
+  const staffFankuruCommentMap = useMemo(() => {
+    const map = new Map<string, { comment: string; month: string }>();
+    if (!fankuruComments) return map;
+
+    for (const comment of fankuruComments) {
+      if (!comment.comment || comment.comment.trim() === "") continue;
+      // driveFileIdからスタッフキーを逆引き
+      for (const [key, pdf] of latestFankuruPdfs) {
+        if (pdf.driveFileId === comment.driveFileId) {
+          if (!map.has(key)) {
+            map.set(key, {
+              comment: comment.comment,
+              month: comment.date || "",
+            });
+          }
+          break;
+        }
+      }
+    }
+    return map;
+  }, [fankuruComments, latestFankuruPdfs]);
 
   // フィルタ・検索適用
   const filteredStaff = useMemo(() => {
@@ -310,6 +369,7 @@ export default function SurveyList() {
               const normalizedKey = `${normalizeName(staff.name)}__${staff.store}`;
               const npsInfo = staffNpsMap.get(normalizedKey);
               const fankuruCount = staffFankuruMap.get(normalizedKey) || 0;
+              const fankuruComment = staffFankuruCommentMap.get(normalizedKey);
               const npsClass = npsInfo ? getNpsClass(npsInfo.npsScore) : null;
 
               return (
@@ -327,7 +387,7 @@ export default function SurveyList() {
                         <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                           <Users className="w-5 h-5 text-primary" />
                         </div>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <h3 className="font-semibold text-base flex items-center gap-1.5 flex-wrap">
                             {staff.name}
                             {isNewStaff(staff.name, staff.store) && (
@@ -358,6 +418,22 @@ export default function SurveyList() {
                               </span>
                             )}
                           </div>
+                          {/* ファンくる最新コメントプレビュー */}
+                          {commentsLoading && fankuruCount > 0 && (
+                            <div className="mt-2 flex items-center gap-1.5">
+                              <Loader2 className="w-3 h-3 text-amber-400 animate-spin" />
+                              <span className="text-[11px] text-muted-foreground/60">コメント読み込み中...</span>
+                            </div>
+                          )}
+                          {!commentsLoading && fankuruComment && (
+                            <div className="mt-2 flex items-start gap-1.5 min-w-0">
+                              <MessageCircle className="w-3 h-3 text-amber-500 shrink-0 mt-0.5" />
+                              <p className="text-xs text-muted-foreground truncate leading-relaxed">
+                                <span className="text-[10px] text-amber-600 font-medium mr-1">{fankuruComment.month}</span>
+                                {fankuruComment.comment}
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
