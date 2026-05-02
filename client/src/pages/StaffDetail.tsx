@@ -659,17 +659,26 @@ export default function StaffDetail() {
       {staffAdvice && (staffAdvice.strength || staffAdvice.reservationAdvice) && !loading && (
         <section className="mb-6">
           <Card className="border-primary/20 shadow-sm bg-gradient-to-r from-blue-50/40 to-sky-50/30 overflow-hidden">
-            <CardContent className="p-4 sm:p-5">
+            <CardContent className="p-3 sm:p-5">
+              {/* モバイル: アイコンとタイトルを上部に配置 */}
+              <div className="flex items-center gap-2 mb-3 sm:hidden">
+                <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <Lightbulb className="w-3.5 h-3.5 text-primary" />
+                </div>
+                <span className="text-xs font-bold text-primary">アドバイス</span>
+              </div>
+
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                {/* PC: 左アイコン */}
+                <div className="w-8 h-8 rounded-lg bg-primary/10 hidden sm:flex items-center justify-center shrink-0 mt-0.5">
                   <Lightbulb className="w-4 h-4 text-primary" />
                 </div>
-                <div className="flex-1 space-y-2.5">
+                <div className="flex-1 space-y-3 sm:space-y-2.5">
                   {/* 強み */}
                   {staffAdvice.strength && (
                     <div className="flex items-start gap-2">
                       <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <p className="text-sm text-foreground leading-relaxed">
+                      <p className="text-[13px] sm:text-sm text-foreground leading-relaxed">
                         <span className="font-bold text-emerald-700">強み：</span>{staffAdvice.strength}
                       </p>
                     </div>
@@ -679,24 +688,24 @@ export default function StaffDetail() {
                   {staffAdvice.reservationAdvice && !staffAdvice.reservationAdvice.achieved && (
                     <div className="flex items-start gap-2">
                       <Target className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                      <div className="space-y-1.5">
-                        <p className="text-sm text-foreground leading-relaxed">
-                          <span className="font-bold text-primary">次回予約率 {staffAdvice.reservationAdvice.currentRate}%</span>
+                      <div className="space-y-2 sm:space-y-1.5">
+                        <p className="text-[13px] sm:text-sm text-foreground leading-relaxed">
+                          <span className="font-bold text-primary">予約率 {staffAdvice.reservationAdvice.currentRate}%</span>
                           <span className="text-muted-foreground"> → 目標 </span>
                           <span className="font-bold text-primary">{staffAdvice.reservationAdvice.targetRate}%</span>
                         </p>
                         {staffAdvice.reservationAdvice.additionalNeeded > 0 && (
-                          <p className="text-sm text-muted-foreground leading-relaxed">
-                            あと<span className="font-bold text-foreground">{staffAdvice.reservationAdvice.additionalNeeded}名</span>の次回予約で{staffAdvice.reservationAdvice.targetRate}%達成。総合点<span className="font-bold text-foreground">{staffAdvice.reservationAdvice.projectedScore}点（{staffAdvice.reservationAdvice.projectedRankLabel}）</span>に。
+                          <p className="text-[13px] sm:text-sm text-muted-foreground leading-relaxed">
+                            あと<span className="font-bold text-foreground">{staffAdvice.reservationAdvice.additionalNeeded}名</span>の次回予約で達成。総合点<span className="font-bold text-foreground">{staffAdvice.reservationAdvice.projectedScore}点（{staffAdvice.reservationAdvice.projectedRankLabel}）</span>に。
                           </p>
                         )}
                         <a
                           href={staffAdvice.reservationAdvice.manualUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors mt-1"
+                          className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors mt-1.5 py-1.5 px-2.5 bg-primary/5 rounded-md sm:bg-transparent sm:p-0 sm:rounded-none"
                         >
-                          <FileText className="w-3 h-3" />
+                          <FileText className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
                           次回予約率の改善マニュアル
                           <ExternalLink className="w-3 h-3" />
                         </a>
@@ -708,8 +717,8 @@ export default function StaffDetail() {
                   {staffAdvice.reservationAdvice?.achieved && (
                     <div className="flex items-start gap-2">
                       <Trophy className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                      <p className="text-sm text-foreground leading-relaxed">
-                        <span className="font-bold text-amber-600">次回予約率 {staffAdvice.reservationAdvice.currentRate}%</span>
+                      <p className="text-[13px] sm:text-sm text-foreground leading-relaxed">
+                        <span className="font-bold text-amber-600">予約率 {staffAdvice.reservationAdvice.currentRate}%</span>
                         <span className="text-muted-foreground"> — 目標達成！この調子を維持しましょう。</span>
                       </p>
                     </div>
