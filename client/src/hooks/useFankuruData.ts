@@ -34,6 +34,7 @@ const STORE_NAME_NORMALIZE: Record<string, string> = {
   "広島楽々園院": "楽々園院",
   "大阪福島院": "福島院",
   "大阪高槻院": "高槻院",
+  "大阪|堀江院": "堀江院",  // スプレッドシートでパイプ区切りの表記
   // そのまま使えるケース
   "姪浜院": "姪浜院",
   "堀江院": "堀江院",
@@ -253,7 +254,12 @@ const STYLIST_NAME_ALIASES: Record<string, string[]> = {
     "いしばしあかね", "イシバシアカネ",
   ],
   // 藤田（過去スタッフ）
-  "藤田": ["ふじた", "フジタ", "fujita"],
+  "藤田": ["ふじた", "フジタ", "fujita", "ふじたみほ", "フジタミホ", "藤田美穂"],
+  "尾上みゆき": [
+    "尾上", "おがみ", "オガミ", "ogami",
+    "みゆき", "ミユキ", "miyuki",
+    "おがみみゆき", "オガミミユキ",
+  ],
 
   // === 楽々園院 ===
   "井上 恵子": [
@@ -286,13 +292,16 @@ const STYLIST_NAME_ALIASES: Record<string, string[]> = {
 
   // === 堀江院 ===
   "Kaede": ["かえで", "カエデ", "kaede", "楓"],
+  // 堀江院のMika（スプレッドシートで「大阪|堀江院」として登録）
+  // STAFF_STORE_MAPで福島院のMikaと区別
 
   // === 堀江院2nd ===
   "Mimi": ["みみ", "ミミ", "mimi"],
-  "sayuri": ["さゆり", "サユリ", "sayuri", "小百合"],
-  "Aki": ["あき", "アキ", "aki"],
+  "sayuri": ["さゆり", "サユリ", "sayuri", "小百合", "Sayuri"],
+  "Aki": ["あき", "アキ", "aki", "AKI"],
   "Kazumi": ["かずみ", "カズミ", "kazumi"],
   "Hiromi": ["ひろみ", "ヒロミ", "hiromi"],
+  "坂手": ["さかて", "サカテ", "sakate"],
 
   // === 高槻院 ===
   "Yuko": ["ゆうこ", "ユウコ", "yuko", "yuuko"],
@@ -306,7 +315,19 @@ const STYLIST_NAME_ALIASES: Record<string, string[]> = {
   "Hiroko": ["ひろこ", "ヒロコ", "hiroko"],
   "Mika": ["みか", "ミカ", "mika"],
   "Hitomi": ["ひとみ", "ヒトミ", "hitomi"],
+  "杉本": ["すぎもと", "スギモト", "sugimoto"],
+  "かよ": ["カヨ", "kayo"],
+
+  // === 高槻院 追加エイリアス ===
+  // ファンくるで「アスカさんです。」と記載されるケース対応
+  // Asukaのエイリアスに追加
 };
+
+// Asukaのエイリアスにファンくる特有の表記を追加
+STYLIST_NAME_ALIASES["Asuka"] = [
+  ...(STYLIST_NAME_ALIASES["Asuka"] || []),
+  "アスカさんです。", "アスカさんです", "アスカさん",
+];
 
 /**
  * スタッフ名と所属店舗の紐づけテーブル。
@@ -319,6 +340,7 @@ const STAFF_STORE_MAP: Record<string, string> = {
   "金田あゆみ": "姪浜院",
   "石橋 茉": "姪浜院",
   "藤田": "姪浜院",
+  "尾上みゆき": "姪浜院",
   // 楽々園院
   "井上 恵子": "楽々園院",
   "前田慶子": "楽々園院",
@@ -333,6 +355,7 @@ const STAFF_STORE_MAP: Record<string, string> = {
   "Aki": "堀江院2nd",
   "Kazumi": "堀江院2nd",
   "Hiromi": "堀江院2nd",
+  "坂手": "堀江院2nd",
   // 高槻院
   "Yuko": "高槻院",
   "Asuka": "高槻院",
@@ -344,6 +367,8 @@ const STAFF_STORE_MAP: Record<string, string> = {
   "Hiroko": "福島院",
   "Mika": "福島院",
   "Hitomi": "福島院",
+  "杉本": "福島院",
+  "かよ": "福島院",
 };
 
 // 逆引きマップを構築（エイリアス → 正式名）
