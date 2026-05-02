@@ -7,7 +7,7 @@ import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
 import {
-  ClipboardList, MapPin, ChevronRight, BarChart3, Star, MessageSquare
+  ClipboardList, MapPin, ChevronRight, BarChart3, Star
 } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
@@ -15,27 +15,23 @@ import { useNpsData, filterByMonth } from "@/hooks/useNpsData";
 import { useFankuruData } from "@/hooks/useFankuruData";
 import { getNpsClass } from "@/lib/npsClass";
 import { isNewStore } from "@/lib/newBadge";
-
 // エリア定義
 const AREA_STORES: { area: string; stores: string[] }[] = [
   { area: "大阪エリア", stores: ["堀江院", "堀江院2nd", "福島院", "高槻院"] },
   { area: "福岡エリア", stores: ["姪浜院"] },
   { area: "広島エリア", stores: ["楽々園院"] },
 ];
-
 // 店舗カード
 function StoreCard({ storeName }: { storeName: string }) {
   const { records: npsRecords } = useNpsData();
   const { rawData } = useMonthlyReport();
   const { pdfs: fankuruPdfs, hasFolderMapping } = useFankuruData(storeName);
-
   // 先月のNPSデータ
   const lastMonth = useMemo(() => {
     const now = new Date();
     const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     return `${lm.getFullYear()}-${String(lm.getMonth() + 1).padStart(2, "0")}`;
   }, []);
-
   const storeNps = useMemo(() => {
     const filtered = filterByMonth(npsRecords, lastMonth).filter(r => r.storeShort === storeName);
     if (filtered.length === 0) return null;
@@ -45,22 +41,21 @@ function StoreCard({ storeName }: { storeName: string }) {
     const npsScore = Math.round(((promoters - detractors) / total) * 100);
     return { total, npsScore };
   }, [npsRecords, lastMonth, storeName]);
-
-  // ファンくるコメント件数（月末報告書から）
+  // ファンくるコメント件数（月末報告書から — 先月でフィルタ）
   const fankuruCommentCount = useMemo(() => {
     return rawData.filter(r => 
       r.storeNormalized === storeName && 
+      r.reportMonth === lastMonth &&
       r.fankuruComment && 
       r.fankuruComment.trim() !== "" && 
       r.fankuruComment.trim() !== "なし"
     ).length;
-  }, [rawData, storeName]);
-
-  // ファンくるPDF件数
-  const fankuruPdfCount = fankuruPdfs.length;
-
+  }, [rawData, storeName, lastMonth]);
+  // ファンくるPDF件数（先月でフィルタ）
+  const fankuruPdfCount = useMemo(() => {
+    return fankuruPdfs.filter(p => p.yearMonth === lastMonth).length;
+  }, [fankuruPdfs, lastMonth]);
   const npsClass = storeNps ? getNpsClass(storeNps.npsScore) : null;
-
   return (
     <Link href={`/survey/${encodeURIComponent(storeName)}`}>
       <motion.div
@@ -115,18 +110,14 @@ function StoreCard({ storeName }: { storeName: string }) {
     </Link>
   );
 }
-
 export default function SurveyList() {
   const { loading: monthlyLoading } = useMonthlyReport();
   const { loading: npsLoading, lastUpdated, refresh } = useNpsData();
-
   const loading = monthlyLoading || npsLoading;
-
   const breadcrumbs = [
     { label: "ホーム", href: "/" },
     { label: "顧客アンケート一覧" },
   ];
-
   return (
     <DashboardLayout
       breadcrumbs={breadcrumbs}
@@ -145,7 +136,6 @@ export default function SurveyList() {
             店舗を選択してNPS・ファンくる調査結果を確認
           </p>
         </div>
-
         {/* ローディング */}
         {loading && (
           <div className="flex items-center justify-center py-16">
@@ -155,7 +145,6 @@ export default function SurveyList() {
             </div>
           </div>
         )}
-
         {/* エリア別店舗一覧 */}
         {!loading && (
           <div className="space-y-6">
