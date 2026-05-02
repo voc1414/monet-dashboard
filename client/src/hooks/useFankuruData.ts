@@ -225,8 +225,7 @@ export async function fetchPdfData(): Promise<Record<string, FankuruPdf[]>> {
   return fetchPromise;
 }
 
-// ファンくるフォルダが設定されている店舗
-const FANKURU_ENABLED_STORES = new Set(["姪浜院", "堀江院", "堀江院2nd", "楽々園院"]);
+// ファンくるフォルダが設定されている店舗（動的判定に移行済み — hasFolderMappingはデータの有無で判定）
 
 /**
  * ファンくるのスタイリスト名（ひらがな/カタカナ/略称/ローマ字）と
@@ -448,7 +447,6 @@ export function useFankuruDataByStaff(staffName: string, storeName?: string) {
 }
 
 export function useFankuruData(storeName: string) {
-  const hasFolderMapping = FANKURU_ENABLED_STORES.has(storeName);
   const [allData, setAllData] = useState<Record<string, FankuruPdf[]>>(LEGACY_DATA);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -482,6 +480,9 @@ export function useFankuruData(storeName: string) {
     });
     return Array.from(months).sort().reverse();
   }, [pdfs]);
+
+  // 動的判定: スプレッドシートにデータがあれば自動的にファンくるセクションを表示
+  const hasFolderMapping = pdfs.length > 0;
 
   return {
     pdfs,
