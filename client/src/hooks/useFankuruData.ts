@@ -248,9 +248,9 @@ const STYLIST_NAME_ALIASES: Record<string, string[]> = {
     "あゆみ", "アユミ", "ayumi",
     "かねだあゆみ", "カネダアユミ",
   ],
-  "石橋 茉": [
+  "石橋茜": [
     "石橋", "いしばし", "イシバシ", "ishibashi",
-    "茉", "あかね", "アカネ", "akane",
+    "あかね", "アカネ", "akane",
     "いしばしあかね", "イシバシアカネ",
   ],
   // 藤田（過去スタッフ）
@@ -338,7 +338,7 @@ const STAFF_STORE_MAP: Record<string, string> = {
   // 姪浜院
   "山口純奈": "姪浜院",
   "金田あゆみ": "姪浜院",
-  "石橋 茉": "姪浜院",
+  "石橋茜": "姪浜院",
   "藤田": "姪浜院",
   "尾上みゆき": "姪浜院",
   // 楽々園院
@@ -385,7 +385,7 @@ for (const [canonical, aliases] of Object.entries(STYLIST_NAME_ALIASES)) {
  * スタイリスト名を正規化する。
  * エイリアスがあれば正式名に変換、なければそのまま返す。
  */
-function normalizeStylistName(name: string): string {
+export function normalizeStylistName(name: string): string {
   const lower = name.trim().toLowerCase();
   return ALIAS_TO_CANONICAL[lower] || name.trim();
 }

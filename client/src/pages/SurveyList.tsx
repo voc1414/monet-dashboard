@@ -1,9 +1,10 @@
 /**
  * Design: Atelier Blanc — クリーンアトリエ
- * Page: スタッフ別アンケート一覧
- * Colors: Warm white base, monet water-blue accent
+ * Page: スタッフ別アンケート一覧（NPS + ファンくる）
+ * データソース: NPSスプレッドシート + ファンくるPDFスプレッドシート
+ * 月末報告書に依存しない
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
 import {
@@ -12,25 +13,62 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import DashboardLayout from "@/components/DashboardLayout";
-import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { useNpsData, getAvailableMonths } from "@/hooks/useNpsData";
+import { fetchPdfData, matchesStylist, normalizeStylistName } from "@/hooks/useFankuruData";
+import type { FankuruPdf } from "@/hooks/useFankuruData";
 import { getNpsClass } from "@/lib/npsClass";
 import { isNewStaff, isRetiredStaff } from "@/lib/newBadge";
 import { PeriodSelector, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
 import type { PeriodSelection } from "@/components/PeriodSelector";
-import type { StaffReport } from "@/hooks/useMonthlyReport";
+
+// スタッフ情報（NPS + ファンくるから構築）
+interface StaffEntry {
+  name: string;
+  store: string;
+}
 
 export default function SurveyList() {
-  const { rawData, loading: monthlyLoading, availableMonths: reportMonths } = useMonthlyReport();
   const { records: npsRecords, loading: npsLoading, lastUpdated, refresh } = useNpsData();
-  const loading = monthlyLoading || npsLoading;
+
+  // ファンくるPDFデータ取得
+  const [fankuruAllData, setFankuruAllData] = useState<Record<string, FankuruPdf[]>>({});
+  const [fankuruLoading, setFankuruLoading] = useState(true);
+
+  const loadFankuru = useCallback(async () => {
+    try {
+      setFankuruLoading(true);
+      const data = await fetchPdfData();
+      setFankuruAllData(data);
+    } catch (err) {
+      console.warn("ファンくるデータ取得エラー:", err);
+    } finally {
+      setFankuruLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadFankuru();
+  }, [loadFankuru]);
+
+  const loading = npsLoading || fankuruLoading;
+
+  // ファンくるPDFから利用可能な月を取得
+  const fankuruMonths = useMemo(() => {
+    const months = new Set<string>();
+    for (const pdfs of Object.values(fankuruAllData)) {
+      for (const pdf of pdfs) {
+        if (pdf.yearMonth) months.add(pdf.yearMonth);
+      }
+    }
+    return Array.from(months).sort().reverse();
+  }, [fankuruAllData]);
 
   // 期間セレクタ
   const npsMonths = useMemo(() => getAvailableMonths(npsRecords), [npsRecords]);
   const allMonths = useMemo(() => {
-    const set = new Set([...npsMonths, ...reportMonths]);
+    const set = new Set([...npsMonths, ...fankuruMonths]);
     return Array.from(set).sort().reverse();
-  }, [npsMonths, reportMonths]);
+  }, [npsMonths, fankuruMonths]);
 
   const [periodSelection, setPeriodSelection] = useState<PeriodSelection>(getDefaultPeriodSelection());
   const filterMonths = useMemo(() => getFilterMonths(periodSelection, allMonths), [periodSelection, allMonths]);
@@ -40,47 +78,83 @@ export default function SurveyList() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStore, setFilterStore] = useState("all");
 
-  // スタッフリスト構築（期間フィルタ連動）
-  const staffList = useMemo(() => {
-    if (!rawData.length) return [];
-    let filtered: StaffReport[];
-    if (isAllPeriod) {
-      // 全期間: 各スタッフの最新月のデータを使用
-      const map = new Map<string, StaffReport>();
-      for (const r of rawData) {
-        const key = `${r.name}__${r.storeNormalized}`;
-        const existing = map.get(key);
-        if (!existing || r.reportMonth > existing.reportMonth) {
-          map.set(key, r);
-        }
+  // スタッフ名正規化（スペース除去）
+  const normalizeName = (name: string) => name.replace(/\s+/g, "").trim();
+
+  // NPSデータからスタッフリストを構築（スタッフ名が入っているレコードのみ）
+  const npsStaffEntries = useMemo(() => {
+    const map = new Map<string, StaffEntry>();
+    for (const r of npsRecords) {
+      if (!r.staff || r.staff.trim() === "" || r.staff.trim() === "選択しない") continue;
+      const key = `${normalizeName(r.staff)}__${r.storeShort}`;
+      if (!map.has(key)) {
+        map.set(key, { name: r.staff.trim(), store: r.storeShort });
       }
-      filtered = Array.from(map.values());
-    } else if ((filterMonths as string[]).length === 1) {
-      filtered = rawData.filter((r) => r.reportMonth === (filterMonths as string[])[0]);
-    } else {
-      const monthSet = new Set(filterMonths as string[]);
-      const inRange = rawData.filter((r) => monthSet.has(r.reportMonth));
-      const map = new Map<string, StaffReport>();
-      for (const r of inRange) {
-        const key = `${r.name}__${r.storeNormalized}`;
-        const existing = map.get(key);
-        if (!existing || r.reportMonth > existing.reportMonth) {
-          map.set(key, r);
-        }
-      }
-      filtered = Array.from(map.values());
     }
+    return map;
+  }, [npsRecords]);
+
+  // ファンくるPDFからスタッフリストを構築（stylistフィールドが入っているレコードのみ）
+  // normalizeStylistNameで正式名に変換してから登録
+  const fankuruStaffEntries = useMemo(() => {
+    const map = new Map<string, StaffEntry>();
+    for (const [storeName, pdfs] of Object.entries(fankuruAllData)) {
+      for (const pdf of pdfs) {
+        if (!pdf.stylist || pdf.stylist.trim() === "") continue;
+        // stylistの正規化名（正式名）を取得
+        const canonicalName = normalizeStylistName(pdf.stylist);
+        const key = `${normalizeName(canonicalName)}__${storeName}`;
+        if (!map.has(key)) {
+          map.set(key, { name: canonicalName, store: storeName });
+        }
+      }
+    }
+    return map;
+  }, [fankuruAllData]);
+
+  // 統合スタッフリスト（NPS + ファンくるから重複排除）
+  const staffList = useMemo(() => {
+    const merged = new Map<string, StaffEntry>();
+
+    // NPSスタッフを追加
+    for (const [key, entry] of Array.from(npsStaffEntries.entries())) {
+      merged.set(key, entry);
+    }
+
+    // ファンくるスタッフを追加（NPSに既にあればスキップ、なければマッチング試行）
+    for (const [, entry] of Array.from(fankuruStaffEntries.entries())) {
+      // 既存のNPSスタッフとマッチするか確認（スペース除去で比較）
+      let matched = false;
+      for (const [existingKey, existingEntry] of Array.from(merged.entries())) {
+        if (existingEntry.store === entry.store && (
+          matchesStylist(entry.name, existingEntry.name) ||
+          normalizeName(entry.name) === normalizeName(existingEntry.name)
+        )) {
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) {
+        const key = `${normalizeName(entry.name)}__${entry.store}`;
+        if (!merged.has(key)) {
+          merged.set(key, entry);
+        }
+      }
+    }
+
     // 退社スタッフを除外
-    return filtered.filter((s) => !isRetiredStaff(s.name, s.storeNormalized, s.reportMonth));
-  }, [rawData, filterMonths, isAllPeriod]);
+    return Array.from(merged.values()).filter(
+      (s) => !isRetiredStaff(s.name, s.store, "")
+    );
+  }, [npsStaffEntries, fankuruStaffEntries]);
 
   // 店舗リスト（フィルタ用）
   const storeList = useMemo(() => {
-    const stores = new Set(staffList.map((s) => s.storeNormalized));
+    const stores = new Set(staffList.map((s) => s.store));
     return Array.from(stores).sort();
   }, [staffList]);
 
-  // 各スタッフのNPS情報を計算
+  // 各スタッフのNPS情報を計算（期間フィルタ連動）
   const staffNpsMap = useMemo(() => {
     const map = new Map<string, { total: number; npsScore: number }>();
     // 期間でフィルタしたNPSレコード
@@ -93,19 +167,10 @@ export default function SurveyList() {
       });
     }
     // スタッフ名でグルーピング
-    for (const r of filteredNps) {
-      if (!r.staff || r.staff.trim() === "") continue;
-      const key = `${r.staff}__${r.storeShort}`;
-      const existing = map.get(key);
-      if (!existing) {
-        map.set(key, { total: 0, npsScore: 0 });
-      }
-    }
-    // 再集計
     const groupedByStaff = new Map<string, typeof filteredNps>();
     for (const r of filteredNps) {
-      if (!r.staff || r.staff.trim() === "") continue;
-      const key = `${r.staff}__${r.storeShort}`;
+      if (!r.staff || r.staff.trim() === "" || r.staff.trim() === "選択しない") continue;
+      const key = `${normalizeName(r.staff)}__${r.storeShort}`;
       const arr = groupedByStaff.get(key) || [];
       arr.push(r);
       groupedByStaff.set(key, arr);
@@ -120,26 +185,37 @@ export default function SurveyList() {
     return map;
   }, [npsRecords, filterMonths, isAllPeriod]);
 
-  // ファンくるコメント件数（月末報告書から）
+  // 各スタッフのファンくる件数を計算（期間フィルタ連動、PDFデータから）
   const staffFankuruMap = useMemo(() => {
     const map = new Map<string, number>();
-    for (const r of rawData) {
-      if (!isAllPeriod && !(filterMonths as string[]).includes(r.reportMonth)) continue;
-      if (r.fankuruComment && r.fankuruComment.trim() !== "" && r.fankuruComment.trim() !== "なし") {
-        const key = `${r.name}__${r.storeNormalized}`;
-        map.set(key, (map.get(key) || 0) + 1);
+    for (const [storeName, pdfs] of Object.entries(fankuruAllData)) {
+      for (const pdf of pdfs) {
+        if (!pdf.stylist || pdf.stylist.trim() === "") continue;
+        // 期間フィルタ
+        if (!isAllPeriod) {
+          if (!pdf.yearMonth || !(filterMonths as string[]).includes(pdf.yearMonth)) continue;
+        }
+        // このPDFのstylistに該当するスタッフを見つける
+        for (const staff of staffList) {
+          if (staff.store !== storeName) continue;
+          if (matchesStylist(pdf.stylist, staff.name)) {
+            const key = `${normalizeName(staff.name)}__${staff.store}`;
+            map.set(key, (map.get(key) || 0) + 1);
+            break;
+          }
+        }
       }
     }
     return map;
-  }, [rawData, filterMonths, isAllPeriod]);
+  }, [fankuruAllData, staffList, filterMonths, isAllPeriod]);
 
   // フィルタ・検索適用
   const filteredStaff = useMemo(() => {
     return staffList.filter((s) => {
-      if (filterStore !== "all" && s.storeNormalized !== filterStore) return false;
+      if (filterStore !== "all" && s.store !== filterStore) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.trim().toLowerCase();
-        if (!s.name.toLowerCase().includes(q) && !s.storeNormalized.toLowerCase().includes(q)) return false;
+        if (!s.name.toLowerCase().includes(q) && !s.store.toLowerCase().includes(q)) return false;
       }
       return true;
     });
@@ -222,7 +298,7 @@ export default function SurveyList() {
             <div className="flex flex-col items-center gap-3 text-muted-foreground">
               <Users className="w-8 h-8 opacity-40" />
               <p className="text-sm">
-                {staffList.length === 0 ? "この期間のスタッフデータはありません" : "検索条件に一致するスタッフがいません"}
+                {staffList.length === 0 ? "この期間のアンケートデータはありません" : "検索条件に一致するスタッフがいません"}
               </p>
             </div>
           </div>
@@ -231,13 +307,13 @@ export default function SurveyList() {
         {!loading && filteredStaff.length > 0 && (
           <div className="space-y-2">
             {filteredStaff.map((staff, i) => {
-              const key = `${staff.name}__${staff.storeNormalized}`;
-              const npsInfo = staffNpsMap.get(key);
-              const fankuruCount = staffFankuruMap.get(key) || 0;
+              const normalizedKey = `${normalizeName(staff.name)}__${staff.store}`;
+              const npsInfo = staffNpsMap.get(normalizedKey);
+              const fankuruCount = staffFankuruMap.get(normalizedKey) || 0;
               const npsClass = npsInfo ? getNpsClass(npsInfo.npsScore) : null;
 
               return (
-                <Link key={key} href={`/staff/${encodeURIComponent(staff.storeNormalized)}/${encodeURIComponent(staff.name)}`}>
+                <Link key={normalizedKey} href={`/staff/${encodeURIComponent(staff.store)}/${encodeURIComponent(staff.name)}`}>
                   <motion.div
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -254,7 +330,7 @@ export default function SurveyList() {
                         <div className="min-w-0">
                           <h3 className="font-semibold text-base flex items-center gap-1.5 flex-wrap">
                             {staff.name}
-                            {isNewStaff(staff.name, staff.storeNormalized) && (
+                            {isNewStaff(staff.name, staff.store) && (
                               <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none">NEW</span>
                             )}
                             {npsInfo && npsInfo.total > 0 && (
@@ -267,7 +343,7 @@ export default function SurveyList() {
                           <div className="flex items-center gap-3 mt-1 flex-wrap">
                             <span className="text-xs text-muted-foreground flex items-center gap-1">
                               <MapPin className="w-3 h-3" />
-                              {staff.storeNormalized}
+                              {staff.store}
                             </span>
                             {npsInfo && npsInfo.total > 0 && (
                               <span className="text-xs text-muted-foreground flex items-center gap-1">
