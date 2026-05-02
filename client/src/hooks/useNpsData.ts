@@ -39,6 +39,10 @@ function parseStoreName(fullName: string): string {
   if (fullName.includes("高槻院")) return "高槻院";
   if (fullName.includes("姪浜院")) return "姪浜院";
   if (fullName.includes("楽々園院")) return "楽々園院";
+  if (fullName.includes("土橋院")) return "土橋院";
+  // 汎用: 「〇〇院」パターンを抽出（将来の新店舗対応）
+  const m = fullName.match(/([一-龥ぁ-ゖァ-ヶA-Za-z0-9]+院(?:2nd)?)/);
+  if (m) return m[1];
   return fullName;
 }
 
