@@ -643,6 +643,7 @@ export default function SurveyDetail() {
       </AnimatePresence>
 
       {/* ===== ファンくる調査結果（一番下） ===== */}
+      {hasFolderMapping && (
       <section className="mb-8 pt-6 border-t-2 border-sage/20">
         <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
           <FolderOpen className="w-5 h-5 text-sage" />
@@ -654,14 +655,7 @@ export default function SurveyDetail() {
           )}
         </h2>
 
-        {!hasFolderMapping ? (
-          <Card className="border-border/50 border-dashed">
-            <CardContent className="p-8 text-center text-muted-foreground">
-              <FolderOpen className="w-8 h-8 mx-auto mb-2 opacity-40" />
-              <p className="text-sm">この店舗のファンくるフォルダはまだ設定されていません</p>
-            </CardContent>
-          </Card>
-        ) : fankuruLoading ? (
+        {fankuruLoading ? (
           <Card className="border-border/50">
             <CardContent className="p-8 text-center text-muted-foreground">
               <Loader2 className="w-6 h-6 mx-auto mb-2 animate-spin opacity-50" />
@@ -799,6 +793,7 @@ export default function SurveyDetail() {
           </>
         )}
       </section>
+      )}
 
       {/* NPS回答なし */}
       {!loading && storeRecords.length === 0 && !hasFankuruData && (

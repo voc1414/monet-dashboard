@@ -93,9 +93,6 @@ function StoreCard({ storeName }: { storeName: string }) {
                     ファンくる {fankuruPdfCount > 0 ? `${fankuruPdfCount}件` : `${fankuruCommentCount}件`}
                   </span>
                 )}
-                {!hasFolderMapping && fankuruCommentCount === 0 && (
-                  <span className="text-xs text-muted-foreground/50">ファンくる未設定</span>
-                )}
               </div>
             </div>
           </div>
