@@ -21,8 +21,7 @@ import AdminLayout from "@/components/AdminLayout";
 import { useNpsData, calculateStoreStats, filterByMonth, getAvailableMonths, type NpsRecord } from "@/hooks/useNpsData";
 import { useFankuruData, type FankuruPdf } from "@/hooks/useFankuruData";
 import { toast } from "sonner";
-
-const ALL_STORES = ["堀江院", "堀江院2nd", "福島院", "高槻院", "姪浜院", "楽々園院"];
+import { useStores } from "@/hooks/useStores";
 
 const formatMonth = (ym: string) => {
   const [y, m] = ym.split("-");
@@ -156,6 +155,7 @@ function FankuruStoreSection({ storeName }: { storeName: string }) {
 }
 
 export default function AdminSurveys() {
+  const { allStores: ALL_STORES } = useStores();
   const { records, loading: npsLoading } = useNpsData();
   const [filterStore, setFilterStore] = useState("all");
   const [activeTab, setActiveTab] = useState<"fankuru" | "nps">("fankuru");

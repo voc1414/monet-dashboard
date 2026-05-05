@@ -22,6 +22,7 @@ import { useSalonBoardData } from "@/hooks/useSalonBoardData";
 import { getNpsClass, NPS_INDUSTRY_AVERAGE } from "@/lib/npsClass";
 import { isNewStore } from "@/lib/newBadge";
 import { validateStoreReport, getAlertSummary } from "@/lib/reportValidation";
+import { useStores } from "@/hooks/useStores";
 
 const HERO_IMAGE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663489426081/aLPZvLfFDC4rFYToBquZNR/monet-salon_83a99286.jpg";
 
@@ -54,16 +55,10 @@ function NpsScoreBadge({ score }: { score: number }) {
   );
 }
 
-/* エリア定義 */
-const AREA_STORES: { area: string; stores: string[] }[] = [
-  { area: "大阪エリア", stores: ["堀江院", "堀江院2nd", "福島院", "高槻院"] },
-  { area: "福岡エリア", stores: ["姪浜院"] },
-  { area: "広島エリア", stores: ["楽々園院"] },
-];
-
-const ALL_STORES = AREA_STORES.flatMap((a) => a.stores);
+/* エリア定義: フォールバック用（useStoresがDBから取得できない場合のみ使用） */
 
 export default function Home() {
+  const { areaStores: AREA_STORES, allStores: ALL_STORES } = useStores();
   const { records, loading: npsLoading, error: npsError, lastUpdated, refresh } = useNpsData();
   const { rawData, loading: reportLoading, error: reportError, getStoreMonthlyStats, availableMonths: reportMonths } = useMonthlyReport();
   const { loading: sbLoading, error: sbError, getStoreMonth, getStoreMonthsAggregated, availableMonths: sbMonths, hasData: hasSbData } = useSalonBoardData();
@@ -284,10 +279,10 @@ export default function Home() {
     return staffScores.slice(0, 5);
   }, [rawData, activeFilterMonths, filteredRecords]);
 
-  /* エリアトグル状態（デフォルト全開） */
-  const [openAreas, setOpenAreas] = useState<Set<string>>(new Set(AREA_STORES.map((a) => a.area)));
+  /* エリアトグル状態（デフォルト全開 — closedAreasで管理） */
+  const [closedAreas, setClosedAreas] = useState<Set<string>>(new Set());
   const toggleArea = (area: string) => {
-    setOpenAreas((prev) => {
+    setClosedAreas((prev) => {
       const next = new Set(prev);
       if (next.has(area)) next.delete(area);
       else next.add(area);
@@ -431,7 +426,7 @@ export default function Home() {
       {/* エリア別トグル店舗一覧 */}
       <div className="space-y-3">
         {AREA_STORES.map((areaGroup) => {
-          const isOpen = openAreas.has(areaGroup.area);
+          const isOpen = !closedAreas.has(areaGroup.area);
           const areaStores = storeStats.filter((s) => areaGroup.stores.includes(s.shortName));
 
           return (

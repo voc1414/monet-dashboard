@@ -1,6 +1,6 @@
 import { and, eq, desc, gte, lte, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, staffStatus, type StaffStatus, staffStatusHistory, type StaffStatusHistory } from "../drizzle/schema";
+import { InsertUser, users, staffStatus, type StaffStatus, staffStatusHistory, type StaffStatusHistory, stores, type Store, type InsertStore } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -218,4 +218,84 @@ export async function getReactivationCountByPeriod(
     .where(and(...conditions));
 
   return Number(result[0]?.count ?? 0);
+}
+
+// ─── Store Master helpers ───
+
+/** Get all active stores ordered by area and displayOrder */
+export async function getAllStores(): Promise<Store[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(stores)
+    .where(eq(stores.isActive, 1))
+    .orderBy(stores.area, stores.displayOrder);
+}
+
+/** Get stores grouped by area */
+export async function getStoresGroupedByArea(): Promise<{ area: string; stores: Store[] }[]> {
+  const allStores = await getAllStores();
+  const grouped: Record<string, Store[]> = {};
+  for (const store of allStores) {
+    if (!grouped[store.area]) grouped[store.area] = [];
+    grouped[store.area].push(store);
+  }
+  // Maintain consistent area ordering
+  const areaOrder = ["大阪エリア", "福岡エリア", "広島エリア"];
+  const result: { area: string; stores: Store[] }[] = [];
+  for (const area of areaOrder) {
+    if (grouped[area]) {
+      result.push({ area, stores: grouped[area] });
+      delete grouped[area];
+    }
+  }
+  // Append any remaining areas not in the predefined order
+  for (const [area, storeList] of Object.entries(grouped)) {
+    result.push({ area, stores: storeList });
+  }
+  return result;
+}
+
+/** Get a store by name */
+export async function getStoreByName(name: string): Promise<Store | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select().from(stores).where(eq(stores.name, name)).limit(1);
+  return rows[0];
+}
+
+/** Insert a new store (used by scheduled task for auto-detection) */
+export async function insertStore(input: {
+  name: string;
+  area: string;
+  displayOrder?: number;
+  rawNameVariants?: string;
+  salonBoardSheetName?: string;
+  isAutoDetected?: boolean;
+}): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.insert(stores).values({
+    name: input.name,
+    area: input.area,
+    displayOrder: input.displayOrder ?? 99,
+    rawNameVariants: input.rawNameVariants ?? input.name,
+    salonBoardSheetName: input.salonBoardSheetName ?? null,
+    isActive: 1,
+    isAutoDetected: input.isAutoDetected ? 1 : 0,
+  }).onDuplicateKeyUpdate({
+    set: {
+      area: input.area,
+      rawNameVariants: input.rawNameVariants ?? input.name,
+      updatedAt: new Date(),
+    },
+  });
+}
+
+/** Check if a store exists by name */
+export async function storeExists(name: string): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const rows = await db.select({ id: stores.id }).from(stores).where(eq(stores.name, name)).limit(1);
+  return rows.length > 0;
 }

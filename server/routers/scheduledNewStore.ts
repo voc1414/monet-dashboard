@@ -1,40 +1,36 @@
 /**
  * /api/scheduled/new-store-check
  * 定期タスクから呼ばれるエンドポイント。
- * スプレッドシートの月末報告書データを解析し、既知店舗以外の新店舗を検出して通知する。
+ * スプレッドシートの月末報告書データを解析し、DB上の既知店舗以外の新店舗を検出。
+ * 新店舗が見つかった場合はDBに自動INSERTし、オーナーに通知する。
  */
 import { Router, Request, Response } from "express";
 import { sdk } from "../_core/sdk";
 import { notifyOwner } from "../_core/notification";
+import { getAllStores, insertStore, storeExists } from "../db";
 
 const SPREADSHEET_ID = "1DXAaFk0aLDZwXq28krOcrDSiTOwd6BeTzV-xFXbLuKI";
 const GID = "505478524";
 const CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&gid=${GID}`;
 
-// 既知店舗一覧
-const KNOWN_STORES = new Set([
-  "堀江院", "堀江院2nd", "姪浜院", "楽々園院", "福島院", "高槻院",
-]);
+// エリア自動判定ルール
+const AREA_KEYWORDS: { keyword: string; area: string }[] = [
+  { keyword: "大阪", area: "大阪エリア" },
+  { keyword: "堀江", area: "大阪エリア" },
+  { keyword: "福島", area: "大阪エリア" },
+  { keyword: "高槻", area: "大阪エリア" },
+  { keyword: "福岡", area: "福岡エリア" },
+  { keyword: "姪浜", area: "福岡エリア" },
+  { keyword: "広島", area: "広島エリア" },
+  { keyword: "楽々園", area: "広島エリア" },
+  { keyword: "土橋", area: "広島エリア" },
+];
 
-// 店舗名正規化マッピング
-const STORE_NAME_MAP: Record<string, string> = {
-  "大阪堀江院": "堀江院",
-  "堀江院": "堀江院",
-  "大阪堀江院2nd": "堀江院2nd",
-  "堀江院2nd": "堀江院2nd",
-  "大阪福島院": "福島院",
-  "福島院": "福島院",
-  "高槻院": "高槻院",
-  "大阪高槻院": "高槻院",
-  "福岡姪浜院": "姪浜院",
-  "姪浜院": "姪浜院",
-  "広島楽々園院": "楽々園院",
-  "楽々園院": "楽々園院",
-};
-
-function normalizeStoreName(raw: string): string {
-  const trimmed = raw.trim();
-  return STORE_NAME_MAP[trimmed] || trimmed;
+function detectArea(storeName: string): string {
+  for (const { keyword, area } of AREA_KEYWORDS) {
+    if (storeName.includes(keyword)) return area;
+  }
+  return "未分類エリア";
 }
 
 function parseCSVLine(line: string): string[] {
@@ -95,9 +91,43 @@ interface NewStoreData {
   avgNextReservationRate: number;
   dataCount: number;
   latestDate: string;
+  detectedArea: string;
+  insertedToDB: boolean;
+}
+
+/**
+ * DBから既知店舗の正規化マッピングを動的に構築する
+ */
+async function buildNormalizationMap(): Promise<Record<string, string>> {
+  const dbStores = await getAllStores();
+  const map: Record<string, string> = {};
+
+  for (const store of dbStores) {
+    // 店舗名そのものをマッピング
+    map[store.name] = store.name;
+    // rawNameVariants（カンマ区切り）を展開
+    if (store.rawNameVariants) {
+      const variants = store.rawNameVariants.split(",").map(v => v.trim());
+      for (const variant of variants) {
+        if (variant) map[variant] = store.name;
+      }
+    }
+  }
+
+  return map;
 }
 
 async function detectNewStores(): Promise<NewStoreData[]> {
+  // DBから既知店舗セットと正規化マップを取得
+  const dbStores = await getAllStores();
+  const knownStoreNames = new Set(dbStores.map(s => s.name));
+  const normMap = await buildNormalizationMap();
+
+  function normalizeStoreName(raw: string): string {
+    const trimmed = raw.trim();
+    return normMap[trimmed] || trimmed;
+  }
+
   const res = await fetch(CSV_URL);
   if (!res.ok) throw new Error(`スプレッドシート取得失敗: HTTP ${res.status}`);
   const text = await res.text();
@@ -122,7 +152,7 @@ async function detectNewStores(): Promise<NewStoreData[]> {
     if (!rawStore) continue;
 
     const normalized = normalizeStoreName(rawStore);
-    if (KNOWN_STORES.has(normalized)) continue;
+    if (knownStoreNames.has(normalized)) continue;
 
     if (!storeAgg[normalized]) {
       storeAgg[normalized] = {
@@ -162,6 +192,26 @@ async function detectNewStores(): Promise<NewStoreData[]> {
       ? agg.nextReservationValues.reduce((a, b) => a + b, 0) / agg.nextReservationValues.length
       : 0;
 
+    const detectedArea = detectArea(storeName);
+
+    // DBに自動INSERT
+    let insertedToDB = false;
+    try {
+      const exists = await storeExists(storeName);
+      if (!exists) {
+        await insertStore({
+          name: storeName,
+          area: detectedArea,
+          rawNameVariants: Array.from(agg.rawNames).join(","),
+          isAutoDetected: true,
+        });
+        insertedToDB = true;
+        console.log(`[Scheduled] 新店舗をDBに登録: ${storeName} (${detectedArea})`);
+      }
+    } catch (err) {
+      console.error(`[Scheduled] 新店舗DB登録失敗: ${storeName}`, err);
+    }
+
     results.push({
       storeName,
       rawNames: Array.from(agg.rawNames),
@@ -175,6 +225,8 @@ async function detectNewStores(): Promise<NewStoreData[]> {
       avgNextReservationRate: Math.round(avgNextRes * 10) / 10,
       dataCount: agg.dataCount,
       latestDate: agg.latestDate,
+      detectedArea,
+      insertedToDB,
     });
   }
 
@@ -185,13 +237,15 @@ function formatNotification(stores: NewStoreData[]): { title: string; content: s
   if (stores.length === 0) {
     return {
       title: "【新店舗チェック】新店舗は検出されませんでした",
-      content: `${new Date().toLocaleDateString("ja-JP")} の定期チェック結果:\n\n既知6店舗以外の新店舗データは見つかりませんでした。\n\n既知店舗: 堀江院、堀江院2nd、福島院、高槻院、姪浜院、楽々園院`,
+      content: `${new Date().toLocaleDateString("ja-JP")} の定期チェック結果:\n\nDB登録済み店舗以外の新店舗データは見つかりませんでした。`,
     };
   }
 
   const storeDetails = stores.map(s => {
     return [
       `■ ${s.storeName}`,
+      `  エリア（自動判定）: ${s.detectedArea}`,
+      `  DB登録: ${s.insertedToDB ? "✓ 自動登録済み" : "既に登録済み"}`,
       `  スタッフ: ${s.staffNames.join("、")}`,
       `  総売上: ¥${s.totalSales.toLocaleString()}（技術: ¥${s.techSales.toLocaleString()} / 店販: ¥${s.retailSales.toLocaleString()}）`,
       `  総客数: ${s.totalCustomers}名（新規: ${s.newCustomers} / リピート: ${s.returnCustomers}）`,
@@ -201,8 +255,8 @@ function formatNotification(stores: NewStoreData[]): { title: string; content: s
   }).join("\n\n");
 
   return {
-    title: `【新店舗検出】${stores.map(s => s.storeName).join("、")} が見つかりました`,
-    content: `${new Date().toLocaleDateString("ja-JP")} の定期チェック結果:\n\n${storeDetails}\n\n---\nダッシュボードへの反映が必要です。管理者に連絡してください。`,
+    title: `【新店舗検出・自動登録】${stores.map(s => s.storeName).join("、")}`,
+    content: `${new Date().toLocaleDateString("ja-JP")} の定期チェック結果:\n\n${storeDetails}\n\n---\n上記の新店舗はダッシュボードに自動反映されました。\nエリア判定が正しいか確認してください。\nサロンボードのシート名マッピングは手動設定が必要です。`,
   };
 }
 
@@ -223,7 +277,7 @@ export function registerScheduledNewStoreRoute(app: Router): void {
 
       console.log(`[Scheduled] new-store-check triggered by user: ${user.name} (${user.role})`);
 
-      // 新店舗検出
+      // 新店舗検出 + DB自動INSERT
       const newStores = await detectNewStores();
 
       // 通知送信

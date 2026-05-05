@@ -75,3 +75,31 @@ export const staffStatusHistory = mysqlTable("staff_status_history", {
 
 export type StaffStatusHistory = typeof staffStatusHistory.$inferSelect;
 export type InsertStaffStatusHistory = typeof staffStatusHistory.$inferInsert;
+
+/**
+ * Store master table — manages all monet salon locations.
+ * New stores detected from spreadsheet data are auto-inserted by scheduled tasks.
+ * Frontend reads this table to render store lists (with hardcoded fallback).
+ */
+export const stores = mysqlTable("stores", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Normalized short name used across the dashboard (e.g. "堀江院") */
+  name: varchar("name", { length: 100 }).notNull().unique(),
+  /** Area/region grouping (e.g. "大阪エリア", "広島エリア") */
+  area: varchar("area", { length: 100 }).notNull(),
+  /** Display order within the area (lower = first) */
+  displayOrder: int("displayOrder").default(0).notNull(),
+  /** Raw name variants from spreadsheet (comma-separated for matching) */
+  rawNameVariants: text("rawNameVariants"),
+  /** Salon board sheet name mapping (e.g. "monet堀江_月別") */
+  salonBoardSheetName: varchar("salonBoardSheetName", { length: 200 }),
+  /** Whether this store is currently active */
+  isActive: int("isActive").default(1).notNull(),
+  /** Auto-detected flag: true if added by scheduled task */
+  isAutoDetected: int("isAutoDetected").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type Store = typeof stores.$inferSelect;
+export type InsertStore = typeof stores.$inferInsert;

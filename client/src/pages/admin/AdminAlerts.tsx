@@ -19,14 +19,7 @@ import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { validateStoreReport, getAlertSummary, type ReportAlert, type AlertSeverity } from "@/lib/reportValidation";
 import { PeriodSelector, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
 import type { PeriodSelection } from "@/components/PeriodSelector";
-
-const AREA_STORES: { area: string; stores: string[] }[] = [
-  { area: "大阪エリア", stores: ["堀江院", "堀江院2nd", "福島院", "高槻院"] },
-  { area: "福岡エリア", stores: ["姪浜院"] },
-  { area: "広島エリア", stores: ["楽々園院"] },
-];
-
-const ALL_STORES = AREA_STORES.flatMap((a) => a.stores);
+import { useStores } from "@/hooks/useStores";
 
 const severityConfig: Record<AlertSeverity, { icon: typeof AlertTriangle; label: string; color: string; bgColor: string; borderColor: string }> = {
   error: {
@@ -57,6 +50,7 @@ interface StoreAlert extends ReportAlert {
 }
 
 export default function AdminAlerts() {
+  const { allStores: ALL_STORES } = useStores();
   const { loading, error, getStoreMonthlyStats, availableMonths } = useMonthlyReport();
 
   const [periodSelection, setPeriodSelection] = useState<PeriodSelection>(getDefaultPeriodSelection());
