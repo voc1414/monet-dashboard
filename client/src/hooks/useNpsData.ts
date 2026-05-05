@@ -39,7 +39,7 @@ function parseStoreName(fullName: string): string {
   if (fullName.includes("高槻院")) return "高槻院";
   if (fullName.includes("姪浜院")) return "姪浜院";
   if (fullName.includes("楽々園院")) return "楽々園院";
-  if (fullName.includes("土橋院")) return "土橋院";
+  if (fullName.includes("土橋院")) return "広島土橋院";
   // 汎用: 「〇〇院」パターンを抽出（将来の新店舗対応）
   const m = fullName.match(/([一-龥ぁ-ゖァ-ヶA-Za-z0-9]+院(?:2nd)?)/);
   if (m) return m[1];
@@ -115,16 +115,15 @@ async function fetchSheetData(): Promise<NpsRecord[]> {
   }));
 }
 
-export function calculateStoreStats(records: NpsRecord[]): StoreStats[] {
+export function calculateStoreStats(records: NpsRecord[], storeList?: string[]): StoreStats[] {
   const storeMap = new Map<string, NpsRecord[]>();
   records.forEach((r) => {
     const existing = storeMap.get(r.storeShort) || [];
     existing.push(r);
     storeMap.set(r.storeShort, existing);
   });
-
-  const storeOrder = ["堀江院", "堀江院2nd", "福島院", "高槻院", "姪浜院", "楽々園院"];
-
+  // Use provided store list or fall back to all stores found in data
+  const storeOrder = storeList || Array.from(storeMap.keys());
   return storeOrder
     .filter((name) => storeMap.has(name))
     .map((shortName) => {

@@ -315,3 +315,7 @@
 - [x] scheduled APIに組み込み（新店舗検出 → DB登録 → シート名自動マッチ → 通知）
 - [x] マッチできなかったシートを通知で報告
 - [x] テスト・チェックポイント保存・デプロイ
+
+## NPSデータの店舗リスト動的化
+- [x] calculateStoreStatsのstoreOrderハードコードをDB店舗リスト対応に修正（引数でstoreListを渡す形式に変更）
+- [x] parseStoreNameの「土橋院」を「広島土橋院」に修正（DBの店舗名と一致させる）

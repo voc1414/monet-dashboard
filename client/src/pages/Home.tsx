@@ -97,7 +97,7 @@ export default function Home() {
     });
   }, [records, activeFilterMonths]);
 
-  const filteredStoreStats = calculateStoreStats(filteredRecords);
+  const filteredStoreStats = calculateStoreStats(filteredRecords, ALL_STORES);
 
   /** 選択された月リスト（配列形式）— 全期間の場合は undefined */
   const selectedMonthsList = useMemo(() => {
