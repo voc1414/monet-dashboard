@@ -292,6 +292,15 @@ export async function insertStore(input: {
   });
 }
 
+/** Update a store's salonBoardSheetName */
+export async function updateStoreSalonBoardSheet(storeName: string, sheetName: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(stores)
+    .set({ salonBoardSheetName: sheetName, updatedAt: new Date() })
+    .where(eq(stores.name, storeName));
+}
+
 /** Check if a store exists by name */
 export async function storeExists(name: string): Promise<boolean> {
   const db = await getDb();
