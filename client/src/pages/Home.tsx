@@ -20,7 +20,7 @@ import type { CompositeScoreResult } from "@/lib/compositeScore";
 
 import { useSalonBoardData } from "@/hooks/useSalonBoardData";
 import { getNpsClass, NPS_INDUSTRY_AVERAGE } from "@/lib/npsClass";
-import { isNewStore } from "@/lib/newBadge";
+
 import { validateStoreReport, getAlertSummary } from "@/lib/reportValidation";
 import { useStores } from "@/hooks/useStores";
 
@@ -58,8 +58,8 @@ function NpsScoreBadge({ score }: { score: number }) {
 /* エリア定義: フォールバック用（useStoresがDBから取得できない場合のみ使用） */
 
 export default function Home() {
-  const { areaStores: AREA_STORES, allStores: ALL_STORES } = useStores();
-  const { records, loading: npsLoading, error: npsError, lastUpdated, refresh } = useNpsData();
+  const { areaStores: AREA_STORES, allStores: ALL_STORES, npsAliasMap, isNewStore } = useStores();
+  const { records, loading: npsLoading, error: npsError, lastUpdated, refresh } = useNpsData(npsAliasMap);
   const { rawData, loading: reportLoading, error: reportError, getStoreMonthlyStats, availableMonths: reportMonths } = useMonthlyReport();
   const { loading: sbLoading, error: sbError, getStoreMonth, getStoreMonthsAggregated, availableMonths: sbMonths, hasData: hasSbData } = useSalonBoardData();
 

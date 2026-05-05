@@ -11,8 +11,8 @@ import { useState, useEffect, useMemo } from "react";
 
 const SPREADSHEET_ID = "1pYQcY42rUS3ftfIkZxffCsy7zfW2hW7U_zxtXf5A5bI";
 
-// シート名 → ダッシュボード店舗名マッピング
-const SHEET_STORE_MAP: { sheetName: string; storeName: string }[] = [
+// シート名 → ダッシュボード店舗名マッピング（フォールバック用）
+const SHEET_STORE_MAP_FALLBACK: { sheetName: string; storeName: string }[] = [
   { sheetName: "monet堀江_月別", storeName: "堀江院" },
   { sheetName: "monet広島_月別", storeName: "楽々園院" },
   { sheetName: "monet福岡姪浜院_月別", storeName: "姪浜院" },
@@ -20,6 +20,23 @@ const SHEET_STORE_MAP: { sheetName: string; storeName: string }[] = [
   { sheetName: "monet高槻_月別", storeName: "高槻院" },
   { sheetName: "monet福島院_月別", storeName: "福島院" },
 ];
+
+// Module-level sheet map that can be updated from DB
+let _salonBoardSheetMap: Record<string, string> | undefined;
+
+export function setSalonBoardSheetMap(map: Record<string, string> | undefined) {
+  _salonBoardSheetMap = map;
+  // Invalidate cache when map changes so next fetch uses new mapping
+  cachedData = null;
+  fetchPromise = null;
+}
+
+function getSheetStoreMap(): { sheetName: string; storeName: string }[] {
+  if (_salonBoardSheetMap && Object.keys(_salonBoardSheetMap).length > 0) {
+    return Object.entries(_salonBoardSheetMap).map(([storeName, sheetName]) => ({ sheetName, storeName }));
+  }
+  return SHEET_STORE_MAP_FALLBACK;
+}
 
 // CSVの列インデックス
 const COL = {
@@ -113,7 +130,7 @@ async function fetchAllStoreData(): Promise<SalonBoardMonthlyData[]> {
     const allData: SalonBoardMonthlyData[] = [];
 
     // 各店舗の月別シートからデータを取得
-    const fetchPromises = SHEET_STORE_MAP.map(async ({ sheetName, storeName }) => {
+    const fetchPromises = getSheetStoreMap().map(async ({ sheetName, storeName }) => {
       try {
         const encodedSheet = encodeURIComponent(sheetName);
         const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodedSheet}`;

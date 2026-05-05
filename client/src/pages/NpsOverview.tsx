@@ -24,7 +24,7 @@ import type { NpsRecord, StoreStats } from "@/hooks/useNpsData";
 import { generateStoreAdvice } from "@/lib/npsAdvice";
 import type { NpsAdvice } from "@/lib/npsAdvice";
 import { getNpsClass, NPS_INDUSTRY_AVERAGE, getAllNpsClasses } from "@/lib/npsClass";
-import { isNewStore } from "@/lib/newBadge";
+import { useStores } from "@/hooks/useStores";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line, AreaChart, Area
@@ -275,7 +275,8 @@ function ReviewCard({ record }: { record: NpsRecord }) {
 export default function NpsOverview() {
   const params = useParams<{ storeId: string }>();
   const storeId = decodeURIComponent(params.storeId || "");
-  const { records, loading, error, lastUpdated, refresh } = useNpsData();
+  const { npsAliasMap, isNewStore } = useStores();
+  const { records, loading, error, lastUpdated, refresh } = useNpsData(npsAliasMap);
   const allMonths = useMemo(() => getAvailableMonths(records), [records]);
   const [periodSelection, setPeriodSelection] = useState<PeriodSelection>(getDefaultPeriodSelection());
   const [reviewFilter, setReviewFilter] = useState<string>("all");

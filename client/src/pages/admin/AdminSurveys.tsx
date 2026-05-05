@@ -155,8 +155,8 @@ function FankuruStoreSection({ storeName }: { storeName: string }) {
 }
 
 export default function AdminSurveys() {
-  const { allStores: ALL_STORES } = useStores();
-  const { records, loading: npsLoading } = useNpsData();
+  const { allStores: ALL_STORES, npsAliasMap } = useStores();
+  const { records, loading: npsLoading } = useNpsData(npsAliasMap);
   const [filterStore, setFilterStore] = useState("all");
   const [activeTab, setActiveTab] = useState<"fankuru" | "nps">("fankuru");
 

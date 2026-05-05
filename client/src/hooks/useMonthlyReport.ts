@@ -42,8 +42,8 @@ function isAfterStartDate(answerDateStr: string): boolean {
   return dateMatch[1] >= DATA_START_DATE;
 }
 
-// 店舗名の正規化マッピング
-const STORE_NAME_MAP: Record<string, string> = {
+// 店舗名の正規化マッピング（フォールバック用 — DBが利用不可の場合のみ使用）
+const STORE_NAME_MAP_FALLBACK: Record<string, string> = {
   "大阪堀江院": "堀江院",
   "堀江院": "堀江院",
   "大阪堀江院2nd": "堀江院2nd",
@@ -58,9 +58,21 @@ const STORE_NAME_MAP: Record<string, string> = {
   "楽々園院": "楽々園院",
 };
 
+// Module-level alias map that can be updated from DB
+let _reportAliasMap: Record<string, string> | undefined;
+
+export function setReportAliasMap(map: Record<string, string> | undefined) {
+  _reportAliasMap = map;
+}
+
 function normalizeStoreName(raw: string): string {
   const trimmed = raw.trim();
-  return STORE_NAME_MAP[trimmed] || trimmed;
+  // DB-based map takes priority
+  if (_reportAliasMap && Object.keys(_reportAliasMap).length > 0) {
+    if (_reportAliasMap[trimmed]) return _reportAliasMap[trimmed];
+  }
+  // Fallback to hardcoded
+  return STORE_NAME_MAP_FALLBACK[trimmed] || trimmed;
 }
 
 // 回答日時から報告月を算出（-1ヶ月）

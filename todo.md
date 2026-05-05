@@ -319,3 +319,14 @@
 ## NPSデータの店舗リスト動的化
 - [x] calculateStoreStatsのstoreOrderハードコードをDB店舗リスト対応に修正（引数でstoreListを渡す形式に変更）
 - [x] parseStoreNameの「土橋院」を「広島土橋院」に修正（DBの店舗名と一致させる）
+
+## 全マッピングDB化 & 毎月6日自動同期タスク
+- [x] DBスキーマ拡張: storesテーブルにnpsAlias, reportAliases, fankuruAliases, knownSinceを追加
+- [x] 既存店舗の初期マッピングデータをDBに投入
+- [x] useNpsData.ts: parseStoreNameをDB参照に切り替え
+- [x] useMonthlyReport.ts: STORE_NAME_MAPをDB参照に切り替え
+- [x] useSalonBoardData.ts: SHEET_STORE_MAPをDB参照に切り替え
+- [x] useFankuruData.ts: STORE_NAME_NORMALIZEをDB参照に切り替え
+- [x] newBadge.ts: KNOWN_STORESをDB参照に切り替え（useStores.isNewStoreに統合）
+- [x] scheduled API: 毎月6日用の全マッピング整合性チェック・自動同期エンドポイント作成
+- [ ] 定期タスク登録（毎月6日朝9時）

@@ -26,7 +26,7 @@ import { getNpsClass, NPS_INDUSTRY_AVERAGE } from "@/lib/npsClass";
 import { generateStoreAdvice } from "@/lib/npsAdvice";
 import { useFankuruData } from "@/hooks/useFankuruData";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
-import { isNewStore } from "@/lib/newBadge";
+import { useStores } from "@/hooks/useStores";
 import type { FankuruPdf } from "@/hooks/useFankuruData";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -237,7 +237,8 @@ function ReviewCard({ record, index }: { record: NpsRecord; index: number }) {
 export default function SurveyDetail() {
   const params = useParams<{ storeId: string }>();
   const storeId = decodeURIComponent(params.storeId || "");
-  const { records, loading: npsLoading, lastUpdated, refresh } = useNpsData();
+  const { npsAliasMap, isNewStore } = useStores();
+  const { records, loading: npsLoading, lastUpdated, refresh } = useNpsData(npsAliasMap);
   const { rawData, loading: reportLoading, availableMonths: reportMonths } = useMonthlyReport();
   const { pdfs: fankuruPdfs, loading: fankuruLoading, hasFolderMapping } = useFankuruData(storeId);
   const loading = npsLoading || reportLoading;

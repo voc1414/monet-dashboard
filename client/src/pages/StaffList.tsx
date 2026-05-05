@@ -22,6 +22,7 @@ import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { useNpsData, filterByMonth } from "@/hooks/useNpsData";
 import type { StaffReport } from "@/hooks/useMonthlyReport";
 import { isNewStaff, isRetiredStaff } from "@/lib/newBadge";
+import { useStores } from "@/hooks/useStores";
 import { calculateUtilizationRate, getUtilizationColor, getUtilizationLabel } from "@/lib/utilizationRate";
 import { getNpsClass } from "@/lib/npsClass";
 import { calculateCompositeScore, getCompositeRank } from "@/lib/compositeScore";
@@ -105,7 +106,8 @@ function StaffNpsBadgeMobile({ npsInfo }: { npsInfo: StaffNpsInfo | undefined })
 
 export default function StaffList() {
   const { rawData, loading, error, availableMonths } = useMonthlyReport();
-  const { records: npsRecords, loading: npsLoading } = useNpsData();
+  const { npsAliasMap } = useStores();
+  const { records: npsRecords, loading: npsLoading } = useNpsData(npsAliasMap);
   const [, navigate] = useLocation();
 
 

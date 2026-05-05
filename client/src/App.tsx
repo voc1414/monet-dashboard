@@ -6,6 +6,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import ScrollToTop from "./components/ScrollToTop";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { StaffStatusProvider } from "./hooks/useStaffStatus";
+import { StoreDataProvider } from "./components/StoreDataProvider";
 import Home from "./pages/Home";
 import StoreDetail from "./pages/StoreDetail";
 import NpsOverview from "./pages/NpsOverview";
@@ -53,9 +54,11 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
-          <StaffStatusProvider />
-          <Toaster />
-          <Router />
+          <StoreDataProvider>
+            <StaffStatusProvider />
+            <Toaster />
+            <Router />
+          </StoreDataProvider>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

@@ -32,7 +32,21 @@ export interface StoreStats {
   detractorPct: number;
 }
 
-function parseStoreName(fullName: string): string {
+/**
+ * Parse store name from NPS spreadsheet full name.
+ * Uses npsAliasMap from DB if available, otherwise falls back to keyword matching.
+ */
+function parseStoreName(fullName: string, npsAliasMap?: Record<string, string>): string {
+  // If we have a DB-based alias map, try to match
+  if (npsAliasMap && Object.keys(npsAliasMap).length > 0) {
+    for (const [alias, storeName] of Object.entries(npsAliasMap)) {
+      if (fullName.includes(alias)) {
+        return storeName;
+      }
+    }
+  }
+
+  // Fallback: hardcoded patterns (for when DB is unavailable)
   if (fullName.includes("堀江院 2nd") || fullName.includes("堀江院2nd")) return "堀江院2nd";
   if (fullName.includes("堀江院")) return "堀江院";
   if (fullName.includes("福島院")) return "福島院";
@@ -40,7 +54,8 @@ function parseStoreName(fullName: string): string {
   if (fullName.includes("姪浜院")) return "姪浜院";
   if (fullName.includes("楽々園院")) return "楽々園院";
   if (fullName.includes("土橋院")) return "広島土橋院";
-  // 汎用: 「〇〇院」パターンを抽出（将来の新店舗対応）
+
+  // Generic: extract 「〇〇院」pattern
   const m = fullName.match(/([一-龥ぁ-ゖァ-ヶA-Za-z0-9]+院(?:2nd)?)/);
   if (m) return m[1];
   return fullName;
@@ -88,22 +103,19 @@ function parseCSV(text: string): string[][] {
   return rows;
 }
 
-async function fetchSheetData(): Promise<NpsRecord[]> {
+async function fetchSheetData(npsAliasMap?: Record<string, string>): Promise<NpsRecord[]> {
   const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_NAME)}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error("Failed to fetch spreadsheet data");
   const text = await res.text();
   const rows = parseCSV(text);
-
   if (rows.length < 2) return [];
-
   // Skip header row
-  return rows.slice(1)
-    .map((cols) => ({
+  return rows.slice(1).map((cols) => ({
     no: cols[0] || "",
     date: cols[1] || "",
     storeName: cols[2] || "",
-    storeShort: parseStoreName(cols[2] || ""),
+    storeShort: parseStoreName(cols[2] || "", npsAliasMap),
     menu: cols[3] || "",
     staff: cols[4] || "",
     npsScore: parseInt(cols[5] || "0", 10),
@@ -134,7 +146,6 @@ export function calculateStoreStats(records: NpsRecord[], storeList?: string[]):
       const passives = recs.filter((r) => r.npsScore >= 7 && r.npsScore <= 8).length;
       const detractors = recs.filter((r) => r.npsScore <= 6).length;
       const nps = Math.round(((promoters - detractors) / total) * 100);
-
       return {
         name: recs[0].storeName,
         shortName,
@@ -153,8 +164,6 @@ export function calculateStoreStats(records: NpsRecord[], storeList?: string[]):
 
 export function filterByMonth(records: NpsRecord[], yearMonth: string): NpsRecord[] {
   if (!yearMonth) return records;
-  // yearMonthは "2026-03" 形式、r.dateは "2026/03/15" 形式の場合がある
-  // スラッシュ区切りにも対応
   const slashMonth = yearMonth.replace(/-/g, "/");
   return records.filter((r) => r.date.startsWith(yearMonth) || r.date.startsWith(slashMonth));
 }
@@ -163,7 +172,6 @@ export function getAvailableMonths(records: NpsRecord[]): string[] {
   const months = new Set<string>();
   records.forEach((r) => {
     if (r.date) {
-      // "2026/01/29" → "2026-01" に統一（スラッシュ→ハイフン）
       const ym = r.date.substring(0, 7).replace(/\//g, "-");
       months.add(ym);
     }
@@ -171,7 +179,11 @@ export function getAvailableMonths(records: NpsRecord[]): string[] {
   return Array.from(months).sort().reverse();
 }
 
-export function useNpsData() {
+/**
+ * useNpsData hook — fetches NPS data from spreadsheet.
+ * Accepts optional npsAliasMap from useStores() to dynamically resolve store names.
+ */
+export function useNpsData(npsAliasMap?: Record<string, string>) {
   const [records, setRecords] = useState<NpsRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -181,7 +193,7 @@ export function useNpsData() {
     try {
       setLoading(true);
       setError(null);
-      const data = await fetchSheetData();
+      const data = await fetchSheetData(npsAliasMap);
       setRecords(data);
       setLastUpdated(new Date());
     } catch (e: any) {
@@ -189,11 +201,10 @@ export function useNpsData() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [npsAliasMap]);
 
   useEffect(() => {
     refresh();
-    // Auto-refresh every 5 minutes
     const interval = setInterval(refresh, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [refresh]);

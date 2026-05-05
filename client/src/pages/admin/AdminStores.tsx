@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import AdminLayout from "@/components/AdminLayout";
-import { isNewStore } from "@/lib/newBadge";
+import { useStores } from "@/hooks/useStores";
 import { toast } from "sonner";
 
 // 現在のハードコード店舗データ（将来的にはDBから取得）
@@ -36,6 +36,7 @@ interface StoreData {
 }
 
 export default function AdminStores() {
+  const { isNewStore: isNewStoreFn } = useStores();
   const [stores] = useState<StoreData[]>(INITIAL_STORES);
   const [editingStore, setEditingStore] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<StoreData | null>(null);
@@ -71,7 +72,7 @@ export default function AdminStores() {
       <div className="space-y-3">
         {stores.map((store, i) => {
           const isEditing = editingStore === store.name;
-          const isNew = isNewStore(store.name);
+          const isNew = isNewStoreFn(store.name);
 
           return (
             <motion.div

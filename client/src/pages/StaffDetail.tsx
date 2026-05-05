@@ -29,6 +29,7 @@ import { useFankuruDataByStaff } from "@/hooks/useFankuruData";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import type { StaffReport } from "@/hooks/useMonthlyReport";
 import { isNewStaff } from "@/lib/newBadge";
+import { useStores } from "@/hooks/useStores";
 import { calculateUtilizationRate, getUtilizationColor } from "@/lib/utilizationRate";
 import { calculateCompositeScore } from "@/lib/compositeScore";
 import type { CompositeScoreResult } from "@/lib/compositeScore";
@@ -246,7 +247,8 @@ export default function StaffDetail() {
   const params = useParams<{ storeId: string; staffId: string }>();
   const staffName = decodeURIComponent(params.staffId || "");
   const storeParam = decodeURIComponent(params.storeId || "");
-  const { records, loading: npsLoading, lastUpdated, refresh } = useNpsData();
+  const { npsAliasMap } = useStores();
+  const { records, loading: npsLoading, lastUpdated, refresh } = useNpsData(npsAliasMap);
   const { rawData, loading: reportLoading, availableMonths: reportMonths } = useMonthlyReport();
   const loading = npsLoading || reportLoading;
 

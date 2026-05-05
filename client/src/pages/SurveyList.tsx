@@ -18,6 +18,7 @@ import { fetchPdfData, matchesStylist, normalizeStylistName } from "@/hooks/useF
 import type { FankuruPdf } from "@/hooks/useFankuruData";
 import { getNpsClass } from "@/lib/npsClass";
 import { isNewStaff, isRetiredStaff } from "@/lib/newBadge";
+import { useStores } from "@/hooks/useStores";
 import { PeriodSelector, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
 import type { PeriodSelection } from "@/components/PeriodSelector";
 
@@ -28,7 +29,8 @@ interface StaffEntry {
 }
 
 export default function SurveyList() {
-  const { records: npsRecords, loading: npsLoading, lastUpdated, refresh } = useNpsData();
+  const { npsAliasMap } = useStores();
+  const { records: npsRecords, loading: npsLoading, lastUpdated, refresh } = useNpsData(npsAliasMap);
 
   // ファンくるPDFデータ取得
   const [fankuruAllData, setFankuruAllData] = useState<Record<string, FankuruPdf[]>>({});

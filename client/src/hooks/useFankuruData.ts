@@ -25,8 +25,8 @@ export interface FankuruPdf {
 const SPREADSHEET_ID = "1bbQT7eBb2Om1ODgsL_g0dx_bcw55j3RHRRJGr7xSwsg";
 const CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv`;
 
-// 店舗名の正規化マッピング（スプレッドシートの店舗名 → ダッシュボードの店舗名）
-const STORE_NAME_NORMALIZE: Record<string, string> = {
+// 店舗名の正規化マッピング（フォールバック用 — DBが利用不可の場合のみ使用）
+const STORE_NAME_NORMALIZE_FALLBACK: Record<string, string> = {
   "大阪堀江院": "堀江院",
   "大阪堀江院2nd": "堀江院2nd",
   "福岡姪浜院": "姪浜院",
@@ -44,8 +44,19 @@ const STORE_NAME_NORMALIZE: Record<string, string> = {
   "高槻院": "高槻院",
 };
 
-function normalizeStoreName(raw: string): string {
-  return STORE_NAME_NORMALIZE[raw] || raw;
+// Module-level alias map that can be updated from DB
+let _fankuruAliasMap: Record<string, string> | undefined;
+
+export function setFankuruAliasMap(map: Record<string, string> | undefined) {
+  _fankuruAliasMap = map;
+}
+
+export function normalizeStoreName(raw: string): string {
+  // DB-based map takes priority
+  if (_fankuruAliasMap && Object.keys(_fankuruAliasMap).length > 0) {
+    if (_fankuruAliasMap[raw]) return _fankuruAliasMap[raw];
+  }
+  return STORE_NAME_NORMALIZE_FALLBACK[raw] || raw;
 }
 
 // CSVパーサー（ダブルクォート対応）

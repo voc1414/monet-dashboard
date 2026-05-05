@@ -93,6 +93,14 @@ export const stores = mysqlTable("stores", {
   rawNameVariants: text("rawNameVariants"),
   /** Salon board sheet name mapping (e.g. "monet堀江_月別") */
   salonBoardSheetName: varchar("salonBoardSheetName", { length: 200 }),
+  /** NPS spreadsheet store name pattern (keyword to match in parseStoreName, e.g. "土橋院") */
+  npsAlias: varchar("npsAlias", { length: 200 }),
+  /** Monthly report name aliases (comma-separated, e.g. "広島土橋院,土橋院") */
+  reportAliases: text("reportAliases"),
+  /** Fankuru store name aliases (comma-separated, e.g. "広島土橋院,土橋院") */
+  fankuruAliases: text("fankuruAliases"),
+  /** Date when this store became "known" (for NEW badge expiry, ISO date string) */
+  knownSince: varchar("knownSince", { length: 10 }),
   /** Whether this store is currently active */
   isActive: int("isActive").default(1).notNull(),
   /** Auto-detected flag: true if added by scheduled task */

@@ -29,7 +29,8 @@ import {
   PieChart, Pie, Cell, Legend, LineChart, Line
 } from "recharts";
 import { useFankuruData } from "@/hooks/useFankuruData";
-import { isNewStore, isNewStaff, isRetiredStaff } from "@/lib/newBadge";
+import { isNewStaff, isRetiredStaff } from "@/lib/newBadge";
+import { useStores } from "@/hooks/useStores";
 import { calculateUtilizationRate } from "@/lib/utilizationRate";
 import { calculateCompositeScore, getCompositeRank } from "@/lib/compositeScore";
 import type { CompositeScoreResult } from "@/lib/compositeScore";
@@ -217,7 +218,8 @@ function AdviceSection({ stats, records }: { stats: StoreStats; records: NpsReco
 export default function StoreDetail() {
   const params = useParams<{ storeId: string }>();
   const storeId = decodeURIComponent(params.storeId || "");
-  const { records, loading: npsLoading, error: npsError, lastUpdated, refresh } = useNpsData();
+  const { npsAliasMap, isNewStore } = useStores();
+  const { records, loading: npsLoading, error: npsError, lastUpdated, refresh } = useNpsData(npsAliasMap);
   const { rawData, loading: reportLoading, error: reportError, getStoreMonthlyStats, availableMonths: reportMonths, getStaffTrend } = useMonthlyReport();
   const { loading: sbLoading, error: sbError, getStoreMonth, getStoreMonthsAggregated, hasData: hasSbData } = useSalonBoardData();
   const loading = npsLoading || reportLoading || sbLoading;
