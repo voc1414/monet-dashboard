@@ -276,9 +276,13 @@ export default function StaffDetail() {
     return staffData?.employmentType || "";
   }, [rawData, staffName, staffStore]);
 
+  // スタッフ名比較用ヘルパー（NPSシートはスペースなし、月末報告書はスペースあり）
+  const normalizeStaffName = (name: string) => name.replace(/[\s\u3000]/g, "");
+
   // 月の管理
   const npsMonths = useMemo(() => {
-    const staffRecords = records.filter(r => r.staff?.trim() === staffName);
+    const norm = normalizeStaffName(staffName);
+    const staffRecords = records.filter(r => normalizeStaffName(r.staff?.trim() || "") === norm);
     return getAvailableMonths(staffRecords);
   }, [records, staffName]);
 
@@ -326,9 +330,10 @@ export default function StaffDetail() {
     return matching[0] || null;
   }, [rawData, staffName, staffStore, filterM, isAllPeriod]);
 
-  // NPS: スタッフ名でフィルタ
+  // NPS: スタッフ名でフィルタ（スペース正規化して比較）
   const staffNpsRecords = useMemo(() => {
-    const filtered = records.filter(r => r.staff?.trim() === staffName);
+    const norm = normalizeStaffName(staffName);
+    const filtered = records.filter(r => normalizeStaffName(r.staff?.trim() || "") === norm);
     if (isAllPeriod) return filtered;
     return filtered.filter(r => {
       if (!r.date) return false;

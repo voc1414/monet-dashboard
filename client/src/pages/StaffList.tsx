@@ -225,12 +225,15 @@ export default function StaffList() {
       });
     }
 
+    // スペース正規化してグルーピング（NPSシートはスペースなし、月末報告書はスペースあり）
+    const normalizeStaffName = (n: string) => n.replace(/[\s\u3000]/g, "");
     const grouped = new Map<string, number[]>();
     for (const r of filteredNps) {
       const staffName = r.staff?.trim();
       if (!staffName) continue;
-      if (!grouped.has(staffName)) grouped.set(staffName, []);
-      grouped.get(staffName)!.push(r.npsScore);
+      const normName = normalizeStaffName(staffName);
+      if (!grouped.has(normName)) grouped.set(normName, []);
+      grouped.get(normName)!.push(r.npsScore);
     }
 
     for (const [name, scores] of Array.from(grouped.entries())) {
@@ -250,7 +253,7 @@ export default function StaffList() {
     const map = new Map<string, CompositeScoreResult>();
     for (const staff of staffFiltered) {
       const utilRate = calculateUtilizationRate(staff.totalCustomers, staff.employmentType);
-      const npsInfo = staffNpsMap.get(staff.name);
+      const npsInfo = staffNpsMap.get(staff.name.replace(/[\s\u3000]/g, ""));
 
 
 
@@ -493,7 +496,7 @@ export default function StaffList() {
             {staffList.map((staff, i) => {
               const staffKey = `${staff.answerId}-${i}`;
               const utilRate = calculateUtilizationRate(staff.totalCustomers, staff.employmentType);
-              const npsInfo = staffNpsMap.get(staff.name);
+              const npsInfo = staffNpsMap.get(staff.name.replace(/[\s\u3000]/g, ""));
 
               return (
                 <motion.div

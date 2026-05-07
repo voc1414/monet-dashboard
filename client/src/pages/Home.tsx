@@ -245,10 +245,11 @@ export default function Home() {
       .filter((r) => !isRetiredStaff(r.name, r.storeNormalized, r.reportMonth))
       .map((r) => {
         const utilRate = calculateUtilizationRate(r.totalCustomers, r.employmentType);
-        // NPS: filteredRecordsからスタッフ名でフィルタ
+        // NPS: filteredRecordsからスタッフ名でフィルタ（スペース正規化して比較）
+        const normName = r.name.replace(/[\s\u3000]/g, "").toLowerCase();
         const staffNpsRecords = filteredRecords.filter((nr) => {
           const nrStaff = nr.staff?.trim();
-          return nrStaff && nrStaff.toLowerCase() === r.name.toLowerCase();
+          return nrStaff && nrStaff.replace(/[\s\u3000]/g, "").toLowerCase() === normName;
         });
         let npsScore: number | null = null;
         let npsResponseCount = 0;

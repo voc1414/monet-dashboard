@@ -330,3 +330,7 @@
 - [x] newBadge.ts: KNOWN_STORESをDB参照に切り替え（useStores.isNewStoreに統合）
 - [x] scheduled API: 毎月6日用の全マッピング整合性チェック・自動同期エンドポイント作成
 - [ ] 定期タスク登録（毎月6日朝9時）
+
+## バグ修正: 4月NPSデータがスタッフ個別に反映されない
+- [x] 原因調査: NPSシートはスペースなし、月末報告書はスペースありで不一致
+- [x] 修正実施: StaffDetail/StaffList/Home/StoreDetailでスペース正規化比較を追加

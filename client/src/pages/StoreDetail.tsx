@@ -488,10 +488,11 @@ export default function StoreDetail() {
           .filter(r => !isRetiredStaff(r.name, r.storeNormalized, r.reportMonth))
           .map(r => {
             const utilRate = calculateUtilizationRate(r.totalCustomers, r.employmentType);
-            // NPS: storeRecordsからスタッフ名でフィルタ
+            // NPS: storeRecordsからスタッフ名でフィルタ（スペース正規化して比較）
+            const normName = r.name.replace(/[\s\u3000]/g, "").toLowerCase();
             const staffNpsRecords = storeRecords.filter((nr: any) => {
               const nrStaff = nr.staff?.trim();
-              return nrStaff && nrStaff.toLowerCase() === r.name.toLowerCase();
+              return nrStaff && nrStaff.replace(/[\s\u3000]/g, "").toLowerCase() === normName;
             });
             let npsScore: number | null = null;
             let npsResponseCount = 0;
@@ -564,10 +565,11 @@ export default function StoreDetail() {
           .filter((sr: StaffReport) => !isRetiredStaff(sr.name, storeId, sr.reportMonth))
           .map((sr: StaffReport) => {
             const utilRate = calculateUtilizationRate(sr.totalCustomers, sr.employmentType);
-            // NPS: storeRecordsからスタッフ名でフィルタ
+            // NPS: storeRecordsからスタッフ名でフィルタ（スペース正規化して比較）
+            const normSrName = sr.name.replace(/[\s\u3000]/g, "").toLowerCase();
             const staffNpsRecords = storeRecords.filter((r: any) => {
               const staffName = r.staff?.trim();
-              return staffName && staffName.toLowerCase() === sr.name.toLowerCase();
+              return staffName && staffName.replace(/[\s\u3000]/g, "").toLowerCase() === normSrName;
             });
             let npsScore: number | null = null;
             let npsResponseCount = 0;
