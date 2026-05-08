@@ -634,7 +634,7 @@ export default function StaffList() {
                       </div>
 
                       {/* Mobile Layout */}
-                      <div className="md:hidden p-4">
+                      <div className="md:hidden px-3 py-2">
                         <div className="flex items-start gap-2">
                           {staff.photoUrl2 ? (
                             <img src={staff.photoUrl2} alt={staff.name} className="w-8 h-8 rounded-full object-cover object-center shrink-0 mt-0.5" />
@@ -644,13 +644,26 @@ export default function StaffList() {
                             </div>
                           )}
                           <div className="flex-1 min-w-0">
-                            {/* 1行目: 名前 + 売上 */}
+                            {/* 1行目: 名前 + 総合点 + 売上 */}
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-1 min-w-0">
+                              <div className="flex items-center gap-1.5 min-w-0">
                                 <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors truncate">{staff.name}</span>
                                 {isNewStaff(staff.name, staff.storeNormalized) && (
                                   <span className="text-[9px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none shrink-0">NEW</span>
                                 )}
+                                {(() => {
+                                  const scoreKey = `${staff.name}__${staff.storeNormalized}`;
+                                  const scoreResult = compositeScoreMap.get(scoreKey);
+                                  if (!scoreResult) return null;
+                                  return (
+                                    <span
+                                      className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-mono-data font-bold border shrink-0"
+                                      style={{ backgroundColor: scoreResult.rank.bgColor, color: scoreResult.rank.color, borderColor: scoreResult.rank.borderColor }}
+                                    >
+                                      {scoreResult.total}点
+                                    </span>
+                                  );
+                                })()}
                               </div>
                               <div className="flex items-center gap-1 shrink-0 ml-2">
                                 <span className="text-[9px] text-muted-foreground">売上</span>
@@ -659,15 +672,15 @@ export default function StaffList() {
                               </div>
                             </div>
                             {/* 2行目: 店舗名 + 雇用形態 */}
-                            <div className="flex items-center gap-2 mt-1">
+                            <div className="flex items-center gap-2 mt-0.5">
                               <span className="text-[11px] text-muted-foreground flex items-center gap-1 truncate">
                                 <Building2 className="w-3 h-3 shrink-0" />
                                 <span className="truncate">{staff.storeNormalized}</span>
                               </span>
                               <span className="text-[10px] text-muted-foreground/70 shrink-0">{staff.employmentType}</span>
                             </div>
-                            {/* 3行目: 稼働率・予約率（左横並び）+ 総合点（右大きめ） */}
-                            <div className="flex items-start justify-between mt-2.5 gap-3">
+                            {/* 3行目: 稼働率・予約率（横並び） */}
+                            <div className="flex items-start justify-between mt-1.5 gap-3">
                               {/* 左側: 稼働率・次回予約率（横並び） */}
                               <div className="flex gap-4 min-w-0 flex-wrap">
                                 {/* 稼働率 */}
@@ -729,28 +742,7 @@ export default function StaffList() {
                                   </div>
                                 </div>
                               </div>
-                              {/* 右側: 総合点（大きめ） */}
-                              <div className="flex flex-col items-center shrink-0">
-                                {(() => {
-                                  const scoreKey = `${staff.name}__${staff.storeNormalized}`;
-                                  const scoreResult = compositeScoreMap.get(scoreKey);
-                                  if (!scoreResult) return null;
-                                  return (
-                                    <div className="flex flex-col items-center">
-                                      <span className="text-[9px] text-muted-foreground mb-1 leading-none">総合点</span>
-                                      <span
-                                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-base font-mono-data font-bold border"
-                                        style={{ backgroundColor: scoreResult.rank.bgColor, color: scoreResult.rank.color, borderColor: scoreResult.rank.borderColor }}
-                                      >
-                                        {scoreResult.total}<span className="text-xs">点</span>
-                                      </span>
-                                      <span className="text-[9px] mt-1 font-medium" style={{ color: scoreResult.rank.color }}>
-                                        {scoreResult.rank.label}
-                                      </span>
-                                    </div>
-                                  );
-                                })()}
-                              </div>
+
                             </div>
                             {/* NPS（モバイル） */}
                             {npsInfo && npsInfo.totalResponses > 0 && (
