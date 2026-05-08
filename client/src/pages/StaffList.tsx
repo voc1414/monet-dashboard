@@ -444,8 +444,8 @@ export default function StaffList() {
       {/* Staff List */}
       {!loading && staffList.length > 0 && (
         <>
-          {/* Table Header (desktop) */}
-          <div className="hidden md:grid grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.5fr)] gap-3 items-center px-5 py-2 text-[10px] text-muted-foreground font-medium uppercase tracking-wider border-b border-border/40 mb-2">
+          {/* Table Header (desktop) - sticky */}
+          <div className="hidden md:grid grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.5fr)] gap-3 items-center px-5 py-2 text-[10px] text-muted-foreground font-medium uppercase tracking-wider border-b border-border/40 mb-2 sticky top-[4rem] bg-[#FAF8F5] z-20 backdrop-blur-sm shadow-sm">
             <span>氏名</span>
             <span
               className="flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors select-none justify-center"
@@ -653,6 +653,7 @@ export default function StaffList() {
                                 )}
                               </div>
                               <div className="flex items-center gap-1 shrink-0 ml-2">
+                                <span className="text-[9px] text-muted-foreground">売上</span>
                                 <span className="font-mono-data text-sm font-bold text-foreground">{formatCurrency(staff.totalSales)}</span>
                                 <ChevronRight className="w-4 h-4 text-muted-foreground" />
                               </div>
@@ -754,6 +755,7 @@ export default function StaffList() {
                             {/* NPS（モバイル） */}
                             {npsInfo && npsInfo.totalResponses > 0 && (
                               <div className="flex items-center gap-2 mt-1.5">
+                                <span className="text-[9px] text-muted-foreground">NPS</span>
                                 <StaffNpsBadgeMobile npsInfo={npsInfo} />
                                 <span className="text-[9px] text-muted-foreground">({npsInfo.totalResponses}件)</span>
                               </div>
