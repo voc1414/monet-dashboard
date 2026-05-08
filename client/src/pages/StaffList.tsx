@@ -654,7 +654,7 @@ export default function StaffList() {
                               </div>
                               <div className="flex items-center gap-1 shrink-0 ml-2">
                                 <span className="text-[9px] text-muted-foreground">売上</span>
-                                <span className="font-mono-data text-sm font-bold text-foreground">{formatCurrency(staff.totalSales)}</span>
+                                <span className="font-mono-data text-base font-bold text-foreground">{formatCurrency(staff.totalSales)}</span>
                                 <ChevronRight className="w-4 h-4 text-muted-foreground" />
                               </div>
                             </div>
@@ -666,10 +666,10 @@ export default function StaffList() {
                               </span>
                               <span className="text-[10px] text-muted-foreground/70 shrink-0">{staff.employmentType}</span>
                             </div>
-                            {/* 3行目: 稼働率・予約率（左）+ 総合点（右大きめ） */}
+                            {/* 3行目: 稼働率・予約率（左横並び）+ 総合点（右大きめ） */}
                             <div className="flex items-start justify-between mt-2.5 gap-3">
-                              {/* 左側: 稼働率・次回予約率 */}
-                              <div className="flex flex-col gap-2 min-w-0">
+                              {/* 左側: 稼働率・次回予約率（横並び） */}
+                              <div className="flex gap-4 min-w-0 flex-wrap">
                                 {/* 稼働率 */}
                                 <div className="flex flex-col gap-0.5">
                                   <span className="text-[9px] text-muted-foreground leading-none">稼働率</span>
@@ -702,7 +702,7 @@ export default function StaffList() {
                                 </div>
                                 {/* 次回予約率 */}
                                 <div className="flex flex-col gap-0.5">
-                                  <span className="text-[9px] text-muted-foreground leading-none">次回予約率</span>
+                                  <span className="text-[9px] text-muted-foreground leading-none">次回予約</span>
                                   <div className="flex items-center gap-1.5">
                                     <span className={`text-sm font-mono-data font-bold ${
                                       staff.nextReservationRate >= 85 ? "text-[#2D9C8F]" :
