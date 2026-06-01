@@ -345,3 +345,10 @@
 - [x] PC版: カラムヘッダー（氏名、総合点、総売上等）をスクロール時にsticky固定（top-[4rem]でナビバー下に固定）
 - [x] スマホ版: 各数値にラベル（売上、稼働率、次回予約率、総合点、NPS）を付与
 - [x] スマホ版: 稼働率と次回予約を横並びに、売上テキストサイズを大きく（text-sm→text-base）
+
+## バグ修正: 新メンバーにNEWアイコンが付かない
+- [x] 原因調査: isNewStaffの判定ロジックを確認（店舗NEW期限ベースのため既存店舗の新入スタッフにNEWが付かない）
+- [x] 修正実施: 月末報告書データから初登場月を検出し、初登場から3ヶ月間NEWを付ける仕組みに変更
+- [x] newBadge.ts: isNewStaffを初登場月ベースに書き換え + buildStaffFirstAppearanceMap関数追加
+- [x] StoreDataProvider.tsx: useMonthlyReportのrawDataから初登場月マップを構築・注入
+- [x] テスト作成: server/newBadge.test.ts（11テスト全パス）
