@@ -116,8 +116,8 @@ export default function StaffList() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStore, setFilterStore] = useState("all");
 
-  // ソート状態（デフォルト: 総売上の降順）
-  const [sortField, setSortField] = useState<SortField>("totalSales");
+  // ソート状態（デフォルト: 次回予約率の降順）
+  const [sortField, setSortField] = useState<SortField>("nextReservationRate");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   const handleSort = (field: SortField) => {
