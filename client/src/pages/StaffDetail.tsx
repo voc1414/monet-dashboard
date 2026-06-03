@@ -607,7 +607,7 @@ export default function StaffDetail() {
                       <div
                         className="h-full rounded-full transition-all duration-500"
                         style={{
-                          width: `${(compositeScore.npsComponent / 50) * 100}%`,
+                          width: `${compositeScore.available.nps && compositeScore.rawValues.npsScore !== null ? ((compositeScore.rawValues.npsScore + 100) / 200) * 100 : 0}%`,
                           backgroundColor: compositeScore.available.nps ? "#2D9C8F" : "#d4d4d4",
                         }}
                       />
@@ -628,7 +628,7 @@ export default function StaffDetail() {
                       <div
                         className="h-full rounded-full transition-all duration-500"
                         style={{
-                          width: `${(compositeScore.reservationComponent / 30) * 100}%`,
+                          width: `${compositeScore.available.reservation && compositeScore.rawValues.nextReservationRate !== null ? compositeScore.rawValues.nextReservationRate : 0}%`,
                           backgroundColor: compositeScore.available.reservation ? "#E5B85C" : "#d4d4d4",
                         }}
                       />
@@ -649,7 +649,7 @@ export default function StaffDetail() {
                       <div
                         className="h-full rounded-full transition-all duration-500"
                         style={{
-                          width: `${(compositeScore.utilizationComponent / 20) * 100}%`,
+                          width: `${compositeScore.available.utilization && compositeScore.rawValues.utilizationRate !== null ? compositeScore.rawValues.utilizationRate : 0}%`,
                           backgroundColor: compositeScore.available.utilization ? "#8B5CF6" : "#d4d4d4",
                         }}
                       />
