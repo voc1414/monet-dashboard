@@ -473,12 +473,6 @@ export default function StaffList() {
             </span>
             <span
               className="flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors select-none justify-end"
-              onClick={() => handleSort("utilizationRate")}
-            >
-              稼働率 {getSortIcon("utilizationRate")}
-            </span>
-            <span
-              className="flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors select-none justify-end"
               onClick={() => handleSort("nextReservationRate")}
             >
               次回予約率 {getSortIcon("nextReservationRate")}
@@ -488,6 +482,12 @@ export default function StaffList() {
               onClick={() => handleSort("npsScore")}
             >
               NPS {getSortIcon("npsScore")}
+            </span>
+            <span
+              className="flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors select-none justify-end"
+              onClick={() => handleSort("utilizationRate")}
+            >
+              稼働率 {getSortIcon("utilizationRate")}
             </span>
             <span />
           </div>
@@ -561,37 +561,6 @@ export default function StaffList() {
                         <div>
                           <span className="text-xs text-muted-foreground">{staff.employmentType}</span>
                         </div>
-                        {/* 稼働率 */}
-                        <div className="text-right">
-                          {utilRate !== null ? (
-                            <div className="flex flex-col items-end gap-0.5">
-                              <span className={`font-mono-data text-sm font-bold ${getUtilizationColor(utilRate)}`}>
-                                {utilRate}%
-                              </span>
-                              {utilRate >= 95 && (
-                                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-1.5 py-0.5 shadow-sm">
-                                  <Trophy className="w-2.5 h-2.5 text-amber-500" />
-                                  エクセレント！
-                                  <Sparkles className="w-2.5 h-2.5 text-amber-400" />
-                                </span>
-                              )}
-                              {utilRate >= 90 && utilRate < 95 && (
-                                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-[#E5B85C] bg-amber-50/60 border border-amber-200/60 rounded-full px-1.5 py-0.5">
-                                  <CircleCheck className="w-2.5 h-2.5 text-[#E5B85C]" />
-                                  適正
-                                </span>
-                              )}
-                              {utilRate <= 89 && (
-                                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5">
-                                  <AlertTriangle className="w-2.5 h-2.5" />
-                                  要改善
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </div>
                         {/* 次回予約率 */}
                         <div className="text-right">
                           <div className="flex flex-col items-end gap-0.5">
@@ -626,6 +595,37 @@ export default function StaffList() {
                         {/* NPS */}
                         <div className="text-right">
                           <StaffNpsBadge npsInfo={npsInfo} />
+                        </div>
+                        {/* 稼働率 */}
+                        <div className="text-right">
+                          {utilRate !== null ? (
+                            <div className="flex flex-col items-end gap-0.5">
+                              <span className={`font-mono-data text-sm font-bold ${getUtilizationColor(utilRate)}`}>
+                                {utilRate}%
+                              </span>
+                              {utilRate >= 95 && (
+                                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-1.5 py-0.5 shadow-sm">
+                                  <Trophy className="w-2.5 h-2.5 text-amber-500" />
+                                  エクセレント！
+                                  <Sparkles className="w-2.5 h-2.5 text-amber-400" />
+                                </span>
+                              )}
+                              {utilRate >= 90 && utilRate < 95 && (
+                                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-[#E5B85C] bg-amber-50/60 border border-amber-200/60 rounded-full px-1.5 py-0.5">
+                                  <CircleCheck className="w-2.5 h-2.5 text-[#E5B85C]" />
+                                  適正
+                                </span>
+                              )}
+                              {utilRate <= 89 && (
+                                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5">
+                                  <AlertTriangle className="w-2.5 h-2.5" />
+                                  要改善
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </div>
                         {/* Arrow */}
                         <div className="flex justify-end">
