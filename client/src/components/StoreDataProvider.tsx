@@ -17,12 +17,17 @@ import { useStores } from "@/hooks/useStores";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { setReportAliasMap } from "@/hooks/useMonthlyReport";
 import { setSalonBoardSheetMap } from "@/hooks/useSalonBoardData";
-import { setFankuruAliasMap } from "@/hooks/useFankuruData";
+import { setFankuruAliasMap, setStylistAliasMapFromDb } from "@/hooks/useFankuruData";
 import { buildStaffFirstAppearanceMap, setStaffFirstAppearanceMap } from "@/lib/newBadge";
+import { trpc } from "@/lib/trpc";
 
 export function StoreDataProvider({ children }: { children: React.ReactNode }) {
   const { reportAliasMap, salonBoardSheetMap, fankuruAliasMap } = useStores();
   const { rawData } = useMonthlyReport();
+  const stylistAliasQuery = trpc.admin.getStylistAliases.useQuery(undefined, {
+    retry: 1,
+    refetchOnWindowFocus: false,
+  });
 
   useEffect(() => {
     if (Object.keys(reportAliasMap).length > 0) {
@@ -49,6 +54,13 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
       setStaffFirstAppearanceMap(map);
     }
   }, [rawData]);
+
+  // DBスタイリストエイリアスをモジュールレベルに注入
+  useEffect(() => {
+    if (stylistAliasQuery.data && stylistAliasQuery.data.length > 0) {
+      setStylistAliasMapFromDb(stylistAliasQuery.data);
+    }
+  }, [stylistAliasQuery.data]);
 
   return <>{children}</>;
 }

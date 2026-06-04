@@ -51,6 +51,21 @@ export function setFankuruAliasMap(map: Record<string, string> | undefined) {
   _fankuruAliasMap = map;
 }
 
+// Module-level stylist alias map from DB (alias → canonicalName)
+let _dbStylistAliasMap: Record<string, string> = {};
+
+export function setStylistAliasMapFromDb(aliases: Array<{ alias: string; canonicalName: string }>) {
+  const map: Record<string, string> = {};
+  for (const a of aliases) {
+    map[a.alias.toLowerCase()] = a.canonicalName;
+  }
+  _dbStylistAliasMap = map;
+}
+
+export function getDbStylistAliasMap(): Record<string, string> {
+  return _dbStylistAliasMap;
+}
+
 export function normalizeStoreName(raw: string): string {
   // DB-based map takes priority
   if (_fankuruAliasMap && Object.keys(_fankuruAliasMap).length > 0) {
@@ -393,12 +408,21 @@ for (const [canonical, aliases] of Object.entries(STYLIST_NAME_ALIASES)) {
 }
 
 /**
+ * 統合エイリアスマップを返す（ハードコード + DB）。
+ * DB側が優先される（上書き）。
+ */
+function getMergedAliasMap(): Record<string, string> {
+  return { ...ALIAS_TO_CANONICAL, ..._dbStylistAliasMap };
+}
+
+/**
  * スタイリスト名を正規化する。
  * エイリアスがあれば正式名に変換、なければそのまま返す。
  */
 export function normalizeStylistName(name: string): string {
   const lower = name.trim().toLowerCase();
-  return ALIAS_TO_CANONICAL[lower] || name.trim();
+  const merged = getMergedAliasMap();
+  return merged[lower] || name.trim();
 }
 
 /**

@@ -7,7 +7,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
 import {
-  ClipboardList, MapPin, ChevronRight, BarChart3, Star, Users, Search, Store, MessageCircle, Loader2
+  ClipboardList, MapPin, ChevronRight, BarChart3, Star, Users, Search, Store, MessageCircle, Loader2, AlertTriangle
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { Input } from "@/components/ui/input";
@@ -270,6 +270,46 @@ export default function SurveyList() {
     return map;
   }, [fankuruComments, latestFankuruPdfs]);
 
+  // 未マッチスタイリスト名の検出（ファンくるPDFのスタイリストが誰にもマッチしない場合）
+  const unmatchedStylists = useMemo(() => {
+    const unmatched: Array<{ stylist: string; store: string; yearMonth: string }> = [];
+    const seen = new Set<string>();
+
+    for (const [storeName, pdfs] of Object.entries(fankuruAllData)) {
+      for (const pdf of pdfs) {
+        if (!pdf.stylist || pdf.stylist.trim() === "") continue;
+        // 期間フィルタ適用
+        if (!isAllPeriod) {
+          if (!pdf.yearMonth || !(filterMonths as string[]).includes(pdf.yearMonth)) continue;
+        }
+        const normalized = normalizeStylistName(pdf.stylist);
+        const dedupeKey = `${normalized.toLowerCase()}__${storeName}`;
+        if (seen.has(dedupeKey)) continue;
+
+        // staffList内の誰かにマッチするかチェック
+        let matched = false;
+        for (const staff of staffList) {
+          if (staff.store !== storeName) continue;
+          if (matchesStylist(pdf.stylist, staff.name)) {
+            matched = true;
+            break;
+          }
+        }
+        if (!matched) {
+          seen.add(dedupeKey);
+          unmatched.push({
+            stylist: pdf.stylist,
+            store: storeName,
+            yearMonth: pdf.yearMonth || "",
+          });
+        }
+      }
+    }
+    return unmatched;
+  }, [fankuruAllData, staffList, filterMonths, isAllPeriod]);
+
+  const [showUnmatchedAlert, setShowUnmatchedAlert] = useState(true);
+
   // フィルタ・検索適用
   const filteredStaff = useMemo(() => {
     return staffList.filter((s) => {
@@ -334,6 +374,50 @@ export default function SurveyList() {
             </SelectContent>
           </Select>
         </div>
+
+        {/* 未マッチアラート */}
+        {!loading && unmatchedStylists.length > 0 && showUnmatchedAlert && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-amber-50 border border-amber-200 rounded-lg p-3"
+          >
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-amber-800">
+                    未マッチのスタイリスト名が{unmatchedStylists.length}件あります
+                  </p>
+                  <button
+                    onClick={() => setShowUnmatchedAlert(false)}
+                    className="text-amber-600 hover:text-amber-800 text-xs"
+                  >
+                    ×
+                  </button>
+                </div>
+                <p className="text-[11px] text-amber-700 mt-1">
+                  ファンくるPDFのスタイリスト名がどのスタッフにも紐づいていません。
+                  <Link href="/admin/surveys">
+                    <span className="underline font-medium cursor-pointer hover:text-amber-900">管理者ページの「名前マッピング」</span>
+                  </Link>
+                  からマッピングを追加してください。
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {unmatchedStylists.slice(0, 5).map((u, i) => (
+                    <span key={i} className="inline-flex items-center gap-1 text-[10px] bg-amber-100 text-amber-800 rounded px-1.5 py-0.5">
+                      <span className="font-medium">{u.stylist}</span>
+                      <span className="text-amber-600">({u.store})</span>
+                    </span>
+                  ))}
+                  {unmatchedStylists.length > 5 && (
+                    <span className="text-[10px] text-amber-600">他{unmatchedStylists.length - 5}件</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* 件数表示 */}
         {!loading && (

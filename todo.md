@@ -355,3 +355,11 @@
 - [x] newBadge.ts: isNewStaffを初登場月ベースに書き換え + buildStaffFirstAppearanceMap関数追加
 - [x] StoreDataProvider.tsx: useMonthlyReportのrawDataから初登場月マップを構築・注入
 - [x] テスト作成: server/newBadge.test.ts（11テスト全パス）
+
+## スタッフ名マッピング管理機能（B + D）
+- [x] DBスキーマ: stylist_aliasesテーブル作成（canonical_name, alias, store, created_at）
+- [x] サーバー: tRPCプロシージャ（一覧取得・追加・削除）
+- [x] 管理者ページUI: スタッフ名マッピング管理画面（AdminSurveysの3つ目のタブとして実装）
+- [x] ファンくるデータフック: DB登録エイリアスを動的に読み込み対応（setStylistAliasMapFromDb）
+- [x] アンケート一覧: 未マッチスタッフのアラート表示（アンバーバナー + 管理者ページへのリンク）
+- [x] テスト作成: server/stylistAliases.test.ts（8テスト全パス）

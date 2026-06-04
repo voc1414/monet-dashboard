@@ -111,3 +111,24 @@ export const stores = mysqlTable("stores", {
 
 export type Store = typeof stores.$inferSelect;
 export type InsertStore = typeof stores.$inferInsert;
+
+/**
+ * Stylist name aliases — maps alternative names (from Fankuru PDFs, etc.)
+ * to canonical staff names used in the dashboard.
+ * Managed via admin panel; consumed by useFankuruData to normalize stylist names.
+ */
+export const stylistAliases = mysqlTable("stylist_aliases", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Canonical staff name as displayed in the dashboard (e.g. "Yoshie", "Yu") */
+  canonicalName: varchar("canonicalName", { length: 100 }).notNull(),
+  /** Alternative name found in external data sources (e.g. "由恵（よしえさん）") */
+  alias: varchar("alias", { length: 200 }).notNull(),
+  /** Store the staff belongs to (for disambiguation of same-name staff) */
+  storeName: varchar("storeName", { length: 100 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ([
+  uniqueIndex("alias_store_idx").on(table.alias, table.storeName),
+]));
+
+export type StylistAlias = typeof stylistAliases.$inferSelect;
+export type InsertStylistAlias = typeof stylistAliases.$inferInsert;

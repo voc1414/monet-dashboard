@@ -3,7 +3,7 @@ import { z } from "zod";
 import { publicProcedure, router } from "../_core/trpc";
 import { ENV } from "../_core/env";
 import { SignJWT, jwtVerify } from "jose";
-import { getAllStaffStatus, upsertStaffStatus, insertStaffStatusHistory, getAllStaffStatusHistory, getStaffStatusByKey, getRetirementCountByPeriod, getReactivationCountByPeriod } from "../db";
+import { getAllStaffStatus, upsertStaffStatus, insertStaffStatusHistory, getAllStaffStatusHistory, getStaffStatusByKey, getRetirementCountByPeriod, getReactivationCountByPeriod, getAllStylistAliases, addStylistAlias, deleteStylistAlias } from "../db";
 
 const JWT_SECRET_KEY = new TextEncoder().encode(ENV.cookieSecret || "monet-admin-secret-key");
 
@@ -161,6 +161,35 @@ export const adminRouter = router({
         periodRetirements: retirementCount,
         periodReactivations: reactivationCount,
       };
+    }),
+
+  // ─── Stylist Aliases endpoints ───
+
+  /** Get all stylist aliases (public - used by frontend to normalize names) */
+  getStylistAliases: publicProcedure.query(async () => {
+    return getAllStylistAliases();
+  }),
+
+  /** Add a new stylist alias (admin only) */
+  addStylistAlias: publicProcedure
+    .input(z.object({
+      canonicalName: z.string().min(1),
+      alias: z.string().min(1),
+      storeName: z.string().min(1),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requireAdminFromCtx(ctx);
+      await addStylistAlias(input.canonicalName, input.alias, input.storeName);
+      return { success: true };
+    }),
+
+  /** Delete a stylist alias (admin only) */
+  deleteStylistAlias: publicProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await requireAdminFromCtx(ctx);
+      await deleteStylistAlias(input.id);
+      return { success: true };
     }),
 
   /** Bulk initialize staff statuses (admin only) - seed from hardcoded data */

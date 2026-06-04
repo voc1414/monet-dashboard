@@ -1,6 +1,6 @@
 import { and, eq, desc, gte, lte, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, staffStatus, type StaffStatus, staffStatusHistory, type StaffStatusHistory, stores, type Store, type InsertStore } from "../drizzle/schema";
+import { InsertUser, users, staffStatus, type StaffStatus, staffStatusHistory, type StaffStatusHistory, stores, type Store, type InsertStore, stylistAliases, type StylistAlias } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -307,4 +307,27 @@ export async function storeExists(name: string): Promise<boolean> {
   if (!db) return false;
   const rows = await db.select({ id: stores.id }).from(stores).where(eq(stores.name, name)).limit(1);
   return rows.length > 0;
+}
+
+// ─── Stylist Aliases ───
+
+/** Get all stylist aliases */
+export async function getAllStylistAliases(): Promise<StylistAlias[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(stylistAliases).orderBy(stylistAliases.canonicalName);
+}
+
+/** Add a new stylist alias */
+export async function addStylistAlias(canonicalName: string, alias: string, storeName: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(stylistAliases).values({ canonicalName, alias, storeName });
+}
+
+/** Delete a stylist alias by ID */
+export async function deleteStylistAlias(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(stylistAliases).where(eq(stylistAliases.id, id));
 }
