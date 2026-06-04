@@ -322,7 +322,7 @@ const STYLIST_NAME_ALIASES: Record<string, string[]> = {
 
   // === 福島院 ===
   "Yu": ["ゆう", "ユウ", "yu", "yuu"],
-  "yoshie": ["よしえ", "ヨシエ", "yoshie"],
+  "yoshie": ["よしえ", "ヨシエ", "yoshie", "由恵（よしえさん）", "由恵"],
   "Hiroko": ["ひろこ", "ヒロコ", "hiroko"],
   "Mika": ["みか", "ミカ", "mika"],
   "Hitomi": ["ひとみ", "ヒトミ", "hitomi"],
