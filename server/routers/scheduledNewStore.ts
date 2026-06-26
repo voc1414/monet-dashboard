@@ -5,7 +5,7 @@
  * 2. サロンボードスプレッドシートのシート名を取得し、未マッピング店舗に自動紐づけ
  */
 import { Router, Request, Response } from "express";
-import { sdk } from "../_core/sdk";
+import { ENV } from "../_core/env";
 import { notifyOwner } from "../_core/notification";
 import { getAllStores, insertStore, storeExists, updateStoreSalonBoardSheet } from "../db";
 
@@ -444,18 +444,18 @@ function formatNotification(
 export function registerScheduledNewStoreRoute(app: Router): void {
   app.post("/api/scheduled/new-store-check", async (req: Request, res: Response) => {
     try {
-      // 認証チェック（user roleを許可）
-      const user = await sdk.authenticateRequest(req);
-      if (!user) {
+      // 認証チェック（CRON_SECRET 共有シークレット方式）
+      // secret 未設定時はエンドポイントを無効化（503）＝デフォルト安全側。
+      if (!ENV.cronSecret) {
+        res.status(503).json({ error: "Scheduled endpoint disabled (CRON_SECRET not set)" });
+        return;
+      }
+      if (req.headers["x-cron-secret"] !== ENV.cronSecret) {
         res.status(401).json({ error: "Unauthorized" });
         return;
       }
-      if (user.role !== "user" && user.role !== "admin") {
-        res.status(403).json({ error: "Forbidden" });
-        return;
-      }
 
-      console.log(`[Scheduled] new-store-check triggered by user: ${user.name} (${user.role})`);
+      console.log("[Scheduled] new-store-check triggered");
 
       // Step 1: 新店舗検出 + DB自動INSERT
       const newStores = await detectNewStores();

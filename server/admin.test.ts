@@ -6,28 +6,15 @@ vi.mock("./_core/env", () => ({
     adminUsername: "commit.1414@gmail.com",
     adminPassword: "hara1414",
     cookieSecret: "test-secret-key-for-jwt",
-    ownerOpenId: "",
     isProduction: false,
-    forgeApiUrl: "",
-    forgeApiKey: "",
-    appId: "",
     databaseUrl: "",
-    oAuthServerUrl: "",
-  },
-}));
-
-// Mock the SDK to avoid actual OAuth calls
-vi.mock("./_core/sdk", () => ({
-  sdk: {
-    authenticateRequest: vi.fn().mockResolvedValue(null),
+    cronSecret: "",
   },
 }));
 
 // Mock db functions
 vi.mock("./db", () => ({
   getDb: vi.fn().mockResolvedValue(null),
-  upsertUser: vi.fn().mockResolvedValue(undefined),
-  getUserByOpenId: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { appRouter } from "./routers";

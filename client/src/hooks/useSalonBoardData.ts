@@ -8,8 +8,12 @@
  * スタッフ個別ページやアンケートの抽出方法は変更しない。
  */
 import { useState, useEffect, useMemo } from "react";
+import { parseStylistFlatCsv } from "./useSalonBoardStylistData";
 
-const SPREADSHEET_ID = "1pYQcY42rUS3ftfIkZxffCsy7zfW2hW7U_zxtXf5A5bI";
+// 正本「サロンボード売上」スプレッドシート（林さん作成・毎朝7:30自動更新）。
+// 店舗値は stylist_flat を合算して算出するため、店舗=Σスタイリストが常に一致する。
+const SPREADSHEET_ID = "1nR36MMsbtAT8f2ccYLBTZjZ4ESin9odmgWN2xP3oVSE";
+const STYLIST_SHEET_NAME = "stylist_flat";
 
 // シート名 → ダッシュボード店舗名マッピング（フォールバック用）
 const SHEET_STORE_MAP_FALLBACK: { sheetName: string; storeName: string }[] = [
@@ -122,72 +126,66 @@ function normalizeYearMonth(raw: string): string {
 let cachedData: SalonBoardMonthlyData[] | null = null;
 let fetchPromise: Promise<SalonBoardMonthlyData[]> | null = null;
 
+/**
+ * stylist_flat のCSVテキストを「店舗×月」へ合算して SalonBoardMonthlyData[] を作る（純関数・テスト対象）。
+ * 売上＝技術＋店販（stylist_flat の SALES 列が既に技術＋店販）。店舗値はスタイリスト値の合算なので
+ * 「店舗合計＝その店のスタイリスト合計」が常に1円単位で一致する。
+ */
+export function aggregateStoreFromStylistCsv(csvText: string): SalonBoardMonthlyData[] {
+  const rows = parseStylistFlatCsv(csvText);
+  const map = new Map<string, SalonBoardMonthlyData>();
+  for (const r of rows) {
+    const key = `${r.storeName}__${r.yearMonth}`;
+    const cur = map.get(key);
+    if (!cur) {
+      map.set(key, {
+        storeName: r.storeName,
+        yearMonth: r.yearMonth,
+        totalSales: r.sales,
+        techSales: r.techSales,
+        retailSales: r.retailSales,
+        unitPrice: 0,
+        totalCustomers: r.customers,
+        newCustomers: r.newCustomers,
+        returnCustomers: r.returnCustomers,
+      });
+    } else {
+      cur.totalSales += r.sales;
+      cur.techSales += r.techSales;
+      cur.retailSales += r.retailSales;
+      cur.totalCustomers += r.customers;
+      cur.newCustomers += r.newCustomers;
+      cur.returnCustomers += r.returnCustomers;
+    }
+  }
+  const out = Array.from(map.values());
+  for (const d of out) {
+    d.unitPrice = d.totalCustomers > 0 ? Math.round(d.totalSales / d.totalCustomers) : 0;
+  }
+  return out;
+}
+
 async function fetchAllStoreData(): Promise<SalonBoardMonthlyData[]> {
   if (cachedData) return cachedData;
   if (fetchPromise) return fetchPromise;
 
   fetchPromise = (async () => {
-    const allData: SalonBoardMonthlyData[] = [];
-
-    // 各店舗の月別シートからデータを取得
-    const fetchPromises = getSheetStoreMap().map(async ({ sheetName, storeName }) => {
-      try {
-        const encodedSheet = encodeURIComponent(sheetName);
-        const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodedSheet}`;
-        const resp = await fetch(url);
-        if (!resp.ok) return [];
-
-        const text = await resp.text();
-        const lines = text.split("\n").filter(l => l.trim());
-
-        // ヘッダー行をスキップ
-        const dataLines = lines.slice(1);
-        const storeData: SalonBoardMonthlyData[] = [];
-
-        for (const line of dataLines) {
-          const cols = parseCSVLine(line);
-          if (cols.length < 11) continue;
-
-          const rawYearMonth = cols[COL.YEAR_MONTH]?.trim().replace(/"/g, "");
-          // 合計行（年月が空）をスキップ
-          if (!rawYearMonth || rawYearMonth === "") continue;
-
-          const yearMonth = normalizeYearMonth(rawYearMonth);
-          if (!yearMonth) continue;
-
-          const totalSales = parseNum(cols[COL.TOTAL_SALES]);
-          const totalCustomers = parseNum(cols[COL.TOTAL_CUSTOMERS]);
-
-          // データが全て0の行はスキップ（まだデータが入っていない月）
-          if (totalSales === 0 && totalCustomers === 0) continue;
-
-          storeData.push({
-            storeName,
-            yearMonth,
-            totalSales,
-            techSales: parseNum(cols[COL.TECH_SALES]),
-            retailSales: parseNum(cols[COL.RETAIL_SALES]),
-            unitPrice: parseNum(cols[COL.UNIT_PRICE]),
-            totalCustomers,
-            newCustomers: parseNum(cols[COL.NEW_CUSTOMERS]),
-            returnCustomers: parseNum(cols[COL.RETURN_CUSTOMERS]),
-          });
-        }
-
-        return storeData;
-      } catch (err) {
-        console.warn(`サロンボードデータ取得失敗 (${sheetName}):`, err);
-        return [];
+    try {
+      const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(STYLIST_SHEET_NAME)}`;
+      const resp = await fetch(url);
+      if (!resp.ok) {
+        cachedData = [];
+        return cachedData;
       }
-    });
-
-    const results = await Promise.all(fetchPromises);
-    for (const storeData of results) {
-      allData.push(...storeData);
+      const text = await resp.text();
+      const data = aggregateStoreFromStylistCsv(text);
+      cachedData = data;
+      return data;
+    } catch (err) {
+      console.warn("サロンボード店舗データ取得失敗:", err);
+      cachedData = [];
+      return cachedData;
     }
-
-    cachedData = allData;
-    return allData;
   })();
 
   return fetchPromise;

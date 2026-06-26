@@ -12,7 +12,7 @@
  * 4. オーナーへ結果通知
  */
 import { Router, Request, Response } from "express";
-import { sdk } from "../_core/sdk";
+import { ENV } from "../_core/env";
 import { notifyOwner } from "../_core/notification";
 import { getAllStores, insertStore, storeExists, updateStoreSalonBoardSheet } from "../db";
 
@@ -383,18 +383,18 @@ export function registerScheduledMonthlySyncRoute(app: import("express").Express
 
   router.post("/api/scheduled/monthly-sync", async (req: Request, res: Response) => {
     try {
-      // 認証チェック
-      const user = await sdk.authenticateRequest(req);
-      if (!user) {
+      // 認証チェック（CRON_SECRET 共有シークレット方式）
+      // secret 未設定時はエンドポイントを無効化（503）＝デフォルト安全側。
+      if (!ENV.cronSecret) {
+        res.status(503).json({ error: "Scheduled endpoint disabled (CRON_SECRET not set)" });
+        return;
+      }
+      if (req.headers["x-cron-secret"] !== ENV.cronSecret) {
         res.status(401).json({ error: "Unauthorized" });
         return;
       }
-      if (user.role !== "user" && user.role !== "admin") {
-        res.status(403).json({ error: "Forbidden" });
-        return;
-      }
 
-      console.log(`[Scheduled] monthly-sync triggered by user: ${user.name} (${user.role})`);
+      console.log("[Scheduled] monthly-sync triggered");
 
       // Step 1: 新店舗検出
       const newStores = await detectNewStores();

@@ -1,6 +1,8 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { notifyOwner } from "./notification";
-import { adminProcedure, publicProcedure, router } from "./trpc";
+import { publicProcedure, router } from "./trpc";
+import { requireAdmin } from "../routers/admin";
 
 export const systemRouter = router({
   health: publicProcedure
@@ -13,14 +15,18 @@ export const systemRouter = router({
       ok: true,
     })),
 
-  notifyOwner: adminProcedure
+  notifyOwner: publicProcedure
     .input(
       z.object({
         title: z.string().min(1, "title is required"),
         content: z.string().min(1, "content is required"),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // Admin-only via Bearer token (Manus OAuth/adminProcedure removed in B-1).
+      if (!(await requireAdmin(ctx))) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "管理者認証が必要です" });
+      }
       const delivered = await notifyOwner(input);
       return {
         success: delivered,

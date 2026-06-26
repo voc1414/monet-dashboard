@@ -20,6 +20,7 @@ import type { PeriodSelection } from "@/components/PeriodSelector";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { useNpsData, filterByMonth } from "@/hooks/useNpsData";
+import { useSalonBoardStylistData } from "@/hooks/useSalonBoardStylistData";
 import type { StaffReport } from "@/hooks/useMonthlyReport";
 import { isNewStaff, isRetiredStaff } from "@/lib/newBadge";
 import { useStores } from "@/hooks/useStores";
@@ -108,7 +109,35 @@ export default function StaffList() {
   const { rawData, loading, error, availableMonths } = useMonthlyReport();
   const { npsAliasMap } = useStores();
   const { records: npsRecords, loading: npsLoading } = useNpsData(npsAliasMap);
+  const { getStylistMonth } = useSalonBoardStylistData();
   const [, navigate] = useLocation();
+
+  /**
+   * 実績系（売上・客数）をサロンボード優先・無ければ月末報告書フォールバックで返す。
+   * 月は当該スタッフの reportMonth（一覧で表示している月）に揃える＝同月比較。
+   * サロンボード未設定時は hasStylist=false 相当で常に report 値となり、現行表示と一致する。
+   */
+  const getMetrics = useMemo(() => {
+    return (staff: StaffReport) => {
+      const sb = getStylistMonth(staff.storeNormalized, staff.name, staff.reportMonth);
+      if (sb) {
+        return {
+          totalSales: sb.sales,
+          totalCustomers: sb.customers,
+          newCustomers: sb.newCustomers,
+          returnCustomers: sb.returnCustomers,
+          dataSource: "salonboard" as const,
+        };
+      }
+      return {
+        totalSales: staff.totalSales,
+        totalCustomers: staff.totalCustomers,
+        newCustomers: staff.newCustomers,
+        returnCustomers: staff.returnCustomers,
+        dataSource: "report" as const,
+      };
+    };
+  }, [getStylistMonth]);
 
 
 
@@ -252,7 +281,7 @@ export default function StaffList() {
   const compositeScoreMap = useMemo(() => {
     const map = new Map<string, CompositeScoreResult>();
     for (const staff of staffFiltered) {
-      const utilRate = calculateUtilizationRate(staff.totalCustomers, staff.employmentType);
+      const utilRate = calculateUtilizationRate(getMetrics(staff).totalCustomers, staff.employmentType);
       const npsInfo = staffNpsMap.get(staff.name.replace(/[\s\u3000]/g, ""));
 
 
@@ -277,14 +306,14 @@ export default function StaffList() {
     list.sort((a, b) => {
       switch (sortField) {
         case "totalSales":
-          return (a.totalSales - b.totalSales) * dir;
+          return (getMetrics(a).totalSales - getMetrics(b).totalSales) * dir;
         case "storeNormalized":
           return a.storeNormalized.localeCompare(b.storeNormalized, "ja") * dir;
         case "employmentType":
           return a.employmentType.localeCompare(b.employmentType, "ja") * dir;
         case "utilizationRate": {
-          const rateA = calculateUtilizationRate(a.totalCustomers, a.employmentType) ?? -1;
-          const rateB = calculateUtilizationRate(b.totalCustomers, b.employmentType) ?? -1;
+          const rateA = calculateUtilizationRate(getMetrics(a).totalCustomers, a.employmentType) ?? -1;
+          const rateB = calculateUtilizationRate(getMetrics(b).totalCustomers, b.employmentType) ?? -1;
           return (rateA - rateB) * dir;
         }
         case "nextReservationRate":
@@ -495,7 +524,8 @@ export default function StaffList() {
           <div className="space-y-2">
             {staffList.map((staff, i) => {
               const staffKey = `${staff.answerId}-${i}`;
-              const utilRate = calculateUtilizationRate(staff.totalCustomers, staff.employmentType);
+              const metrics = getMetrics(staff);
+              const utilRate = calculateUtilizationRate(metrics.totalCustomers, staff.employmentType);
               const npsInfo = staffNpsMap.get(staff.name.replace(/[\s\u3000]/g, ""));
 
               return (
@@ -551,7 +581,7 @@ export default function StaffList() {
                         })()}
                         {/* 総売上 */}
                         <div>
-                          <span className="font-mono-data text-sm font-bold text-foreground">{formatCurrency(staff.totalSales)}</span>
+                          <span className="font-mono-data text-sm font-bold text-foreground">{formatCurrency(metrics.totalSales)}</span>
                         </div>
                         {/* 店舗 */}
                         <div>
@@ -667,7 +697,7 @@ export default function StaffList() {
                               </div>
                               <div className="flex items-center gap-1 shrink-0 ml-2">
                                 <span className="text-[9px] text-muted-foreground">売上</span>
-                                <span className="font-mono-data text-base font-bold text-foreground">{formatCurrency(staff.totalSales)}</span>
+                                <span className="font-mono-data text-base font-bold text-foreground">{formatCurrency(metrics.totalSales)}</span>
                                 <ChevronRight className="w-4 h-4 text-muted-foreground" />
                               </div>
                             </div>

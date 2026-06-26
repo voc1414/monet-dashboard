@@ -27,6 +27,7 @@ import { generateStoreAdvice } from "@/lib/npsAdvice";
 import type { NpsAdvice } from "@/lib/npsAdvice";
 import { useFankuruDataByStaff } from "@/hooks/useFankuruData";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
+import { useSalonBoardStylistData } from "@/hooks/useSalonBoardStylistData";
 import type { StaffReport } from "@/hooks/useMonthlyReport";
 import { isNewStaff } from "@/lib/newBadge";
 import { useStores } from "@/hooks/useStores";
@@ -330,6 +331,38 @@ export default function StaffDetail() {
     return matching[0] || null;
   }, [rawData, staffName, staffStore, filterM, isAllPeriod]);
 
+  // 実績系（売上・技術・店販・客数・新規・再来・客単価）はサロンボード優先・無ければ月末報告書フォールバック。
+  // 月は staffReport.reportMonth に揃える（同月比較）。サロンボード未設定時は常に report 値＝現行表示と一致。
+  const { getStylistMonth } = useSalonBoardStylistData();
+  const metrics = useMemo(() => {
+    if (!staffReport) return null;
+    const sb = getStylistMonth(staffReport.storeNormalized, staffReport.name, staffReport.reportMonth);
+    if (sb) {
+      return {
+        totalSales: sb.sales,
+        techSales: sb.techSales,
+        retailSales: sb.retailSales,
+        unitPrice: sb.unitPrice,
+        totalCustomers: sb.customers,
+        newCustomers: sb.newCustomers,
+        returnCustomers: sb.returnCustomers,
+        employmentType: staffReport.employmentType,
+        dataSource: "salonboard" as const,
+      };
+    }
+    return {
+      totalSales: staffReport.totalSales,
+      techSales: staffReport.techSales,
+      retailSales: staffReport.retailSales,
+      unitPrice: staffReport.unitPrice,
+      totalCustomers: staffReport.totalCustomers,
+      newCustomers: staffReport.newCustomers,
+      returnCustomers: staffReport.returnCustomers,
+      employmentType: staffReport.employmentType,
+      dataSource: "report" as const,
+    };
+  }, [staffReport, getStylistMonth]);
+
   // NPS: スタッフ名でフィルタ（スペース正規化して比較）
   const staffNpsRecords = useMemo(() => {
     const norm = normalizeStaffName(staffName);
@@ -442,7 +475,7 @@ export default function StaffDetail() {
   const compositeScore = useMemo((): CompositeScoreResult | null => {
     // データが何もない場合はnull
     if (!staffNpsStats && !staffReport && !hasFankuruData) return null;
-    const utilRate = staffReport ? calculateUtilizationRate(staffReport.totalCustomers, staffReport.employmentType) : null;
+    const utilRate = metrics ? calculateUtilizationRate(metrics.totalCustomers, metrics.employmentType) : null;
     return calculateCompositeScore({
       npsScore: staffNpsStats?.npsScore ?? null,
       npsResponseCount: staffNpsStats?.totalResponses ?? 0,
@@ -454,14 +487,14 @@ export default function StaffDetail() {
   // アドバイス生成
   const staffAdvice = useMemo((): StaffAdvice | null => {
     if (!compositeScore) return null;
-    const utilRate = staffReport ? calculateUtilizationRate(staffReport.totalCustomers, staffReport.employmentType) : null;
+    const utilRate = metrics ? calculateUtilizationRate(metrics.totalCustomers, metrics.employmentType) : null;
     return generateStaffAdvice({
       totalScore: compositeScore.total,
       rankLabel: compositeScore.rank.label,
       nextReservationRate: staffReport?.nextReservationRate ?? null,
       utilizationRate: utilRate,
       npsScore: staffNpsStats?.npsScore ?? null,
-      totalCustomers: staffReport?.totalCustomers ?? 0,
+      totalCustomers: metrics?.totalCustomers ?? 0,
       nextReservationCount: staffReport?.nextReservation ?? 0,
     });
   }, [compositeScore, staffReport, staffNpsStats]);
@@ -739,7 +772,7 @@ export default function StaffDetail() {
 
       {/* ===== 0. 次回予約率・稼働率 ===== */}
       {staffReport && (() => {
-        const utilRate = calculateUtilizationRate(staffReport.totalCustomers, staffReport.employmentType);
+        const utilRate = calculateUtilizationRate(metrics?.totalCustomers ?? staffReport.totalCustomers, staffReport.employmentType);
         return (
           <section className="mb-6 pt-6 border-t-2 border-primary/20">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -849,27 +882,32 @@ export default function StaffDetail() {
         {staffReport ? (
           <Card className="border-border/50 shadow-sm">
             <CardContent className="p-5">
+              {metrics?.dataSource === "salonboard" && (
+                <div className="mb-3">
+                  <span className="text-[10px] font-medium text-primary/70 bg-primary/5 border border-primary/20 rounded px-1.5 py-0.5">SalonBoard</span>
+                </div>
+              )}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
                 <div>
                   <div className="text-[10px] text-muted-foreground mb-1">総売上</div>
-                  <div className="font-mono-data text-lg font-bold text-foreground">{formatCurrency(staffReport.totalSales)}</div>
+                  <div className="font-mono-data text-lg font-bold text-foreground">{formatCurrency(metrics?.totalSales ?? staffReport.totalSales)}</div>
                 </div>
                 <div>
                   <div className="text-[10px] text-muted-foreground mb-1">技術売上</div>
-                  <div className="font-mono-data text-lg font-bold text-foreground">{formatCurrency(staffReport.techSales)}</div>
+                  <div className="font-mono-data text-lg font-bold text-foreground">{formatCurrency(metrics?.techSales ?? staffReport.techSales)}</div>
                 </div>
                 <div>
                   <div className="text-[10px] text-muted-foreground mb-1">店販売上</div>
-                  <div className="font-mono-data text-lg font-bold text-foreground">{formatCurrency(staffReport.retailSales)}</div>
+                  <div className="font-mono-data text-lg font-bold text-foreground">{formatCurrency(metrics?.retailSales ?? staffReport.retailSales)}</div>
                 </div>
                 <div>
                   <div className="text-[10px] text-muted-foreground mb-1">客単価</div>
-                  <div className="font-mono-data text-lg font-bold text-foreground">{formatCurrency(staffReport.unitPrice)}</div>
+                  <div className="font-mono-data text-lg font-bold text-foreground">{formatCurrency(metrics?.unitPrice ?? staffReport.unitPrice)}</div>
                 </div>
                 <div>
                   <div className="text-[10px] text-muted-foreground mb-1">総客数</div>
-                  <div className="font-mono-data text-lg font-bold text-foreground">{staffReport.totalCustomers}名</div>
-                  <div className="text-[9px] text-muted-foreground/70">新規{staffReport.newCustomers} / 再来{staffReport.returnCustomers}</div>
+                  <div className="font-mono-data text-lg font-bold text-foreground">{metrics?.totalCustomers ?? staffReport.totalCustomers}名</div>
+                  <div className="text-[9px] text-muted-foreground/70">新規{metrics?.newCustomers ?? staffReport.newCustomers} / 再来{metrics?.returnCustomers ?? staffReport.returnCustomers}</div>
                 </div>
                 <div>
                   <div className="text-[10px] text-muted-foreground mb-1">次回予約率</div>
