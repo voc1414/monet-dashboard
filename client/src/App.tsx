@@ -14,6 +14,7 @@ import StaffList from "./pages/StaffList";
 import SurveyList from "./pages/SurveyList";
 import SurveyDetail from "./pages/SurveyDetail";
 import StaffDetail from "./pages/StaffDetail";
+import Counseling from "./pages/Counseling";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminAlerts from "./pages/admin/AdminAlerts";
 import AdminStores from "./pages/admin/AdminStores";
@@ -33,6 +34,7 @@ function Router() {
         <Route path="/staff/:storeId/:staffId" component={StaffDetail} />
         <Route path="/survey" component={SurveyList} />
         <Route path="/survey/:storeId" component={SurveyDetail} />
+        <Route path="/counseling" component={Counseling} />
         <Route path="/store/:storeId/nps" component={NpsOverview} />
 
         {/* Admin Routes */}

@@ -5,7 +5,7 @@
  * Typography: Noto Sans JP (body), Inter (data)
  */
 import { Link, useLocation } from "wouter";
-import { ChevronRight, RefreshCw, Home, Users, ClipboardList, Settings } from "lucide-react";
+import { ChevronRight, RefreshCw, Home, Users, ClipboardList, MessageSquareText, Settings } from "lucide-react";
 import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 
@@ -85,6 +85,16 @@ export default function DashboardLayout({
               >
                 <ClipboardList className="w-4 h-4" />
                 アンケート
+              </span>
+            </Link>
+            <Link href="/counseling">
+              <span
+                className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary ${
+                  location.startsWith("/counseling") ? "text-foreground" : "text-muted-foreground"
+                }`}
+              >
+                <MessageSquareText className="w-4 h-4" />
+                カウンセリング
               </span>
             </Link>
             <div className="w-px h-5 bg-border/60" />
@@ -182,6 +192,14 @@ export default function DashboardLayout({
             }`}>
               <ClipboardList className="w-5 h-5" />
               <span className="text-[10px] font-medium">アンケート</span>
+            </div>
+          </Link>
+          <Link href="/counseling">
+            <div className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-colors ${
+              location.startsWith("/counseling") ? "text-primary" : "text-muted-foreground"
+            }`}>
+              <MessageSquareText className="w-5 h-5" />
+              <span className="text-[10px] font-medium">カウンセリング</span>
             </div>
           </Link>
           <Link href="/admin">
