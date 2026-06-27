@@ -104,45 +104,56 @@ export function parseCounselingCsv(text: string): CounselingRow[] {
   return out;
 }
 
-/** 行データを月ごと・タクソノミー順に構造化する。 */
-export function buildMonths(rows: CounselingRow[]): CounselingMonth[] {
-  const byMonth = new Map<string, CounselingRow[]>();
-  for (const r of rows) {
-    if (!byMonth.has(r.yearMonth)) byMonth.set(r.yearMonth, []);
-    byMonth.get(r.yearMonth)!.push(r);
-  }
-  const months: CounselingMonth[] = [];
-  Array.from(byMonth.entries()).forEach(([ym, rs]) => {
-    const questions: CounselingQuestion[] = [];
-    for (const tq of COUNSELING_TAXONOMY) {
-      const qRows = rs.filter((r) => r.qKey === tq.key);
-      if (qRows.length === 0) continue;
-      const base = qRows[0].base;
-      // タクソノミー順に並べ、件数降順で安定化
-      const options: CounselingOption[] = qRows
-        .map((r) => ({
-          key: r.optKey,
-          label: optionLabel(tq.key, r.optKey),
-          count: r.count,
-          pct: r.pct,
-        }))
-        .sort((a, b) => b.count - a.count);
-      questions.push({
-        key: tq.key,
-        title: questionTitle(tq.key),
-        multi: tq.multi,
-        base,
-        options,
-      });
+/**
+ * 指定した月（複数可・"all"可）の行を院横断ではなく月横断で合算し、
+ * タクソノミー順の設問構造にする。複数月選択時は件数・baseを合算しpctを再計算する。
+ */
+export function aggregateRows(
+  rows: CounselingRow[],
+  monthsFilter: string[] | "all"
+): { totalRespondents: number; questions: CounselingQuestion[] } {
+  const target =
+    monthsFilter === "all"
+      ? rows
+      : rows.filter((r) => monthsFilter.includes(r.yearMonth));
+
+  const questions: CounselingQuestion[] = [];
+  for (const tq of COUNSELING_TAXONOMY) {
+    const qRows = target.filter((r) => r.qKey === tq.key);
+    if (qRows.length === 0) continue;
+    // base = 対象月のbaseの合算（1ヶ月ならその月のbase）
+    const monthsForBase = new Map<string, number>();
+    for (const r of qRows) {
+      if (!monthsForBase.has(r.yearMonth))
+        monthsForBase.set(r.yearMonth, r.base);
     }
-    const genderQ = questions.find((q) => q.key === "gender");
-    const totalRespondents = genderQ
-      ? genderQ.options.reduce((s, o) => s + o.count, 0)
-      : 0;
-    months.push({ yearMonth: ym, totalRespondents, questions });
-  });
-  months.sort((a, b) => (a.yearMonth < b.yearMonth ? 1 : -1)); // 新しい順
-  return months;
+    const base = Array.from(monthsForBase.values()).reduce((s, b) => s + b, 0);
+    // 選択肢ごとに件数を合算
+    const countByOpt = new Map<string, number>();
+    for (const r of qRows) {
+      countByOpt.set(r.optKey, (countByOpt.get(r.optKey) || 0) + r.count);
+    }
+    const options: CounselingOption[] = Array.from(countByOpt.entries())
+      .map(([optKey, count]) => ({
+        key: optKey,
+        label: optionLabel(tq.key, optKey),
+        count,
+        pct: base > 0 ? Math.round((count / base) * 100) : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
+    questions.push({
+      key: tq.key,
+      title: questionTitle(tq.key),
+      multi: tq.multi,
+      base,
+      options,
+    });
+  }
+  const genderQ = questions.find((q) => q.key === "gender");
+  const totalRespondents = genderQ
+    ? genderQ.options.reduce((s, o) => s + o.count, 0)
+    : 0;
+  return { totalRespondents, questions };
 }
 
 let cached: CounselingRow[] | null = null;
@@ -200,11 +211,13 @@ export function useCounselingData() {
     };
   }, []);
 
-  const months = useMemo(() => buildMonths(rows), [rows]);
   const availableMonths = useMemo(
-    () => months.map((m) => m.yearMonth),
-    [months]
+    () =>
+      Array.from(new Set(rows.map((r) => r.yearMonth))).sort((a, b) =>
+        a < b ? 1 : -1
+      ),
+    [rows]
   );
 
-  return { months, availableMonths, loading, error };
+  return { rows, availableMonths, loading, error };
 }

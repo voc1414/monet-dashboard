@@ -2,35 +2,24 @@
  * Design: monet Brand Identity — 水彩ブルー × コンクリートモダン
  * Page: カウンセリングシート集計（サロンブレイン分析の院横断サマリー）
  * データソース: スプレッドシート counseling タブ（gviz）→ useCounselingData
- *   表示ラベルは counselingTaxonomy。集計値のみ・PIIなし・モネ7院合算（ヨルモネ除外）。
+ *   期間UIは店舗一覧・スタッフ一覧と同じ PeriodSelector（既定=先月）。
+ *   集計値のみ・PIIなし・モネ7院合算（ヨルモネ除外）。
  */
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { ClipboardList, Users, Info, Loader2 } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useCounselingData } from "@/hooks/useCounselingData";
+  PeriodSelector,
+  getDefaultPeriodSelection,
+  getFilterMonths,
+  getPeriodLabel,
+} from "@/components/PeriodSelector";
+import type { PeriodSelection } from "@/components/PeriodSelector";
+import { useCounselingData, aggregateRows } from "@/hooks/useCounselingData";
 import type { CounselingQuestion } from "@/hooks/useCounselingData";
 
-function ymLabel(ym: string): string {
-  const m = ym.match(/^(\d{4})-(\d{2})$/);
-  if (!m) return ym;
-  return `${m[1]}年${parseInt(m[2], 10)}月`;
-}
-
-function QuestionCard({
-  q,
-  index,
-}: {
-  q: CounselingQuestion;
-  index: number;
-}) {
+function QuestionCard({ q, index }: { q: CounselingQuestion; index: number }) {
   const maxPct = Math.max(...q.options.map((o) => o.pct), 1);
   return (
     <motion.div
@@ -69,20 +58,22 @@ function QuestionCard({
 }
 
 export default function Counseling() {
-  const { months, availableMonths, loading, error } = useCounselingData();
-  const [selected, setSelected] = useState<string>("");
-
-  // 既定は最新月（＝先月。店舗一覧・スタッフ一覧と同じ）
-  useEffect(() => {
-    if (!selected && availableMonths.length > 0) {
-      setSelected(availableMonths[0]);
-    }
-  }, [availableMonths, selected]);
-
-  const current = useMemo(
-    () => months.find((m) => m.yearMonth === selected) ?? months[0],
-    [months, selected]
+  const { rows, availableMonths, loading, error } = useCounselingData();
+  const [selection, setSelection] = useState<PeriodSelection>(
+    getDefaultPeriodSelection()
   );
+
+  const filterMonths = useMemo(
+    () => getFilterMonths(selection, availableMonths),
+    [selection, availableMonths]
+  );
+
+  const agg = useMemo(
+    () => aggregateRows(rows, filterMonths),
+    [rows, filterMonths]
+  );
+
+  const hasData = agg.questions.length > 0;
 
   return (
     <DashboardLayout breadcrumbs={[{ label: "カウンセリング集計" }]}>
@@ -99,6 +90,28 @@ export default function Counseling() {
         </p>
       </div>
 
+      {/* Controls */}
+      <div className="flex flex-wrap items-center gap-3 mb-6">
+        <PeriodSelector
+          allMonths={availableMonths}
+          selection={selection}
+          onChange={setSelection}
+        />
+        <span className="text-xs text-muted-foreground">
+          {getPeriodLabel(selection)}
+        </span>
+        {hasData && (
+          <div className="flex items-center gap-2 rounded-full border border-border/60 bg-white/70 px-4 py-1.5">
+            <Users className="w-4 h-4 text-primary" />
+            <span className="text-xs text-muted-foreground">回答者数</span>
+            <span className="text-base font-bold text-foreground tabular-nums">
+              {agg.totalRespondents.toLocaleString()}
+            </span>
+            <span className="text-xs text-muted-foreground">名</span>
+          </div>
+        )}
+      </div>
+
       {loading && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground py-16 justify-center">
           <Loader2 className="w-4 h-4 animate-spin" />
@@ -106,56 +119,27 @@ export default function Counseling() {
         </div>
       )}
 
-      {!loading && (!current || months.length === 0) && (
+      {!loading && !hasData && (
         <div className="rounded-xl border border-border/50 bg-muted/30 p-6 text-sm text-muted-foreground">
-          集計データがまだありません。
+          選択した期間の集計データがありません。
           {error ? `（${error}）` : ""}
         </div>
       )}
 
-      {!loading && current && (
+      {!loading && hasData && (
         <>
-          {/* Controls + summary */}
-          <div className="flex flex-wrap items-center gap-3 mb-6">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">集計期間</span>
-              <Select value={selected} onValueChange={setSelected}>
-                <SelectTrigger className="w-[160px] h-9 bg-white/70">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableMonths.map((m) => (
-                    <SelectItem key={m} value={m}>
-                      {ymLabel(m)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-2 rounded-full border border-border/60 bg-white/70 px-4 py-1.5">
-              <Users className="w-4 h-4 text-primary" />
-              <span className="text-xs text-muted-foreground">回答者数</span>
-              <span className="text-base font-bold text-foreground tabular-nums">
-                {current.totalRespondents.toLocaleString()}
-              </span>
-              <span className="text-xs text-muted-foreground">名</span>
-            </div>
-          </div>
-
-          {/* Questions grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {current.questions.map((q, i) => (
+            {agg.questions.map((q, i) => (
               <QuestionCard key={q.key} q={q} index={i} />
             ))}
           </div>
 
-          {/* Source note */}
           <div className="mt-6 flex items-start gap-2 rounded-xl border border-border/40 bg-muted/30 p-4 text-xs text-muted-foreground">
             <Info className="w-4 h-4 shrink-0 mt-0.5" />
             <div>
               出典: サロンブレイン カウンセリングシート分析。モネ全7院（福岡姪浜 /
               高槻 / 堀江院2nd / 福島 / 堀江 / 土橋 / 広島）の合算で、ヨルモネは含みません。
-              複数回答の設問は回答延べ数に対する比率です。集計値のみで、個人情報・自由記述の本文は含みません。
+              複数月を選んだ場合は件数を合算して比率を再計算します。複数回答の設問は回答延べ数に対する比率です。集計値のみで、個人情報・自由記述の本文は含みません。
             </div>
           </div>
         </>
