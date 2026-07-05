@@ -8,12 +8,15 @@
  * スタッフ個別ページやアンケートの抽出方法は変更しない。
  */
 import { useState, useEffect, useMemo } from "react";
-import { parseStylistFlatCsv } from "./useSalonBoardStylistData";
+import { parseStylistFlatCsv, normalizeSalonBoardStore } from "./useSalonBoardStylistData";
 
 // 正本「サロンボード売上」スプレッドシート（林さん作成・毎朝7:30自動更新）。
 // 店舗値は stylist_flat を合算して算出するため、店舗=Σスタイリストが常に一致する。
 const SPREADSHEET_ID = "1nR36MMsbtAT8f2ccYLBTZjZ4ESin9odmgWN2xP3oVSE";
 const STYLIST_SHEET_NAME = "stylist_flat";
+// A方針(2026-07-05): 店舗カードはサロンボード公式の店舗別月次集計 store_official を正本にする。
+// （明細再集計=Σスタイリストではサロンボード公式値と一致しないため。詳細はproject_monet_salonboard_truth_source）
+const STORE_OFFICIAL_SHEET_NAME = "store_official";
 
 // シート名 → ダッシュボード店舗名マッピング（フォールバック用）
 const SHEET_STORE_MAP_FALLBACK: { sheetName: string; storeName: string }[] = [
@@ -122,6 +125,38 @@ function normalizeYearMonth(raw: string): string {
   return trimmed.replace("/", "-");
 }
 
+/**
+ * store_official タブ（サロンボード公式の店舗別月次集計）のCSVを SalonBoardMonthlyData[] に変換。
+ * 列: 店舗,年月,純売上,技術,店販,オプション,総売上,割引,客単価,総客数,新規,再来
+ * A方針の正本。totalSales=純売上（公式）、totalCustomers=総客数。店舗名は normalizeSalonBoardStore で正規化。
+ */
+export function parseStoreOfficialCsv(csvText: string): SalonBoardMonthlyData[] {
+  const lines = csvText.split("\n").filter((l) => l.trim() !== "");
+  if (lines.length <= 1) return [];
+  const out: SalonBoardMonthlyData[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const c = parseCSVLine(lines[i]);
+    if (c.length < 12) continue;
+    const storeName = normalizeSalonBoardStore(c[0]);
+    const yearMonth = normalizeYearMonth(c[1]);
+    if (!storeName || !yearMonth) continue;
+    const totalCustomers = parseNum(c[9]);
+    const totalSales = parseNum(c[2]); // 純売上（公式）
+    out.push({
+      storeName,
+      yearMonth,
+      totalSales,
+      techSales: parseNum(c[3]),
+      retailSales: parseNum(c[4]),
+      unitPrice: parseNum(c[8]) || (totalCustomers > 0 ? Math.round(totalSales / totalCustomers) : 0),
+      totalCustomers,
+      newCustomers: parseNum(c[10]),
+      returnCustomers: parseNum(c[11]),
+    });
+  }
+  return out;
+}
+
 // キャッシュ
 let cachedData: SalonBoardMonthlyData[] | null = null;
 let fetchPromise: Promise<SalonBoardMonthlyData[]> | null = null;
@@ -171,6 +206,24 @@ async function fetchAllStoreData(): Promise<SalonBoardMonthlyData[]> {
 
   fetchPromise = (async () => {
     try {
+      // A方針: まず store_official（サロンボード公式の店舗別月次）を読む。
+      // タブが無い/空の場合のみ stylist_flat 合算にフォールバック（GAS未反映でも壊れないように）。
+      const officialUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(STORE_OFFICIAL_SHEET_NAME)}`;
+      try {
+        const oresp = await fetch(officialUrl);
+        if (oresp.ok) {
+          const otext = await oresp.text();
+          const odata = parseStoreOfficialCsv(otext);
+          if (odata.length > 0) {
+            cachedData = odata;
+            return odata;
+          }
+        }
+      } catch {
+        // store_official 取得失敗 → フォールバックへ
+      }
+
+      // フォールバック: stylist_flat を店舗合算（store_official タブが未生成のとき）
       const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(STYLIST_SHEET_NAME)}`;
       const resp = await fetch(url);
       if (!resp.ok) {

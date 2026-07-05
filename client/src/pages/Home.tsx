@@ -160,7 +160,7 @@ export default function Home() {
     const storeTechSales = hasSb ? (sbData?.techSales || 0) : (report?.totalTechSales || 0);
     const storeRetailSales = hasSb ? (sbData?.retailSales || 0) : (report?.totalRetailSales || 0);
     const storeTotalCustomers = hasSb ? (sbData?.totalCustomers || 0) : (report?.totalCustomers || 0);
-    const storeNewCustomers = hasSb ? (sbData?.newCustomers || 0) : (report?.totalNewCustomers || 0);
+    const storeNewCustomers = hasSb ? (sbData?.newCustomers || 0) : 0;
     const storeReturnCustomers = hasSb ? (sbData?.returnCustomers || 0) : (report?.totalReturnCustomers || 0);
     const storeUnitPrice = hasSb ? (sbData?.unitPrice || 0) : (report?.avgUnitPrice || 0);
 

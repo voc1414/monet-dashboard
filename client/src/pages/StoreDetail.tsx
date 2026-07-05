@@ -37,6 +37,7 @@ import type { CompositeScoreResult } from "@/lib/compositeScore";
 import type { FankuruPdf } from "@/hooks/useFankuruData";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { useSalonBoardData } from "@/hooks/useSalonBoardData";
+import { useSalonBoardStylistData } from "@/hooks/useSalonBoardStylistData";
 import type { StaffReport } from "@/hooks/useMonthlyReport";
 import { validateStoreReport, getAlertSummary } from "@/lib/reportValidation";
 import type { ReportAlert } from "@/lib/reportValidation";
@@ -222,6 +223,7 @@ export default function StoreDetail() {
   const { records, loading: npsLoading, error: npsError, lastUpdated, refresh } = useNpsData(npsAliasMap);
   const { rawData, loading: reportLoading, error: reportError, getStoreMonthlyStats, availableMonths: reportMonths } = useMonthlyReport();
   const { loading: sbLoading, error: sbError, getStoreMonth, getStoreMonthsAggregated, hasData: hasSbData } = useSalonBoardData();
+  const { getStylistMonth: getSbStylistMonth } = useSalonBoardStylistData();
   const loading = npsLoading || reportLoading || sbLoading;
   const error = npsError || reportError || sbError;
   const allNpsMonths = useMemo(() => getAvailableMonths(records), [records]);
@@ -675,7 +677,18 @@ export default function StoreDetail() {
         </h2>
         {reportStats && reportStats.staffReports.length > 0 ? (
           <div className="grid gap-3">
-            {reportStats.staffReports.map((sr: StaffReport, i: number) => (
+            {reportStats.staffReports.map((sr: StaffReport, i: number) => {
+              // 実績はサロンボード優先（無ければ月末報告書）。新規はサロンボードのみ（無ければ0）。
+              const sb = getSbStylistMonth(sr.storeNormalized, sr.name, sr.reportMonth);
+              const m = {
+                totalSales: sb ? sb.sales : sr.totalSales,
+                totalCustomers: sb ? sb.customers : sr.totalCustomers,
+                unitPrice: sb ? sb.unitPrice : sr.unitPrice,
+                newCustomers: sb ? sb.newCustomers : 0,
+                returnCustomers: sb ? sb.returnCustomers : sr.returnCustomers,
+                retailSales: sb ? sb.retailSales : sr.retailSales,
+              };
+              return (
               <motion.div key={sr.answerId || i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.03 }}>
                 <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
                   <CardContent className="p-4">
@@ -701,16 +714,16 @@ export default function StoreDetail() {
                       <div className="flex-1 grid grid-cols-2 sm:grid-cols-5 gap-3">
                         <div>
                           <div className="text-[10px] text-muted-foreground">総売上</div>
-                          <div className="font-mono-data text-sm font-bold">{formatCurrency(sr.totalSales)}</div>
+                          <div className="font-mono-data text-sm font-bold">{formatCurrency(m.totalSales)}</div>
                         </div>
                         <div>
                           <div className="text-[10px] text-muted-foreground">客単価</div>
-                          <div className="font-mono-data text-sm font-bold">{formatCurrency(sr.unitPrice)}</div>
+                          <div className="font-mono-data text-sm font-bold">{formatCurrency(m.unitPrice)}</div>
                         </div>
                         <div>
                           <div className="text-[10px] text-muted-foreground">総客数</div>
-                          <div className="font-mono-data text-sm font-bold">{sr.totalCustomers}名</div>
-                          <div className="text-[9px] text-muted-foreground/70">新規{sr.newCustomers} / 再来{sr.returnCustomers}</div>
+                          <div className="font-mono-data text-sm font-bold">{m.totalCustomers}名</div>
+                          <div className="text-[9px] text-muted-foreground/70">新規{m.newCustomers} / 再来{m.returnCustomers}</div>
                         </div>
                         <div>
                           <div className="text-[10px] text-muted-foreground">次回予約率</div>
@@ -739,14 +752,15 @@ export default function StoreDetail() {
                         </div>
                         <div>
                           <div className="text-[10px] text-muted-foreground">店販売上</div>
-                          <div className="font-mono-data text-sm font-bold">{formatCurrency(sr.retailSales)}</div>
+                          <div className="font-mono-data text-sm font-bold">{formatCurrency(m.retailSales)}</div>
                         </div>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
               </motion.div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <Card className="border-border/50 border-dashed">
@@ -1108,7 +1122,7 @@ export default function StoreDetail() {
         const storeRetailSales = hasSb ? (sbData?.retailSales || 0) : (reportStats?.totalRetailSales || 0);
         const storeUnitPrice = hasSb ? (sbData?.unitPrice || 0) : (reportStats?.avgUnitPrice || 0);
         const storeTotalCustomers = hasSb ? (sbData?.totalCustomers || 0) : (reportStats?.totalCustomers || 0);
-        const storeNewCustomers = hasSb ? (sbData?.newCustomers || 0) : (reportStats?.totalNewCustomers || 0);
+        const storeNewCustomers = hasSb ? (sbData?.newCustomers || 0) : 0;
         const storeReturnCustomers = hasSb ? (sbData?.returnCustomers || 0) : (reportStats?.totalReturnCustomers || 0);
         // 次回予約率は常に月末報告書から（サロンボードにはない）
         const nextReservationRate = reportStats?.nextReservationRate || 0;

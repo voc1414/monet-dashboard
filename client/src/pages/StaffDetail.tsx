@@ -356,7 +356,7 @@ export default function StaffDetail() {
       retailSales: staffReport.retailSales,
       unitPrice: staffReport.unitPrice,
       totalCustomers: staffReport.totalCustomers,
-      newCustomers: staffReport.newCustomers,
+      newCustomers: 0,
       returnCustomers: staffReport.returnCustomers,
       employmentType: staffReport.employmentType,
       dataSource: "report" as const,
@@ -907,7 +907,7 @@ export default function StaffDetail() {
                 <div>
                   <div className="text-[10px] text-muted-foreground mb-1">総客数</div>
                   <div className="font-mono-data text-lg font-bold text-foreground">{metrics?.totalCustomers ?? staffReport.totalCustomers}名</div>
-                  <div className="text-[9px] text-muted-foreground/70">新規{metrics?.newCustomers ?? staffReport.newCustomers} / 再来{metrics?.returnCustomers ?? staffReport.returnCustomers}</div>
+                  <div className="text-[9px] text-muted-foreground/70">新規{metrics?.newCustomers ?? 0} / 再来{metrics?.returnCustomers ?? staffReport.returnCustomers}</div>
                 </div>
                 <div>
                   <div className="text-[10px] text-muted-foreground mb-1">次回予約率</div>

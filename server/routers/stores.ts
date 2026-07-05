@@ -9,7 +9,7 @@ import { getAllStores, getStoresGroupedByArea } from "../db";
 const FALLBACK_AREA_STORES = [
   { area: "大阪エリア", stores: ["堀江院", "堀江院2nd", "福島院", "高槻院"] },
   { area: "福岡エリア", stores: ["姪浜院"] },
-  { area: "広島エリア", stores: ["楽々園院"] },
+  { area: "広島エリア", stores: ["楽々園院", "土橋院"] },
 ];
 
 export const storesRouter = router({

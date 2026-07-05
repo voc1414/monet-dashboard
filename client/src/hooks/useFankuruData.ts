@@ -337,6 +337,7 @@ const STYLIST_NAME_ALIASES: Record<string, string[]> = {
 
   // === 福島院 ===
   "Yu": ["ゆう", "ユウ", "yu", "yuu"],
+  "Yukiko": ["ゆきこ", "ユキコ", "yukiko"],
   "yoshie": ["よしえ", "ヨシエ", "yoshie", "由恵（よしえさん）", "由恵"],
   "Hiroko": ["ひろこ", "ヒロコ", "hiroko"],
   "Mika": ["みか", "ミカ", "mika"],
@@ -389,6 +390,7 @@ const STAFF_STORE_MAP: Record<string, string> = {
   "Nao": "高槻院",
   // 福島院
   "Yu": "福島院",
+  "Yukiko": "福島院",
   "yoshie": "福島院",
   "Hiroko": "福島院",
   "Mika": "福島院",
@@ -429,23 +431,50 @@ export function normalizeStylistName(name: string): string {
  * スタッフ名とスタイリスト名が一致するかチェックする。
  * 直接一致、部分一致、エイリアス経由の一致をすべてチェック。
  */
+// 半角英数字のみか（ローマ字名の判定）
+function isAsciiName(s: string): boolean {
+  return /^[\x00-\x7F]+$/.test(s);
+}
+/**
+ * 名前の包含一致を安全に判定する。
+ * - 完全一致は常にOK。
+ * - 英字（ローマ字）同士は「完全一致のみ」。"Yukiko" が "Yu" を含む等の誤マッチを防ぐ。
+ * - 日本語（かな/漢字）を含む場合のみ部分一致を許可（「山口」→「山口純奈」等の姓/名一致）。
+ *   1文字だけの部分一致は誤爆しやすいので2文字以上を要求。
+ */
+function nameContain(a: string, b: string): boolean {
+  if (a === b) return true;
+  if (isAsciiName(a) && isAsciiName(b)) return false; // 英字同士は完全一致のみ
+  if (a.length >= 2 && b.length >= 2 && (a.includes(b) || b.includes(a))) return true;
+  return false;
+}
+
+// 名前の表記ゆれを吸収: 空白除去＋末尾の敬称/会話調（さん/さんです/です/。）除去。
+// 例: "山口 純奈"→"山口純奈"、"サユリさんです。"→"サユリ"、"石橋 茜"→"石橋茜"。
+function cleanName(s: string): string {
+  return (s || "")
+    .replace(/[\s　]/g, "")
+    .replace(/(さんです。?|さんでした。?|さん。?|です。?|でした。?)$/u, "")
+    .replace(/[。.]+$/u, "")
+    .trim();
+}
+
 export function matchesStylist(stylistRaw: string, staffName: string): boolean {
   if (!stylistRaw || !staffName) return false;
-  const stylist = stylistRaw.trim().toLowerCase();
-  const target = staffName.trim().toLowerCase();
-  
-  // 直接一致・部分一致
-  if (stylist.includes(target) || target.includes(stylist)) return true;
-  
-  // エイリアス経由: 両方を正規化して比較
-  const normalizedStylist = normalizeStylistName(stylistRaw);
-  const normalizedTarget = normalizeStylistName(staffName);
-  if (normalizedStylist.toLowerCase() === normalizedTarget.toLowerCase()) return true;
-  
-  // 正規化した名前での部分一致
-  if (normalizedStylist.toLowerCase().includes(normalizedTarget.toLowerCase()) ||
-      normalizedTarget.toLowerCase().includes(normalizedStylist.toLowerCase())) return true;
-  
+  const sClean = cleanName(stylistRaw);
+  const tClean = cleanName(staffName);
+  const stylist = sClean.toLowerCase();
+  const target = tClean.toLowerCase();
+  if (!stylist || !target) return false;
+
+  if (nameContain(stylist, target)) return true;
+
+  // エイリアス経由: 両方を正規化して比較（cleanNameで表記ゆれを吸収してから）
+  const normalizedStylist = normalizeStylistName(sClean).toLowerCase();
+  const normalizedTarget = normalizeStylistName(tClean).toLowerCase();
+  if (normalizedStylist === normalizedTarget) return true;
+  if (nameContain(normalizedStylist, normalizedTarget)) return true;
+
   return false;
 }
 
