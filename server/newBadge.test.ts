@@ -86,6 +86,14 @@ describe("buildStaffFirstAppearanceMap", () => {
   });
 });
 
+// 実行日からの相対月 "YYYY-MM"（テストが実行日付で期限切れにならないよう動的に計算）
+function ymOffset(offset: number): string {
+  const d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + offset);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 describe("isNewStaff", () => {
   beforeEach(() => {
     // テスト前にマップをリセット
@@ -102,20 +110,18 @@ describe("isNewStaff", () => {
   });
 
   it("初登場月から3ヶ月以内のスタッフにNEWを付ける", () => {
-    // 現在月: 2026-06（テスト実行時）
-    // 初登場月が2026-04のスタッフ → 2026-04, 2026-05, 2026-06 まで NEW
+    // 初登場月が2ヶ月前 → 初登場月を含めて3ヶ月間NEW → 今月が期限ちょうど＝NEW
     const map = new Map<string, string>();
-    map.set("田中太郎|堀江院", "2026-04");
+    map.set("田中太郎|堀江院", ymOffset(-2));
     setStaffFirstAppearanceMap(map);
 
     expect(isNewStaff("田中太郎", "堀江院")).toBe(true);
   });
 
   it("初登場月から3ヶ月を超えたスタッフにはNEWを付けない", () => {
-    // 現在月: 2026-06
-    // 初登場月が2026-02のスタッフ → 2026-02, 2026-03, 2026-04 まで NEW → 2026-06はNEWではない
+    // 初登場月が4ヶ月前 → NEW期間（初登場月＋2ヶ月）を過ぎている
     const map = new Map<string, string>();
-    map.set("佐藤花子|姪浜院", "2026-02");
+    map.set("佐藤花子|姪浜院", ymOffset(-4));
     setStaffFirstAppearanceMap(map);
 
     expect(isNewStaff("佐藤花子", "姪浜院")).toBe(false);
@@ -123,7 +129,7 @@ describe("isNewStaff", () => {
 
   it("マップに存在しないスタッフにはNEWを付けない", () => {
     const map = new Map<string, string>();
-    map.set("田中太郎|堀江院", "2026-04");
+    map.set("田中太郎|堀江院", ymOffset(-1));
     setStaffFirstAppearanceMap(map);
 
     expect(isNewStaff("山田次郎", "堀江院")).toBe(false);
@@ -132,7 +138,7 @@ describe("isNewStaff", () => {
   it("スタッフ名のスペースを正規化して判定する", () => {
     // マップには正規化済みキーが入っている
     const map = new Map<string, string>();
-    map.set("藤原牧子|堀江院", "2026-04");
+    map.set("藤原牧子|堀江院", ymOffset(-1));
     setStaffFirstAppearanceMap(map);
 
     // スペースありで呼んでも正規化されてマッチする
@@ -142,7 +148,7 @@ describe("isNewStaff", () => {
 
   it("大文字小文字を区別しない", () => {
     const map = new Map<string, string>();
-    map.set("yu|福島院", "2026-05");
+    map.set("yu|福島院", ymOffset(-1));
     setStaffFirstAppearanceMap(map);
 
     expect(isNewStaff("YU", "福島院")).toBe(true);
