@@ -72,6 +72,9 @@ function lookupRegionLine(name: string, byRegion: Record<string, number>): numbe
 // "院"・空白を除いた共通キーで一致させる（福島院→福島 / 堀江2nd院→堀江2nd 等）。
 const canonicalStore = (name: string) => (name || "").replace(/院/g, "").replace(/[\s　]/g, "");
 
+// HPB（ホットペッパービューティー）掲載費: 全店一律の月額。CPA/ROASの分母に集客広告費と合算する（林 確定仕様 2026-07-05）
+const HPB_MONTHLY_FEE = 55000;
+
 // 選択期間(since〜until)が重なる年月("YYYY-MM")の一覧。
 function monthsBetween(since: string, until: string): string[] {
   const out: string[] = [];
@@ -147,6 +150,7 @@ function MetricTable({
   byRegion,
   newByStore,
   newSalesByStore,
+  hpbCost,
   firstColLabel,
 }: {
   typeKey: TypeKey;
@@ -157,6 +161,8 @@ function MetricTable({
   byRegion?: Record<string, number>;
   newByStore?: Record<string, number>;
   newSalesByStore?: Record<string, number>;
+  /** HPB費用（全店一律・選択期間分＝月額×月数）。集客の店舗別テーブルのみ。CPA/ROASの分母に加算 */
+  hpbCost?: number;
   firstColLabel?: string;
 }) {
   const showLine = typeKey === "shukyaku" ? !!byStore : !!byRegion;
@@ -166,6 +172,8 @@ function MetricTable({
   const salesOf = (name: string): number | null =>
     newSalesByStore ? (newSalesByStore[canonicalStore(name)] ?? null) : null;
   const showCpaRoas = showNew; // 集客（新規来店がある）時のみ CPA / ROAS を表示
+  const hpb = hpbCost ?? 0;
+  const showHpb = hpbCost != null;
   // 合計
   const tot = rows.reduce(
     (a, r) => {
@@ -184,6 +192,7 @@ function MetricTable({
   );
   const totCpl = cpl(tot.spend, tot.lead);
   const totCtr = ctr(tot.click, tot.impr);
+  const totHpb = hpb * rows.length; // 全店一律×店舗数
 
   const firstCol = firstColLabel || (typeKey === "shukyaku" ? "店舗" : "エリア");
   return (
@@ -208,6 +217,7 @@ function MetricTable({
               {showLine && <th className="text-right font-medium px-3 py-2">LINE単価</th>}
               <th className="text-right font-medium px-3 py-2">リード</th>
               {showNew && <th className="text-right font-medium px-3 py-2">新規</th>}
+              {showHpb && <th className="text-right font-medium px-3 py-2">HPB費用</th>}
               {showCpaRoas && <th className="text-right font-medium px-3 py-2">CPA</th>}
               {showCpaRoas && <th className="text-right font-medium px-3 py-2">ROAS</th>}
               <th className="text-right font-medium px-3 py-2">CPL</th>
@@ -253,19 +263,24 @@ function MetricTable({
                       })()}
                     </td>
                   )}
+                  {showHpb && (
+                    <td className="text-right px-3 py-2 tabular-nums">{yen(hpb)}</td>
+                  )}
                   {showCpaRoas && (
                     <td className="text-right px-3 py-2 tabular-nums font-semibold text-foreground">
                       {(() => {
+                        // CPA = (集客広告費 + HPB費用) ÷ 新規来店数
                         const nv = newOf(r.name);
-                        return nv && nv > 0 && b.spend > 0 ? yen(Math.round(b.spend / nv)) : "—";
+                        return nv && nv > 0 && b.spend + hpb > 0 ? yen(Math.round((b.spend + hpb) / nv)) : "—";
                       })()}
                     </td>
                   )}
                   {showCpaRoas && (
                     <td className="text-right px-3 py-2 tabular-nums font-semibold text-foreground">
                       {(() => {
+                        // ROAS = 新規売上 ÷ (集客広告費 + HPB費用) × 100
                         const ns = salesOf(r.name);
-                        return ns != null && b.spend > 0 ? `${Math.round((ns / b.spend) * 100)}%` : "—";
+                        return ns != null && b.spend + hpb > 0 ? `${Math.round((ns / (b.spend + hpb)) * 100)}%` : "—";
                       })()}
                     </td>
                   )}
@@ -285,7 +300,7 @@ function MetricTable({
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={13} className="text-center px-3 py-6 text-muted-foreground">
+                <td colSpan={showHpb ? 14 : 13} className="text-center px-3 py-6 text-muted-foreground">
                   該当データがありません
                 </td>
               </tr>
@@ -299,8 +314,9 @@ function MetricTable({
                 {showLine && <td className="text-right px-3 py-2 tabular-nums">{tot.line > 0 && tot.spend > 0 ? yen(Math.round(tot.spend / tot.line)) : "—"}</td>}
                 <td className="text-right px-3 py-2 tabular-nums">{NB(tot.lead)}</td>
                 {showNew && <td className="text-right px-3 py-2 tabular-nums">{numf(tot.newc)}</td>}
-                {showCpaRoas && <td className="text-right px-3 py-2 tabular-nums">{tot.newc > 0 && tot.spend > 0 ? yen(Math.round(tot.spend / tot.newc)) : "—"}</td>}
-                {showCpaRoas && <td className="text-right px-3 py-2 tabular-nums">{tot.spend > 0 ? `${Math.round((tot.newSales / tot.spend) * 100)}%` : "—"}</td>}
+                {showHpb && <td className="text-right px-3 py-2 tabular-nums">{yen(totHpb)}</td>}
+                {showCpaRoas && <td className="text-right px-3 py-2 tabular-nums">{tot.newc > 0 && tot.spend + totHpb > 0 ? yen(Math.round((tot.spend + totHpb) / tot.newc)) : "—"}</td>}
+                {showCpaRoas && <td className="text-right px-3 py-2 tabular-nums">{tot.spend + totHpb > 0 ? `${Math.round((tot.newSales / (tot.spend + totHpb)) * 100)}%` : "—"}</td>}
                 <td className="text-right px-3 py-2 tabular-nums">{totCpl > 0 ? yen(totCpl) : "—"}</td>
                 <td className="text-right px-3 py-2 tabular-nums">{totCtr > 0 ? pct(totCtr) : "—"}</td>
                 <td className="text-right px-3 py-2 tabular-nums">{YB(cpc(tot.spend, tot.click))}</td>
@@ -440,6 +456,12 @@ export default function Ads() {
     return map;
   }, [D, newSalesData]);
 
+  // HPB費用: 全店一律 月額¥55,000 × 選択期間に重なる月数（集客のCPA/ROAS分母に加算。求人は対象外）
+  const hpbCost = useMemo(() => {
+    if (!D) return 0;
+    return HPB_MONTHLY_FEE * monthsBetween(D.period.since, D.period.until).length;
+  }, [D]);
+
   const showShukyaku = type === "all" || type === "shukyaku";
   const showKyujin = type === "all" || type === "kyujin";
 
@@ -555,7 +577,7 @@ export default function Ads() {
           <div className="space-y-6">
             {showShukyaku &&
               (view === "store" ? (
-                <MetricTable typeKey="shukyaku" rows={storeRows} title="店舗別 一覧（直営・FC統合）" badge="集客" byStore={D.lmessage.byStoreShort} newByStore={newByStore} newSalesByStore={newSalesByStore} />
+                <MetricTable typeKey="shukyaku" rows={storeRows} title="店舗別 一覧（直営・FC統合）" badge="集客" byStore={D.lmessage.byStoreShort} newByStore={newByStore} newSalesByStore={newSalesByStore} hpbCost={hpbCost} />
               ) : (
                 <NonStoreTable typeKey="shukyaku" rows={view === "campaign" ? D.byCampaign : D.byAdset} title={view === "campaign" ? "キャンペーン別 一覧" : "広告セット別 一覧"} badge="集客" labelCol={view === "campaign" ? "キャンペーン名" : "広告セット名"} />
               ))}
@@ -568,7 +590,7 @@ export default function Ads() {
           </div>
 
           <div className="mt-6 rounded-xl border border-border/40 bg-muted/30 p-4 text-xs text-muted-foreground">
-            出典: Meta広告データ（SyncWith）＋ L Message 流入タグ。CPL警告しきい値=集客¥350超・求人¥3,000超、CTR=集客3%未満・求人2%未満で赤表示。LINE登録数は流入タグ友だちの期間内増分。「新規（新規来店数）」はサロンボード実績。日次データ(daily_new)があれば選択期間に厳密一致で合算、未反映の間は月次(該当月計)にフォールバック（KPIの注記に出所と範囲を表示）。集計値のみで個人情報は含みません。
+            出典: Meta広告データ（SyncWith）＋ L Message 流入タグ。CPL警告しきい値=集客¥350超・求人¥3,000超、CTR=集客3%未満・求人2%未満で赤表示。LINE登録数は流入タグ友だちの期間内増分。「新規（新規来店数）」はサロンボード実績。日次データ(daily_new)があれば選択期間に厳密一致で合算、未反映の間は月次(該当月計)にフォールバック（KPIの注記に出所と範囲を表示）。HPB費用=全店一律 月額¥55,000×選択期間の月数。CPA=(集客広告費+HPB費用)÷新規来店数、ROAS=新規売上÷(集客広告費+HPB費用)。CPL（リード単価）は広告費のみ。集計値のみで個人情報は含みません。
           </div>
         </motion.div>
       )}
