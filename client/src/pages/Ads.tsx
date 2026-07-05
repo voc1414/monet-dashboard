@@ -213,20 +213,19 @@ function MetricTable({
           <thead>
             <tr className="text-muted-foreground border-b border-border/50">
               <th className="text-left font-medium px-3 py-2">{firstCol}</th>
+              <th className="text-right font-medium px-3 py-2">1日予算</th>
+              <th className="text-right font-medium px-3 py-2">消化額</th>
+              {showHpb && <th className="text-right font-medium px-3 py-2">HPB費用</th>}
               {showLine && <th className="text-right font-medium px-3 py-2">LINE登録</th>}
               {showLine && <th className="text-right font-medium px-3 py-2">LINE単価</th>}
               <th className="text-right font-medium px-3 py-2">リード</th>
-              {showNew && <th className="text-right font-medium px-3 py-2">新規</th>}
-              {showHpb && <th className="text-right font-medium px-3 py-2">HPB費用</th>}
+              {showNew && <th className="text-right font-medium px-3 py-2">新規数</th>}
               {showCpaRoas && <th className="text-right font-medium px-3 py-2">CPA</th>}
               {showCpaRoas && <th className="text-right font-medium px-3 py-2">ROAS</th>}
               <th className="text-right font-medium px-3 py-2">CPL</th>
               <th className="text-right font-medium px-3 py-2">CTR</th>
               <th className="text-right font-medium px-3 py-2">CPC</th>
               <th className="text-right font-medium px-3 py-2">フリーク</th>
-              <th className="text-right font-medium px-3 py-2">消化額</th>
-              <th className="text-right font-medium px-3 py-2">1日予算</th>
-              <th className="text-right font-medium px-3 py-2">最終変更日</th>
             </tr>
           </thead>
           <tbody>
@@ -252,6 +251,11 @@ function MetricTable({
                     )}
                     {r.name}
                   </td>
+                  <td className="text-right px-3 py-2 tabular-nums">{b.dailyBudget && b.dailyBudget > 0 ? yen(b.dailyBudget) : "—"}</td>
+                  <td className="text-right px-3 py-2 tabular-nums">{YB(b.spend)}</td>
+                  {showHpb && (
+                    <td className="text-right px-3 py-2 tabular-nums">{yen(hpb)}</td>
+                  )}
                   {showLine && <td className="text-right px-3 py-2 tabular-nums">{line != null ? numf(line) : "—"}</td>}
                   {showLine && <td className="text-right px-3 py-2 tabular-nums">{tanka != null ? yen(tanka) : "—"}</td>}
                   <td className="text-right px-3 py-2 tabular-nums">{NB(b.lead)}</td>
@@ -262,9 +266,6 @@ function MetricTable({
                         return nv != null ? numf(nv) : "—";
                       })()}
                     </td>
-                  )}
-                  {showHpb && (
-                    <td className="text-right px-3 py-2 tabular-nums">{yen(hpb)}</td>
                   )}
                   {showCpaRoas && (
                     <td className="text-right px-3 py-2 tabular-nums font-semibold text-foreground">
@@ -292,15 +293,12 @@ function MetricTable({
                   </td>
                   <td className="text-right px-3 py-2 tabular-nums">{YB(cpc(b.spend, b.click))}</td>
                   <td className="text-right px-3 py-2 tabular-nums">{b.impr > 0 ? fr(freqAvg(b.freqWeighted, b.impr)) : "—"}</td>
-                  <td className="text-right px-3 py-2 tabular-nums">{YB(b.spend)}</td>
-                  <td className="text-right px-3 py-2 tabular-nums">{b.dailyBudget && b.dailyBudget > 0 ? yen(b.dailyBudget) : "—"}</td>
-                  <td className="text-right px-3 py-2 tabular-nums text-muted-foreground">{b.lastUpdated || "—"}</td>
                 </tr>
               );
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={showHpb ? 14 : 13} className="text-center px-3 py-6 text-muted-foreground">
+                <td colSpan={8 + (showLine ? 2 : 0) + (showNew ? 1 : 0) + (showHpb ? 1 : 0) + (showCpaRoas ? 2 : 0)} className="text-center px-3 py-6 text-muted-foreground">
                   該当データがありません
                 </td>
               </tr>
@@ -310,20 +308,19 @@ function MetricTable({
             <tfoot>
               <tr className="border-t-2 border-border/60 font-bold bg-muted/30">
                 <td className="text-left px-3 py-2">合計</td>
+                <td className="text-right px-3 py-2 tabular-nums">{tot.dailyBudget > 0 ? yen(tot.dailyBudget) : "—"}</td>
+                <td className="text-right px-3 py-2 tabular-nums">{YB(tot.spend)}</td>
+                {showHpb && <td className="text-right px-3 py-2 tabular-nums">{yen(totHpb)}</td>}
                 {showLine && <td className="text-right px-3 py-2 tabular-nums">{numf(tot.line)}</td>}
                 {showLine && <td className="text-right px-3 py-2 tabular-nums">{tot.line > 0 && tot.spend > 0 ? yen(Math.round(tot.spend / tot.line)) : "—"}</td>}
                 <td className="text-right px-3 py-2 tabular-nums">{NB(tot.lead)}</td>
                 {showNew && <td className="text-right px-3 py-2 tabular-nums">{numf(tot.newc)}</td>}
-                {showHpb && <td className="text-right px-3 py-2 tabular-nums">{yen(totHpb)}</td>}
                 {showCpaRoas && <td className="text-right px-3 py-2 tabular-nums">{tot.newc > 0 && tot.spend + totHpb > 0 ? yen(Math.round((tot.spend + totHpb) / tot.newc)) : "—"}</td>}
                 {showCpaRoas && <td className="text-right px-3 py-2 tabular-nums">{tot.spend + totHpb > 0 ? `${Math.round((tot.newSales / (tot.spend + totHpb)) * 100)}%` : "—"}</td>}
                 <td className="text-right px-3 py-2 tabular-nums">{totCpl > 0 ? yen(totCpl) : "—"}</td>
                 <td className="text-right px-3 py-2 tabular-nums">{totCtr > 0 ? pct(totCtr) : "—"}</td>
                 <td className="text-right px-3 py-2 tabular-nums">{YB(cpc(tot.spend, tot.click))}</td>
                 <td className="text-right px-3 py-2 tabular-nums">{tot.impr > 0 ? fr(freqAvg(tot.freqWeighted, tot.impr)) : "—"}</td>
-                <td className="text-right px-3 py-2 tabular-nums">{YB(tot.spend)}</td>
-                <td className="text-right px-3 py-2 tabular-nums">{tot.dailyBudget > 0 ? yen(tot.dailyBudget) : "—"}</td>
-                <td className="px-3 py-2"></td>
               </tr>
             </tfoot>
           )}
@@ -483,7 +480,6 @@ export default function Ads() {
         </div>
         <p className="text-sm text-muted-foreground">
           {D ? `${D.period.since} 〜 ${D.period.until}` : "—"}
-          {D ? `　最終更新: ${D.updatedAt}` : ""}
         </p>
       </div>
 
