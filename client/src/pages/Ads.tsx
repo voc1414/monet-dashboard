@@ -7,7 +7,7 @@
  */
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Megaphone, Loader2 } from "lucide-react";
+import { Megaphone, Loader2, AlertTriangle } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -459,6 +459,21 @@ export default function Ads() {
     return HPB_MONTHLY_FEE * monthsBetween(D.period.since, D.period.until).length;
   }, [D]);
 
+  // データ鮮度: スプシに入っている日次データの最新日付。同期(SyncWith)停止の検知用。
+  // 健全時は「昨日〜一昨日」まで入る（日次同期＋Metaのレポート遅延1日）ため、3日以上で警告。
+  const latestDataDate = useMemo(() => {
+    if (!raw?.monet?.length) return null;
+    let max = "";
+    for (const r of raw.monet) if (r.date && r.date > max) max = r.date;
+    return max || null;
+  }, [raw]);
+  const dataLagDays = useMemo(() => {
+    if (!latestDataDate) return null;
+    const t = new Date(`${latestDataDate}T00:00:00`).getTime();
+    if (Number.isNaN(t)) return null;
+    return Math.floor((Date.now() - t) / 86400000);
+  }, [latestDataDate]);
+
   const showShukyaku = type === "all" || type === "shukyaku";
   const showKyujin = type === "all" || type === "kyujin";
 
@@ -478,8 +493,17 @@ export default function Ads() {
           <Megaphone className="w-5 h-5 text-primary" />
           <h1 className="text-xl font-bold text-foreground">monet Meta広告 ダッシュボード</h1>
         </div>
-        <p className="text-sm text-muted-foreground">
-          {D ? `${D.period.since} 〜 ${D.period.until}` : "—"}
+        <p className="text-sm text-muted-foreground flex items-center flex-wrap gap-x-2 gap-y-1">
+          <span>{D ? `${D.period.since} 〜 ${D.period.until}` : "—"}</span>
+          {latestDataDate && (
+            <span className="text-xs">データ: 〜{latestDataDate}</span>
+          )}
+          {dataLagDays != null && dataLagDays >= 3 && (
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5">
+              <AlertTriangle className="w-3 h-3" />
+              同期が{dataLagDays}日分遅れています（SyncWith要確認）
+            </span>
+          )}
         </p>
       </div>
 
