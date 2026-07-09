@@ -1106,7 +1106,7 @@ export default function StoreDetail() {
       </section>
       )}
 
-      {/* 店舗売上サマリ（サロンボードデータ優先、フォールバックは月末報告書） */}
+      {/* 店舗売上サマリ（売上は【サロンボードのみ】。林さんの指示により月末報告書は使わない） */}
       {(() => {
         // サロンボードデータ—単月・複数月・全期間すべて対応
         const sbData = selectedMonthsList
@@ -1116,14 +1116,14 @@ export default function StoreDetail() {
           : getStoreMonthsAggregated(storeId); // 全期間
         const hasSb = !!sbData;
 
-        // 店舗レベルの数値: サロンボードデータを優先、なければ月末報告書にフォールバック
-        const storeTotalSales = hasSb ? (sbData?.totalSales || 0) : (reportStats?.totalSales || 0);
-        const storeTechSales = hasSb ? (sbData?.techSales || 0) : (reportStats?.totalTechSales || 0);
-        const storeRetailSales = hasSb ? (sbData?.retailSales || 0) : (reportStats?.totalRetailSales || 0);
-        const storeUnitPrice = hasSb ? (sbData?.unitPrice || 0) : (reportStats?.avgUnitPrice || 0);
-        const storeTotalCustomers = hasSb ? (sbData?.totalCustomers || 0) : (reportStats?.totalCustomers || 0);
+        // 店舗レベルの数値: サロンボードのみ。無ければ月末報告書へフォールバックせず 0（売上に月末報告書を混ぜない）
+        const storeTotalSales = hasSb ? (sbData?.totalSales || 0) : 0;
+        const storeTechSales = hasSb ? (sbData?.techSales || 0) : 0;
+        const storeRetailSales = hasSb ? (sbData?.retailSales || 0) : 0;
+        const storeUnitPrice = hasSb ? (sbData?.unitPrice || 0) : 0;
+        const storeTotalCustomers = hasSb ? (sbData?.totalCustomers || 0) : 0;
         const storeNewCustomers = hasSb ? (sbData?.newCustomers || 0) : 0;
-        const storeReturnCustomers = hasSb ? (sbData?.returnCustomers || 0) : (reportStats?.totalReturnCustomers || 0);
+        const storeReturnCustomers = hasSb ? (sbData?.returnCustomers || 0) : 0;
         // 次回予約率は常に月末報告書から（サロンボードにはない）
         const nextReservationRate = reportStats?.nextReservationRate || 0;
         const nextReservation = reportStats?.totalNextReservation || 0;
