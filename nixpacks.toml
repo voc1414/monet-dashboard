@@ -1,0 +1,5 @@
+# Railwayビルドのインストールコマンドを明示（このプロジェクトはnpm管理）。
+# 旧pnpm-lock.yamlが存在した頃にビルダーがpnpmを自動選択して
+# frozen-lockfile不一致で落ちた事故の再発防止（2026-07-09）。
+[phases.install]
+cmds = ["npm ci --legacy-peer-deps"]
