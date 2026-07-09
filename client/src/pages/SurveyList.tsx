@@ -14,6 +14,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useNpsData, getAvailableMonths } from "@/hooks/useNpsData";
+import { useMonthlyReport } from "@/hooks/useMonthlyReport";
+import { normalizeStaffKey } from "@/lib/staffNameAlias";
 import { fetchPdfData, matchesStylist, normalizeStylistName } from "@/hooks/useFankuruData";
 import type { FankuruPdf } from "@/hooks/useFankuruData";
 import { getNpsClass } from "@/lib/npsClass";
@@ -310,6 +312,26 @@ export default function SurveyList() {
 
   const [showUnmatchedAlert, setShowUnmatchedAlert] = useState(true);
 
+  // NPS側の未マッチ検出（「スタッフ選択」の名前が月末報告書のどのスタッフにも名寄せできない場合）
+  const { rawData: reportRawData } = useMonthlyReport();
+  const unmatchedNpsStaff = useMemo(() => {
+    if (!reportRawData.length) return [] as Array<{ staff: string; store: string; count: number }>;
+    const rosterKeys = new Set(reportRawData.map((r) => normalizeStaffKey(r.name)));
+    const agg = new Map<string, { staff: string; store: string; count: number }>();
+    for (const r of npsRecords) {
+      const staff = r.staff?.trim();
+      if (!staff || staff === "選択しない") continue;
+      const key = normalizeStaffKey(staff);
+      if (rosterKeys.has(key)) continue;
+      const dedupeKey = `${key}__${r.storeShort}`;
+      const cur = agg.get(dedupeKey);
+      if (cur) cur.count++;
+      else agg.set(dedupeKey, { staff, store: r.storeShort, count: 1 });
+    }
+    return Array.from(agg.values()).sort((a, b) => b.count - a.count);
+  }, [npsRecords, reportRawData]);
+  const [showNpsUnmatchedAlert, setShowNpsUnmatchedAlert] = useState(true);
+
   // フィルタ・検索適用
   const filteredStaff = useMemo(() => {
     return staffList.filter((s) => {
@@ -412,6 +434,50 @@ export default function SurveyList() {
                   ))}
                   {unmatchedStylists.length > 5 && (
                     <span className="text-[10px] text-amber-600">他{unmatchedStylists.length - 5}件</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* NPS未マッチアラート */}
+        {!loading && unmatchedNpsStaff.length > 0 && showNpsUnmatchedAlert && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-amber-50 border border-amber-200 rounded-lg p-3"
+          >
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-amber-800">
+                    NPSアンケートに未マッチのスタッフ名が{unmatchedNpsStaff.length}名分あります
+                  </p>
+                  <button
+                    onClick={() => setShowNpsUnmatchedAlert(false)}
+                    className="text-amber-600 hover:text-amber-800 text-xs"
+                  >
+                    ×
+                  </button>
+                </div>
+                <p className="text-[11px] text-amber-700 mt-1">
+                  NPSの「スタッフ選択」の名前が月末報告書のどのスタッフにも名寄せできていません。
+                  <Link href="/admin/surveys">
+                    <span className="underline font-medium cursor-pointer hover:text-amber-900">管理者ページの「名前マッピング」</span>
+                  </Link>
+                  で「この表記 → 正式名」を追加すると自動で紐付きます。
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {unmatchedNpsStaff.slice(0, 5).map((u, i) => (
+                    <span key={i} className="inline-flex items-center gap-1 text-[10px] bg-amber-100 text-amber-800 rounded px-1.5 py-0.5">
+                      <span className="font-medium">{u.staff}</span>
+                      <span className="text-amber-600">({u.store}・{u.count}件)</span>
+                    </span>
+                  ))}
+                  {unmatchedNpsStaff.length > 5 && (
+                    <span className="text-[10px] text-amber-600">他{unmatchedNpsStaff.length - 5}名</span>
                   )}
                 </div>
               </div>

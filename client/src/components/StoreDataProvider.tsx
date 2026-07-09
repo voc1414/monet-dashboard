@@ -18,6 +18,7 @@ import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { setReportAliasMap } from "@/hooks/useMonthlyReport";
 import { setSalonBoardSheetMap } from "@/hooks/useSalonBoardData";
 import { setFankuruAliasMap, setStylistAliasMapFromDb } from "@/hooks/useFankuruData";
+import { setStaffAliasMapFromDb } from "@/lib/staffNameAlias";
 import { buildStaffFirstAppearanceMap, setStaffFirstAppearanceMap } from "@/lib/newBadge";
 import { trpc } from "@/lib/trpc";
 
@@ -55,10 +56,12 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [rawData]);
 
-  // DBスタイリストエイリアスをモジュールレベルに注入
+  // DBスタイリストエイリアス（名前マッピング）をモジュールレベルに注入
+  // ファンくる照合(useFankuruData)とNPS照合(staffNameAlias)の両方が同じ登録を参照する
   useEffect(() => {
     if (stylistAliasQuery.data && stylistAliasQuery.data.length > 0) {
       setStylistAliasMapFromDb(stylistAliasQuery.data);
+      setStaffAliasMapFromDb(stylistAliasQuery.data);
     }
   }, [stylistAliasQuery.data]);
 

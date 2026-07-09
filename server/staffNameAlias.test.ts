@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { normalizeStaffKey } from "../client/src/lib/staffNameAlias";
+import { describe, it, expect, afterEach } from "vitest";
+import { normalizeStaffKey, setStaffAliasMapFromDb } from "../client/src/lib/staffNameAlias";
 
 describe("normalizeStaffKey", () => {
   it("空白除去＋小文字化する", () => {
@@ -26,5 +26,27 @@ describe("normalizeStaffKey", () => {
   it("エイリアスに無い名前はそのまま（空文字も安全）", () => {
     expect(normalizeStaffKey("中島真優")).toBe("中島真優");
     expect(normalizeStaffKey("")).toBe("");
+  });
+});
+
+describe("setStaffAliasMapFromDb", () => {
+  afterEach(() => setStaffAliasMapFromDb([]));
+
+  it("DB名前マッピング（管理者ページ登録）が反映される", () => {
+    setStaffAliasMapFromDb([{ alias: "みなちゃん", canonicalName: "Minaho" }]);
+    expect(normalizeStaffKey("みなちゃん")).toBe("minaho");
+    expect(normalizeStaffKey("みなちゃん")).toBe(normalizeStaffKey("Minaho"));
+  });
+
+  it("DB登録はコード内蔵表より優先される", () => {
+    setStaffAliasMapFromDb([{ alias: "AKIKO", canonicalName: "別の正式名" }]);
+    expect(normalizeStaffKey("akiko")).toBe("別の正式名");
+    setStaffAliasMapFromDb([]);
+    expect(normalizeStaffKey("akiko")).toBe("小池明子"); // 内蔵表に戻る
+  });
+
+  it("alias/canonicalNameは空白・大小文字を正規化して照合する", () => {
+    setStaffAliasMapFromDb([{ alias: "石原 ヨウコ", canonicalName: "石原　葉子" }]);
+    expect(normalizeStaffKey("石原ヨウコ")).toBe("石原葉子");
   });
 });

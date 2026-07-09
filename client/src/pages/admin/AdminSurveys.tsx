@@ -361,8 +361,9 @@ function StylistAliasManagement() {
       <Card className="border-border/30 bg-muted/20">
         <CardContent className="p-3">
           <p className="text-xs text-muted-foreground">
-            <strong>使い方:</strong> ファンくるPDFなどの外部データで使われているスタッフ名（エイリアス）を、
-            ダッシュボードの正式名にマッピングします。これにより、表記揺れがあっても同一人物として集計されます。
+            <strong>使い方:</strong> NPSアンケートやファンくるPDFなどの外部データで使われているスタッフ名（エイリアス）を、
+            月末報告書の正式名にマッピングします。ここに登録すると、NPS・ファンくる両方の紐付けに反映され、
+            表記揺れがあっても同一人物として集計されます。新人で表記が違う場合もここに1行追加するだけです。
           </p>
         </CardContent>
       </Card>
