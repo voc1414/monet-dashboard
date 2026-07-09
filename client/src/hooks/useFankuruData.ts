@@ -318,6 +318,8 @@ const STYLIST_NAME_ALIASES: Record<string, string[]> = {
 
   // === 堀江院 ===
   "Kaede": ["かえで", "カエデ", "kaede", "楓"],
+  // ファンくる側で "Akiko" と表記されるケースあり（林 確認済み 2026-07-06）
+  "小池明子": ["akiko", "Akiko", "AKIKO", "あきこ", "アキコ", "小池", "こいけ", "コイケ", "koike", "こいけあきこ", "コイケアキコ", "小池明子"],
   // 堀江院のMika（スプレッドシートで「大阪|堀江院」として登録）
   // STAFF_STORE_MAPで福島院のMikaと区別
 
