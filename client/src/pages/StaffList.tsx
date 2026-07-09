@@ -28,6 +28,7 @@ import { calculateUtilizationRate, getUtilizationColor, getUtilizationLabel } fr
 import { getNpsClass } from "@/lib/npsClass";
 import { calculateCompositeScore, getCompositeRank } from "@/lib/compositeScore";
 import type { CompositeScoreResult } from "@/lib/compositeScore";
+import { normalizeStaffKey } from "@/lib/staffNameAlias";
 
 
 const formatCurrency = (n: number) => {
@@ -257,7 +258,7 @@ export default function StaffList() {
     }
 
     // スペース正規化＋小文字化してグルーピング（NPSシートは"Yoshie"、月末報告書は"yoshie"等の大小違いがある）
-    const normalizeStaffName = (n: string) => n.replace(/[\s\u3000]/g, "").toLowerCase();
+    const normalizeStaffName = (n: string) => normalizeStaffKey(n);
     const grouped = new Map<string, number[]>();
     for (const r of filteredNps) {
       const staffName = r.staff?.trim();
@@ -284,7 +285,7 @@ export default function StaffList() {
     const map = new Map<string, CompositeScoreResult>();
     for (const staff of staffFiltered) {
       const utilRate = calculateUtilizationRate(getMetrics(staff).totalCustomers, staff.employmentType);
-      const npsInfo = staffNpsMap.get(staff.name.replace(/[\s\u3000]/g, "").toLowerCase());
+      const npsInfo = staffNpsMap.get(normalizeStaffKey(staff.name));
 
 
 
@@ -321,8 +322,8 @@ export default function StaffList() {
         case "nextReservationRate":
           return (a.nextReservationRate - b.nextReservationRate) * dir;
         case "npsScore": {
-          const npsA = staffNpsMap.get(a.name.replace(/[\s\u3000]/g, "").toLowerCase())?.npsScore ?? -999;
-          const npsB = staffNpsMap.get(b.name.replace(/[\s\u3000]/g, "").toLowerCase())?.npsScore ?? -999;
+          const npsA = staffNpsMap.get(normalizeStaffKey(a.name))?.npsScore ?? -999;
+          const npsB = staffNpsMap.get(normalizeStaffKey(b.name))?.npsScore ?? -999;
           return (npsA - npsB) * dir;
         }
         case "compositeScore": {
@@ -528,7 +529,7 @@ export default function StaffList() {
               const staffKey = `${staff.answerId}-${i}`;
               const metrics = getMetrics(staff);
               const utilRate = calculateUtilizationRate(metrics.totalCustomers, staff.employmentType);
-              const npsInfo = staffNpsMap.get(staff.name.replace(/[\s\u3000]/g, "").toLowerCase());
+              const npsInfo = staffNpsMap.get(normalizeStaffKey(staff.name));
 
               return (
                 <motion.div

@@ -36,6 +36,7 @@ import { calculateCompositeScore } from "@/lib/compositeScore";
 import type { CompositeScoreResult } from "@/lib/compositeScore";
 import { generateStaffAdvice } from "@/lib/staffAdvice";
 import type { StaffAdvice } from "@/lib/staffAdvice";
+import { normalizeStaffKey } from "@/lib/staffNameAlias";
 import type { FankuruPdf } from "@/hooks/useFankuruData";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -278,7 +279,7 @@ export default function StaffDetail() {
   }, [rawData, staffName, staffStore]);
 
   // スタッフ名比較用ヘルパー（NPSシートはスペースなし、月末報告書はスペースあり。大文字小文字の登録違いも吸収）
-  const normalizeStaffName = (name: string) => name.replace(/[\s\u3000]/g, "").toLowerCase();
+  const normalizeStaffName = (name: string) => normalizeStaffKey(name);
 
   // 月の管理
   const npsMonths = useMemo(() => {

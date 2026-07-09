@@ -41,6 +41,7 @@ import { useSalonBoardStylistData } from "@/hooks/useSalonBoardStylistData";
 import type { StaffReport } from "@/hooks/useMonthlyReport";
 import { validateStoreReport, getAlertSummary } from "@/lib/reportValidation";
 import type { ReportAlert } from "@/lib/reportValidation";
+import { normalizeStaffKey } from "@/lib/staffNameAlias";
 
 const NPS_HEADER_IMAGE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663489426081/aLPZvLfFDC4rFYToBquZNR/nps-header-6cTohzoTSmSjrDCLc4VzHg.webp";
 
@@ -491,10 +492,10 @@ export default function StoreDetail() {
           .map(r => {
             const utilRate = calculateUtilizationRate(r.totalCustomers, r.employmentType);
             // NPS: storeRecordsからスタッフ名でフィルタ（スペース正規化して比較）
-            const normName = r.name.replace(/[\s\u3000]/g, "").toLowerCase();
+            const normName = normalizeStaffKey(r.name);
             const staffNpsRecords = storeRecords.filter((nr: any) => {
               const nrStaff = nr.staff?.trim();
-              return nrStaff && nrStaff.replace(/[\s\u3000]/g, "").toLowerCase() === normName;
+              return nrStaff && normalizeStaffKey(nrStaff) === normName;
             });
             let npsScore: number | null = null;
             let npsResponseCount = 0;
@@ -568,10 +569,10 @@ export default function StoreDetail() {
           .map((sr: StaffReport) => {
             const utilRate = calculateUtilizationRate(sr.totalCustomers, sr.employmentType);
             // NPS: storeRecordsからスタッフ名でフィルタ（スペース正規化して比較）
-            const normSrName = sr.name.replace(/[\s\u3000]/g, "").toLowerCase();
+            const normSrName = normalizeStaffKey(sr.name);
             const staffNpsRecords = storeRecords.filter((r: any) => {
               const staffName = r.staff?.trim();
-              return staffName && staffName.replace(/[\s\u3000]/g, "").toLowerCase() === normSrName;
+              return staffName && normalizeStaffKey(staffName) === normSrName;
             });
             let npsScore: number | null = null;
             let npsResponseCount = 0;
