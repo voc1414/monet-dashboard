@@ -4,6 +4,7 @@ import { publicProcedure, router } from "../_core/trpc";
 import { ENV } from "../_core/env";
 import { SignJWT, jwtVerify } from "jose";
 import { getAllStaffStatus, upsertStaffStatus, insertStaffStatusHistory, getAllStaffStatusHistory, getStaffStatusByKey, getRetirementCountByPeriod, getReactivationCountByPeriod, getAllStylistAliases, addStylistAlias, deleteStylistAlias } from "../db";
+import { suggestStaffMatches } from "../nameSuggest";
 
 const JWT_SECRET_KEY = new TextEncoder().encode(ENV.cookieSecret || "monet-admin-secret-key");
 
@@ -190,6 +191,17 @@ export const adminRouter = router({
       await requireAdminFromCtx(ctx);
       await deleteStylistAlias(input.id);
       return { success: true };
+    }),
+
+  /** 未マッチ名の候補推定（読み仮名ベース・admin only）。確定はせず候補提示のみ */
+  suggestStaffMatches: publicProcedure
+    .input(z.object({
+      names: z.array(z.string()).max(200),
+      roster: z.array(z.string()).max(500),
+    }))
+    .query(async ({ ctx, input }) => {
+      await requireAdminFromCtx(ctx);
+      return suggestStaffMatches(input);
     }),
 
   /** Bulk initialize staff statuses (admin only) - seed from hardcoded data */
