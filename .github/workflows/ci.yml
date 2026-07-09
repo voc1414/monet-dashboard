@@ -1,0 +1,24 @@
+# push/PRごとに型チェックとテストを自動実行する品質ゲート。
+# 「デプロイ前に必ず tsc を通す」ルールをCIに固定化（2026-07-09）。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # vite7 と @builder.io/vite-plugin-jsx-loc の peer 衝突があるため legacy-peer-deps 必須
+      - run: npm ci --legacy-peer-deps
+      - name: 型チェック (tsc --noEmit)
+        run: npx tsc --noEmit
+      - name: テスト (vitest)
+        run: npx vitest run
