@@ -1,56 +1,68 @@
-# monet-dashboard — Claude Code 引き継ぎ / 開発ガイド
+# monet-dashboard — Claude Code 開発ガイド
 
-このリポジトリは monet（白髪染め・髪質改善サロン・全7店舗）の経営ダッシュボード。
+monet（白髪染め・髪質改善サロン・全7店舗）の経営ダッシュボード。
 FC共有前提でログイン不要の公開閲覧（管理ページ `/admin` のみ要ログイン）。
 本番: https://monet-dashboard-production.up.railway.app/
 
-このファイルは Cowork（はやしん）→ Claude Code への引き継ぎ。**コード実装・ビルド・テスト・デプロイ・git は Claude Code 側で完結**させる。ブラウザ操作/CAPTCHA/Notion は Cowork 側の担当。
+**コード実装・ビルド・テスト・デプロイ・git は Claude Code 側で完結**させる。ブラウザ操作/CAPTCHA/Notion/SyncWith・GAS等の外部SaaS管理画面は Cowork（はやしん）側の担当。
+
+> 最終更新: 2026-07-09（push解決・タスク①〜④/⑦-a完了・名前マッピング仕組み化まで反映）
 
 ---
-## 0. 最優先（前提）
-- **GitHub push の 403 を解決する**。remote は `origin https://github.com/voc1414/monet-dashboard.git`。現状 push が 403（書込権限不足）で、デプロイは `railway up`（CLIローカル直アップロード）運用＝**git履歴が残っていない**。まず push 権限（PAT/権限）を通し、現状の作業ツリーをcommit/pushしてから作業を始める。これがClaude Code運用（差分管理・安全なコミット）の前提。
-
-## 1. ビルド / テスト / デプロイ
-- 開発: `npm install`（初回。Drive上のnode_modulesは不完全な場合あり→ローカルで入れ直す）
-- 型チェック: `npx tsc --noEmit`（**デプロイ前に必ず通す**。Cowork側はsandboxにtscが無く検証できなかった＝ここがClaude Codeの主眼）
-- テスト: `npx vitest run`（server/ に *.test.ts 多数。既存全緑を維持）
-- デプロイ: `npx --yes @railway/cli up --detach --service monet-dashboard`（この1コマンド。プロジェクト 63c9060f…、サービス monet-dashboard）
-  - env: JWT_SECRET / CRON_SECRET / ADMIN_USERNAME(commit.1414@gmail.com) / ADMIN_PASSWORD(林設定) / NODE_ENV / DATABASE_URL=${{MySQL.MYSQL_URL}}。Node22。preDeployで drizzle-kit migrate。
+## 1. ビルド / テスト / デプロイ / git
+- 依存: `npm install --legacy-peer-deps`（**legacy-peer-deps必須**。vite7 と @builder.io/vite-plugin-jsx-loc の peer 衝突のため）
+- 型チェック: `npx tsc --noEmit`（デプロイ前に必ず通す）
+- テスト: `npx vitest run`（server/ に *.test.ts。全緑を維持。**「現在月」前提の月ハードコードテストは禁止**＝時限爆弾になる。newBadge.test の ymOffset 方式を踏襲）
+- デプロイ: `npx --yes @railway/cli up --detach --service monet-dashboard`（プロジェクト 63c9060f…）
+  - ビルドは `nixpacks.toml` で `npm ci --legacy-peer-deps` に固定済み。**pnpm/yarn のロックファイルを置かないこと**（過去にビルダーがpnpmを誤検知してビルド失敗）
+  - env: JWT_SECRET / CRON_SECRET / ADMIN_USERNAME(commit.1414@gmail.com) / ADMIN_PASSWORD(林設定) / NODE_ENV / DATABASE_URL=${{MySQL.MYSQL_URL}}。Node22。preDeployで drizzle-kit migrate
+- git: **push可**（2026-07-06 SSH化済み。remote `git@github.com:voc1414/monet-dashboard.git`、鍵 `~/.ssh/id_ed25519`）。関心事ごとにコミットし、デプロイ前に push する。CI（GitHub Actions）が push ごとに tsc+vitest を自動実行
+- Drive同期で node_modules / package-lock.json が壊れることがある → `rm -rf node_modules package-lock.json && npm install --legacy-peer-deps` で復旧
 
 ## 2. データソース（すべて gviz 匿名CSV読み・集計値のみPIIなし）
 - 正本スプシ「サロンボード売上」= `1nR36MMsbtAT8f2ccYLBTZjZ4ESin9odmgWN2xP3oVSE`。タブ:
-  - `stylist_flat`（店舗×スタイリスト×月：売上/客数/新規/再来/技術/店販）… スタッフ実績の正本
-  - `store_official`（**サロンボード公式の店舗別月次集計**：純売上/技術/店販/オプション/総売上/割引/客単価/総客数/新規/再来）… **店舗カードの正本（A方針）**
-  - `store_newsales`（店舗×月：新規売上/新規客数）… ROASの分子（新規客の売上）
-  - `daily_new`（店舗×日付：新規/再来/客数）、`counseling`
-  - これらは salonboard-scraper（別フォルダ）が毎朝生成→Drive→GASで各タブ化。GASは1nR36にbound（project id `1v5a2dS-WQMx3ZoYx2Cobnafc2vIdn4AcRep70Vui3CKEQsS8R79iaB2d`、関数 refreshAll＝毎朝8:54トリガー、refreshStoreExtras＝毎時トリガーで store_official/store_newsales を再生成）。GASはブラウザ編集した経緯があるが、**今後は clasp で管理推奨**。
-- 広告正本スプシ「monet Meta広告」= `1z5JU-Onf6wiqydFUeYYoQ0czXByyZbqH4JODWkYh6Ts`。シート monet（日付×広告セット：店舗/キャンペーン名/消化額/リード/…）/ lmessage / adset_meta。集客/求人は**キャンペーン名の接頭辞**（"集客"/"求人"）で判定。
+  - `stylist_flat`（店舗×スタイリスト×月）… スタッフ実績の正本
+  - `store_official`（サロンボード公式の店舗別月次集計）… **店舗カード売上の正本**（月末報告書へはフォールバックしない＝林指示 2026-07-06）
+  - `store_newsales`（店舗×月：新規売上）… ROASの分子
+  - `daily_new`（店舗×日付）、`counseling`
+  - salonboard-scraper（../salonboard-scraper、Mac mini常駐 launchd 毎朝7:30）が生成→Drive→GAS（1nR36にbound、refreshAll=毎朝8:54、refreshStoreExtras=毎時）
+- 広告正本スプシ「monet Meta広告」= `1z5JU-Onf6wiqydFUeYYoQ0czXByyZbqH4JODWkYh6Ts`（シート monet / lmessage / adset_meta）。**SyncWith が Meta から同期**（管理はCowork側）。集客/求人はキャンペーン名の接頭辞で判定。/ads ヘッダにデータ最新日付を表示し、3日以上遅れると赤警告が出る
+- 月末報告書スプシ = `1DXAaFk0aLDZwXq28krOcrDSiTOwd6BeTzV-xFXbLuKI`（スタッフ自己申告。**次回予約率はここ由来**）
+- NPSスプシ = `1xSm2poTIeRPFviVmINdWNWmLT5d9pXXL2XzWEQsxiRU`（タブ「全店舗」。スタッフ選択肢はHPB掲載名連動）
+- ファンくるスプシ = `1bbQT7eBb2Om1ODgsL_g0dx_bcw55j3RHRRJGr7xSwsg`（担当者名はお客様申告＝表記ゆれ前提）
 
-## 3. 主要ファイル
-- `client/src/hooks/useSalonBoardData.ts` … 店舗カードの値。**store_official を gviz 優先で読む**（`parseStoreOfficialCsv`）。無ければ stylist_flat 合算にフォールバック。店舗名は `normalizeSalonBoardStore`（useSalonBoardStylistData）で正規化。
-- `client/src/hooks/useAdsData.ts` … 広告データ（`useAdsData()`→`{raw,loading,error}`、raw.monet=MonetRow[]）。`getDashboardData(raw, period)`／`resolvePeriod`／`getCampaignType`。
-- `client/src/pages/Ads.tsx` … /adsページ。`MetricTable`（集客=店舗別）に **CPA・ROAS列を実装済**（CPA=集客spend÷新規来店、ROAS=新規売上÷集客spend）。新規来店=`newByStore`（daily_new優先/月次フォールバック）、新規売上=`useStoreNewSales`→`newSalesByStore`。店舗名突合は `canonicalStore`（"院"・空白除去）。
-- `client/src/hooks/useStoreNewSales.ts` … store_newsales を gviz 読み（ROAS用）。
-- `client/src/hooks/useStores.ts` / `server/routers/stores.ts` … 店舗マスタ（DB `stores`）＋ハードコードfallback。**土橋院を広島エリアに追加済（両方）**。新店は scheduledNewStore が自動検知して DB挿入する設計（keyword「土橋」定義済）。DBに登録が無い店はfallback（DB空時のみ）でしか出ない点に注意。
-- `client/src/pages/Home.tsx` … トップ。店舗一覧＋「月間表彰」セクション（L372〜、総合点TOP5/ランキング）。
-- `client/src/pages/StoreDetail.tsx` … 店舗詳細（店舗売上サマリ＝公式値）。
-- `client/src/components/StoreCpaRoas.tsx` … **未使用**（CPA/ROASを一旦店舗詳細に置いたが/adsへ移設。削除してよい）。
+## 3. スタッフ名・店舗名の名寄せ（重要）
+**新人・表記ゆれは管理画面で解決する運用が確立済み（2026-07-09）。コード修正は原則不要。**
+- 未マッチのスタッフ名が出ると: ①アンケート一覧(/surveys)に警告バナー ②管理ページ→アンケート情報→名前マッピングタブの検出パネルに、**読み仮名ベースの候補つき**で一覧表示 → 管理者が[登録]を押すだけで NPS・ファンくる両方に反映
+- 実装: DB `stylist_aliases`（正本） > コード内蔵表。照合キー=空白除去＋小文字化
+  - NPS照合: `client/src/lib/staffNameAlias.ts`（normalizeStaffKey。内蔵表: akiko→小池明子, 石原ようこ→石原葉子）
+  - ファンくる照合: `useFankuruData.ts` の `matchesStylist`＋`STYLIST_NAME_ALIASES`
+  - 候補推定: `server/nameSuggest.ts`（kuromoji読み推定。tRPC admin.suggestStaffMatches。誤マッチ防止のため自動確定はしない）
+- 店舗名の突合:
+  - 広告「堀江2nd院」↔サロンボード「堀江院2nd」は `canonicalStore`（Ads.tsx、"院"・空白除去）
+  - 月末報告書「広島土橋院」等の接頭辞付き→短縮名は `useMonthlyReport.ts` の `STORE_NAME_MAP_FALLBACK`（**新店追加時はここ＋useFankuruData/useNpsDataのfallbackにも追加**。DB storesのaliases列は現状短縮名のみ）
+  - NPSサロン名判定 `parseStoreName` は**長いエイリアス優先＋空白除去**（「堀江院 2nd」が堀江院に誤配賦されるバグを2026-07-06修正済み。同型バグに注意）
+- 退職者（堀江院2nd AKI・姪浜院 藤田）は名簿外のため未紐付けが正常
 
-## 4. 未実装タスク（林 確定仕様・2026-07-05）
-- **① ランキング廃止**：`Home.tsx` の「**月間表彰」セクション（L372〜）を丸ごと削除**（総合点TOP5・総合点ランキング含め全部）。関連import/未使用変数も掃除。
-- **② /ads に「HPB費用」列を追加**：全店一律 **月額¥55,000**。選択期間が複数月なら **×月数**（`monthsBetween(D.period.since, D.period.until).length`）。集客の店舗別テーブル（`MetricTable` 集客）に列追加。表示は各店同額×月数、合計は 55,000×月数×店舗数。
-- **③ ROAS 再計算**：ROAS = **新規売上 ÷（集客広告費 ＋ HPB費用）**×100。今の実装は分母が集客spendのみ→分母に hpb費用（月額×月数）を足す。集客のみ対象（求人は対象外）。
-- **④ CPA 再計算**：CPA = **（集客広告費 ＋ HPB費用）÷ 新規来店数**。**CPL（リード単価）は据え置き**＝広告費のみ（HPBは含めない）。
-  - ②〜④実装メモ：MetricTableに hpbPerMonth(=55000) と monthCount を渡すか、Ads本体で hpbByStore を作って渡す。CPA/ROASのtd・合計・列ヘッダ「HPB費用」を追加。既存のCPA/ROAS実装（spendのみ）を (spend+hpb) に変更。
-- **⑦-a 次回予約率の異常/欠測**：`Home.tsx`/`StoreDetail.tsx`。堀江院2ndが **107.8%（>100%）**＝計算かデータ異常（次回予約数>客数）。土橋院が **0%**＝月末報告書が未取込（次回予約率だけ月末報告書由来）。ロジック点検＋土橋の月末報告書取込（データ側はCowork/scraper連携）。
-- **⑦-b 失敗通知の復活**：スクレイパー/同期stopの通知。現状 notifyOwner はno-op化。Cowork側で鮮度チェックの scheduledタスク `salonboard-freshness-check`（毎朝10:03・daily_new最新日付が2日以上遅れたら警告）を稼働中＝部分カバー。恒久はメール/LINE通知の復活を検討。
+## 4. 主要ファイル
+- `client/src/pages/Ads.tsx` … /ads。列順=1日予算→消化額→HPB費用→LINE登録→LINE単価→リード→新規数→CPA→ROAS→CPL→CTR→CPC→フリーク。**HPB費用=全店一律月額¥55,000×選択期間の月数（HPB_MONTHLY_FEE）。CPA=(集客広告費+HPB)÷新規来店、ROAS=新規売上÷(集客広告費+HPB)。CPLは広告費のみ**。求人はHPB/CPA/ROAS対象外。データ鮮度警告つき
+- `client/src/hooks/useSalonBoardData.ts` … 店舗カード値（store_official優先）
+- `client/src/hooks/useAdsData.ts` / `useStoreNewSales.ts` / `useSalonBoardDailyNew.ts` … 広告・新規売上・日次新規
+- `client/src/hooks/useMonthlyReport.ts` … 月末報告書（次回予約率の由来）
+- `client/src/pages/Home.tsx` … 店舗一覧（月間表彰は2026-07-05廃止済み）
+- `client/src/pages/StoreDetail.tsx` … 店舗詳細（売上=サロンボードのみ。**店舗内月間表彰が残存＝廃止判断は林さん待ち**）
+- `client/src/pages/admin/AdminSurveys.tsx` … 名前マッピング管理（未マッチ検出＋候補承認パネル）
+- `client/src/hooks/useStores.ts` / `server/routers/stores.ts` … 店舗マスタ（DB＋fallback）。新店は scheduledNewStore が自動検知
 
-## 5. 注意 / ハマりどころ
-- **店舗名の突合**：広告 tenpo「堀江2nd院」↔ サロンボード「堀江院2nd」。`canonicalStore`（"院"・空白除去）で "堀江2nd" に揃えて一致。store_official/store_newsales/stylist_flat は `normalizeSalonBoardStore`（→「堀江院2nd」等 canonical）。混同注意。
-- **gviz は新規タブのインデックス反映が遅れる**ことがある。GAS側 `DriveApp.getFilesByName` も新規CSV名は遅延で見つからない→**出力フォルダID直接指定**（`getFolderById('14TOVk8oVfknCfK0HgaK6SDSqIbyk8Pw_').getFilesByName`）＋グローバルfallbackで解決済（refreshStoreExtras参照）。
-- **サロンボードのスクレイプはCAPTCHA/ログインで人手が要る**（Claude Code＝ターミナルでは無人不可）。scraperのnodeスクリプト自体は実行可能だが、セッション切れ時のログインはCowork/人手。
-- **Cowork担当（Claude Code対象外）**：Notion司令塔の読み書き、サロンボード/HPBのブラウザ操作、本番サイトの目視確認、⑤スタッフ一覧(Notion)。
-- 詳細な経緯・データ系譜は Cowork側メモリ `project_monet_salonboard_truth_source` / `reference_salonboard_scraper_sheets` / `reference_monet_ads_page_react` と GrandFusion法人司令塔(Notion)に記録。
+## 5. 未解決 / 継続事項
+- **⑦-b 失敗通知の恒久化**: notifyOwner は no-op のまま。Cowork側 scheduled task `salonboard-freshness-check`（毎朝10:03）＋/adsの鮮度警告で部分カバー。メール/LINE通知の復活は未着手
+- **データ入力異常（林さん確認中 2026-07-09）**: 次回予約数>客数（堀江院2nd Minaho 6月 58/12、土橋院 藤原牧子 6月 89/58）→ 既存validationがアラート表示中。訂正はデータ側
+- **NPS 0件の在籍スタッフ**: 小池明子・石原葉子はシートに回答自体が未着（エイリアスは登録済みなので回答が来れば自動紐付け）。回答ゼロが続くならフォーム→シート連携をCowork側で確認
+- 旧 fine-grained PAT（7/24期限）は不要になった。GitHub側で削除推奨
 
-## 6. 関連リポジトリ/資産（別フォルダ）
-- スクレイパー: `../salonboard-scraper`（download_sales.js=明細・download_monthly.js=公式月別集計・aggregate_*.js・auto_run.sh＝launchd毎朝7:30、Mac mini常駐）。GAS: 1nR36にbound（clasp化推奨）。
+## 6. 注意 / ハマりどころ
+- **gviz は新規タブのインデックス反映が遅れる**。GAS側は出力フォルダID直接指定＋グローバルfallbackで解決済（refreshStoreExtras参照）
+- **サロンボードのスクレイプはCAPTCHA/ログインで人手が要る**（セッション切れ時はCowork/人手）
+- **Cowork担当（Claude Code対象外）**: Notion司令塔、サロンボード/HPB/SyncWithのブラウザ操作、本番の目視確認
+- このフォルダは**Cowork側セッションと並行作業になることがある**。コミット前に `git status` で自分が触っていないファイルの変更が混ざっていないか確認し、混ざっていたら関心事を分けてコミットする
+- 経緯の詳細: Cowork側メモリ `project_monet_salonboard_truth_source` 等と GrandFusion法人司令塔(Notion)
