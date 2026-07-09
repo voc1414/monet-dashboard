@@ -28,13 +28,15 @@ export const COUNSELING_TAXONOMY: TaxQuestion[] = [
   { key: "dayoff", title: "休日", multi: false, options: [{ key: "irregular", label: "お休み不定" }, { key: "weekend", label: "土日休み" }, { key: "weekday", label: "平日休み" }] },
   { key: "wave", title: "髪にうねり・クセがあるか", multi: false, options: [{ key: "yes", label: "はい" }, { key: "no", label: "いいえ" }] },
   { key: "wave_intent", title: "クセをおさめたいか活かしたいか", multi: false, options: [{ key: "tame", label: "おさめたい" }, { key: "keep", label: "活かせるなら活かしたい" }] },
+  { key: "hair_concern", title: "髪のお悩み（その他気になること）", multi: true, options: [{ key: "dry", label: "パサつき" }, { key: "puff", label: "表面の毛がぱやぱや・もやもや" }, { key: "noshine", label: "艶がない" }, { key: "spread", label: "広がりが気になる" }, { key: "manage", label: "収まりを良くしたい" }, { key: "colorlast", label: "色もちをよくしたい" }, { key: "aging", label: "年齢とともに扱いにくい" }, { key: "nobody", label: "ハリコシがない" }, { key: "many", label: "毛が多い" }, { key: "thick", label: "毛が太い" }, { key: "none", label: "該当なし" }] },
   { key: "scalp", title: "頭皮のお悩み", multi: true, options: [{ key: "hairloss", label: "抜け毛" }, { key: "parting", label: "分け目が気になる" }, { key: "itch", label: "かゆみ" }, { key: "dry", label: "フケや乾燥" }, { key: "colorsting", label: "カラーが沁みやすい" }, { key: "oily", label: "油っぽい" }, { key: "none", label: "該当なし" }] },
   { key: "treatment_freq", title: "定期的にサロンでトリートメントをするか", multi: false, options: [{ key: "regular", label: "している" }, { key: "sometimes", label: "たまにする" }, { key: "never", label: "しない" }] },
   { key: "treatment_effect", title: "トリートメントの変化実感", multi: false, options: [{ key: "lasting", label: "続けることで変化を感じた" }, { key: "slight", label: "やや感じた" }, { key: "temporary", label: "その時だけ感じた" }, { key: "none", label: "感じなかった" }] },
   { key: "color_freq", title: "カラーの頻度", multi: false, options: [{ key: "monthly", label: "月に一度" }, { key: "q2_3m", label: "２〜３ヶ月に一度" }, { key: "half_year", label: "半年に一度" }, { key: "never", label: "しない" }, { key: "other", label: "その他" }] },
   { key: "straight", title: "ストレート施術の経験", multi: false, options: [{ key: "yes", label: "ある" }, { key: "regular", label: "定期的に当てている" }, { key: "no", label: "ない" }] },
+  { key: "straight_feedback", title: "ストレートの感想（定期的に当てている方）", multi: false, options: [{ key: "good", label: "よかった" }, { key: "damage", label: "ダメージが気になる" }, { key: "toostiff", label: "ピンピンになりすぎた" }, { key: "notenough", label: "癖があまり伸びなかった" }] },
   { key: "purchase", title: "シャンプー・トリートメントの購入場所", multi: true, options: [{ key: "drugstore", label: "ドラッグストア" }, { key: "internet", label: "インターネット" }, { key: "salon", label: "美容室" }, { key: "depart", label: "百貨店" }, { key: "other", label: "その他" }] },
-  { key: "channel", title: "来店のきっかけ", multi: true, options: [{ key: "ig_ad", label: "Instagram広告" }, { key: "ig", label: "Instagram" }, { key: "hpb", label: "ホットペッパー" }, { key: "google", label: "Google" }, { key: "referral", label: "紹介" }, { key: "walkby", label: "通りすがり" }] },
+  { key: "channel", title: "来店のきっかけ", multi: true, options: [{ key: "ig_ad", label: "Instagram広告" }, { key: "ig", label: "Instagram" }, { key: "hpb", label: "ホットペッパー" }, { key: "google", label: "Google" }, { key: "referral", label: "紹介" }, { key: "walkby", label: "通りすがり" }, { key: "tiktok", label: "TikTok" }] },
 ];
 
 export function questionTitle(qKey: string): string {
