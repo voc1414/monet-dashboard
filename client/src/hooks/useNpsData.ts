@@ -37,10 +37,14 @@ export interface StoreStats {
  * Uses npsAliasMap from DB if available, otherwise falls back to keyword matching.
  */
 function parseStoreName(fullName: string, npsAliasMap?: Record<string, string>): string {
-  // If we have a DB-based alias map, try to match
+  // If we have a DB-based alias map, try to match.
+  // 長いエイリアスから照合（「堀江院 2nd」が「堀江院」に先取りされ2nd分が堀江院へ誤計上されるのを防ぐ）。
+  // シート側は「堀江院 2nd」とスペース入りのため、空白を除去して比較する。
   if (npsAliasMap && Object.keys(npsAliasMap).length > 0) {
-    for (const [alias, storeName] of Object.entries(npsAliasMap)) {
-      if (fullName.includes(alias)) {
+    const compact = fullName.replace(/[\s　]/g, "");
+    const entries = Object.entries(npsAliasMap).sort((a, b) => b[0].length - a[0].length);
+    for (const [alias, storeName] of entries) {
+      if (compact.includes(alias.replace(/[\s　]/g, ""))) {
         return storeName;
       }
     }
@@ -53,7 +57,7 @@ function parseStoreName(fullName: string, npsAliasMap?: Record<string, string>):
   if (fullName.includes("高槻院")) return "高槻院";
   if (fullName.includes("姪浜院")) return "姪浜院";
   if (fullName.includes("楽々園院")) return "楽々園院";
-  if (fullName.includes("土橋院")) return "広島土橋院";
+  if (fullName.includes("土橋院")) return "土橋院";
 
   // Generic: extract 「〇〇院」pattern
   const m = fullName.match(/([一-龥ぁ-ゖァ-ヶA-Za-z0-9]+院(?:2nd)?)/);

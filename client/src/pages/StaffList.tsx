@@ -113,9 +113,10 @@ export default function StaffList() {
   const [, navigate] = useLocation();
 
   /**
-   * 実績系（売上・客数）をサロンボード優先・無ければ月末報告書フォールバックで返す。
-   * 月は当該スタッフの reportMonth（一覧で表示している月）に揃える＝同月比較。
-   * サロンボード未設定時は hasStylist=false 相当で常に report 値となり、現行表示と一致する。
+   * 実績系（売上・客数・新規・再来）は【サロンボードのみ】。林さんの指示により、
+   * 売上データに月末報告書は使わない。サロンボードに該当月のデータが無い場合は
+   * 月末報告書へフォールバックせず 0（データ無し）を返す。
+   * ※雇用形態・次回予約率は別途 report 由来（売上ではないので従来どおり）。
    */
   const getMetrics = useMemo(() => {
     return (staff: StaffReport) => {
@@ -129,12 +130,13 @@ export default function StaffList() {
           dataSource: "salonboard" as const,
         };
       }
+      // サロンボードにデータが無い → 月末報告書は使わず 0
       return {
-        totalSales: staff.totalSales,
-        totalCustomers: staff.totalCustomers,
-        newCustomers: staff.newCustomers,
-        returnCustomers: staff.returnCustomers,
-        dataSource: "report" as const,
+        totalSales: 0,
+        totalCustomers: 0,
+        newCustomers: 0,
+        returnCustomers: 0,
+        dataSource: "none" as const,
       };
     };
   }, [getStylistMonth]);
@@ -254,8 +256,8 @@ export default function StaffList() {
       });
     }
 
-    // スペース正規化してグルーピング（NPSシートはスペースなし、月末報告書はスペースあり）
-    const normalizeStaffName = (n: string) => n.replace(/[\s\u3000]/g, "");
+    // スペース正規化＋小文字化してグルーピング（NPSシートは"Yoshie"、月末報告書は"yoshie"等の大小違いがある）
+    const normalizeStaffName = (n: string) => n.replace(/[\s\u3000]/g, "").toLowerCase();
     const grouped = new Map<string, number[]>();
     for (const r of filteredNps) {
       const staffName = r.staff?.trim();
@@ -282,7 +284,7 @@ export default function StaffList() {
     const map = new Map<string, CompositeScoreResult>();
     for (const staff of staffFiltered) {
       const utilRate = calculateUtilizationRate(getMetrics(staff).totalCustomers, staff.employmentType);
-      const npsInfo = staffNpsMap.get(staff.name.replace(/[\s\u3000]/g, ""));
+      const npsInfo = staffNpsMap.get(staff.name.replace(/[\s\u3000]/g, "").toLowerCase());
 
 
 
@@ -319,8 +321,8 @@ export default function StaffList() {
         case "nextReservationRate":
           return (a.nextReservationRate - b.nextReservationRate) * dir;
         case "npsScore": {
-          const npsA = staffNpsMap.get(a.name)?.npsScore ?? -999;
-          const npsB = staffNpsMap.get(b.name)?.npsScore ?? -999;
+          const npsA = staffNpsMap.get(a.name.replace(/[\s\u3000]/g, "").toLowerCase())?.npsScore ?? -999;
+          const npsB = staffNpsMap.get(b.name.replace(/[\s\u3000]/g, "").toLowerCase())?.npsScore ?? -999;
           return (npsA - npsB) * dir;
         }
         case "compositeScore": {
@@ -526,7 +528,7 @@ export default function StaffList() {
               const staffKey = `${staff.answerId}-${i}`;
               const metrics = getMetrics(staff);
               const utilRate = calculateUtilizationRate(metrics.totalCustomers, staff.employmentType);
-              const npsInfo = staffNpsMap.get(staff.name.replace(/[\s\u3000]/g, ""));
+              const npsInfo = staffNpsMap.get(staff.name.replace(/[\s\u3000]/g, "").toLowerCase());
 
               return (
                 <motion.div

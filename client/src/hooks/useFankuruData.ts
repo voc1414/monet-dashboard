@@ -327,6 +327,8 @@ const STYLIST_NAME_ALIASES: Record<string, string[]> = {
   "Aki": ["あき", "アキ", "aki", "AKI"],
   "Kazumi": ["かずみ", "カズミ", "kazumi"],
   "Hiromi": ["ひろみ", "ヒロミ", "hiromi"],
+  // ファンくる側で "Minato" と表記されるケースあり（林 確認済み 2026-07-06）
+  "Minaho": ["みなほ", "ミナホ", "minaho", "minato"],
   "坂手": ["さかて", "サカテ", "sakate"],
 
   // === 高槻院 ===
@@ -339,10 +341,10 @@ const STYLIST_NAME_ALIASES: Record<string, string[]> = {
   "Yu": ["ゆう", "ユウ", "yu", "yuu"],
   "Yukiko": ["ゆきこ", "ユキコ", "yukiko"],
   "yoshie": ["よしえ", "ヨシエ", "yoshie", "由恵（よしえさん）", "由恵"],
-  "Hiroko": ["ひろこ", "ヒロコ", "hiroko"],
+  // 杉本＝Hiroko（月末報告書の登録名はHiroko。林 確認済み 2026-07-06）
+  "Hiroko": ["ひろこ", "ヒロコ", "hiroko", "杉本", "すぎもと", "スギモト", "sugimoto"],
   "Mika": ["みか", "ミカ", "mika"],
   "Hitomi": ["ひとみ", "ヒトミ", "hitomi"],
-  "杉本": ["すぎもと", "スギモト", "sugimoto"],
   "かよ": ["カヨ", "kayo"],
 
   // === 高槻院 追加エイリアス ===

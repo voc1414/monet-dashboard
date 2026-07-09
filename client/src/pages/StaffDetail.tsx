@@ -277,8 +277,8 @@ export default function StaffDetail() {
     return staffData?.employmentType || "";
   }, [rawData, staffName, staffStore]);
 
-  // スタッフ名比較用ヘルパー（NPSシートはスペースなし、月末報告書はスペースあり）
-  const normalizeStaffName = (name: string) => name.replace(/[\s\u3000]/g, "");
+  // スタッフ名比較用ヘルパー（NPSシートはスペースなし、月末報告書はスペースあり。大文字小文字の登録違いも吸収）
+  const normalizeStaffName = (name: string) => name.replace(/[\s\u3000]/g, "").toLowerCase();
 
   // 月の管理
   const npsMonths = useMemo(() => {
@@ -331,8 +331,9 @@ export default function StaffDetail() {
     return matching[0] || null;
   }, [rawData, staffName, staffStore, filterM, isAllPeriod]);
 
-  // 実績系（売上・技術・店販・客数・新規・再来・客単価）はサロンボード優先・無ければ月末報告書フォールバック。
-  // 月は staffReport.reportMonth に揃える（同月比較）。サロンボード未設定時は常に report 値＝現行表示と一致。
+  // 実績系（売上・技術・店販・客数・新規・再来・客単価）は【サロンボードのみ】。
+  // 林さんの指示により売上データに月末報告書は使わない。該当月のサロンボードデータが無ければ 0（データ無し）。
+  // ※雇用形態は report 由来（売上ではない）なので保持。次回予約率は別ロジック。
   const { getStylistMonth } = useSalonBoardStylistData();
   const metrics = useMemo(() => {
     if (!staffReport) return null;
@@ -350,16 +351,17 @@ export default function StaffDetail() {
         dataSource: "salonboard" as const,
       };
     }
+    // サロンボードにデータが無い → 月末報告書は使わず 0（雇用形態のみ report から保持）
     return {
-      totalSales: staffReport.totalSales,
-      techSales: staffReport.techSales,
-      retailSales: staffReport.retailSales,
-      unitPrice: staffReport.unitPrice,
-      totalCustomers: staffReport.totalCustomers,
+      totalSales: 0,
+      techSales: 0,
+      retailSales: 0,
+      unitPrice: 0,
+      totalCustomers: 0,
       newCustomers: 0,
-      returnCustomers: staffReport.returnCustomers,
+      returnCustomers: 0,
       employmentType: staffReport.employmentType,
-      dataSource: "report" as const,
+      dataSource: "none" as const,
     };
   }, [staffReport, getStylistMonth]);
 
