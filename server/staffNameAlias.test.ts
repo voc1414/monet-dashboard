@@ -31,6 +31,11 @@ describe("normalizeStaffKey", () => {
   it("本人入力ゆれ: 坂手 と 坂手芳 は同一キーになる", () => {
     expect(normalizeStaffKey("坂手")).toBe(normalizeStaffKey("坂手芳"));
   });
+
+  it("注記混入: sayuri  ホットペッパー は sayuri と同一キーになる", () => {
+    expect(normalizeStaffKey("sayuri  ホットペッパー")).toBe(normalizeStaffKey("sayuri"));
+    expect(canonicalizeStaffName("sayuri  ホットペッパー")).toBe("sayuri");
+  });
 });
 
 describe("canonicalizeStaffName（表示名の正準化）", () => {

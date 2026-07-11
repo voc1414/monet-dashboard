@@ -260,12 +260,36 @@ function UnmatchedSuggestPanel({
     addMutation.mutate({ canonicalName: canonical, alias: u.name, storeName: u.store });
   };
 
-  if (unmatched.length === 0) {
+  // 月末報告書内の表記ゆれ検出（同一店舗で片方の名前がもう片方を含む → 同一人物の疑い。
+  // 例: 「坂手」と「坂手芳」。誤検出防止のため英字名は4文字以上を要求（Yu⊂Yukiko等を除外）
+  const duplicateSuspects = useMemo(() => {
+    const out: Array<{ store: string; shorter: string; longer: string }> = [];
+    const norm = (s: string) => s.replace(/[\s　]/g, "").toLowerCase();
+    for (const [store, names] of Array.from(rosterByStore.entries())) {
+      const arr = Array.from(names);
+      for (let i = 0; i < arr.length; i++) {
+        for (let j = i + 1; j < arr.length; j++) {
+          const ka = norm(arr[i]);
+          const kb = norm(arr[j]);
+          if (ka === kb || !ka || !kb) continue;
+          const [s, l, sRaw, lRaw] = ka.length <= kb.length ? [ka, kb, arr[i], arr[j]] : [kb, ka, arr[j], arr[i]];
+          if (!l.includes(s)) continue;
+          const minLen = /^[\x20-\x7e]+$/.test(s) ? 4 : 2;
+          if (s.length < minLen) continue;
+          out.push({ store, shorter: sRaw, longer: lRaw });
+        }
+      }
+    }
+    return out;
+  }, [rosterByStore]);
+  const [dupSelections, setDupSelections] = useState<Record<string, string>>({});
+
+  if (unmatched.length === 0 && duplicateSuspects.length === 0) {
     return (
       <Card className="border-emerald-200/60 bg-emerald-50/40">
         <CardContent className="p-3">
           <p className="text-xs text-emerald-700">
-            ✓ 未マッチのスタッフ名はありません（NPS・ファンくるとも全件が名簿に紐付いています）
+            ✓ 未マッチのスタッフ名・表記ゆれの疑いはありません（NPS・ファンくる・月末報告書とも整合しています）
           </p>
         </CardContent>
       </Card>
@@ -275,6 +299,54 @@ function UnmatchedSuggestPanel({
   return (
     <Card className="border-amber-200/70 bg-amber-50/30">
       <CardContent className="p-4">
+        {duplicateSuspects.length > 0 && (
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-1">
+              <AlertTriangle className="w-4 h-4 text-amber-600" />
+              <h4 className="text-sm font-bold text-foreground">同一人物の疑い（月末報告書内の表記ゆれ・{duplicateSuspects.length}件）</h4>
+            </div>
+            <p className="text-[11px] text-muted-foreground mb-2">
+              同じ店舗に似た名前が2つあります。同一人物なら正式名を選んで「統合」してください（スタッフ一覧などの表示が1人にまとまります）。別人なら無視してOKです。
+            </p>
+            <div className="space-y-2">
+              {duplicateSuspects.map((d) => {
+                const rowKey = `dup__${d.shorter}__${d.longer}__${d.store}`;
+                const canonical = dupSelections[rowKey] ?? d.longer;
+                const aliasName = canonical === d.longer ? d.shorter : d.longer;
+                return (
+                  <div key={rowKey} className="flex flex-col sm:flex-row sm:items-center gap-2 bg-white/80 border border-border/40 rounded-lg px-3 py-2">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <span className="text-sm font-medium truncate">「{d.shorter}」と「{d.longer}」</span>
+                      <span className="text-[11px] text-muted-foreground shrink-0">（{d.store}）</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground shrink-0">正式名:</span>
+                      <Select value={canonical} onValueChange={(v) => setDupSelections((p) => ({ ...p, [rowKey]: v }))}>
+                        <SelectTrigger className="w-[160px] bg-white h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={d.longer}>{d.longer}</SelectItem>
+                          <SelectItem value={d.shorter}>{d.shorter}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        size="sm"
+                        className="h-8"
+                        disabled={addMutation.isPending}
+                        onClick={() => addMutation.mutate({ canonicalName: canonical, alias: aliasName, storeName: d.store })}
+                      >
+                        統合
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {unmatched.length > 0 && (<>
         <div className="flex items-center gap-2 mb-1">
           <AlertTriangle className="w-4 h-4 text-amber-600" />
           <h4 className="text-sm font-bold text-foreground">未マッチのスタッフ名（{unmatched.length}件）</h4>
@@ -329,6 +401,7 @@ function UnmatchedSuggestPanel({
             );
           })}
         </div>
+        </>)}
       </CardContent>
     </Card>
   );
