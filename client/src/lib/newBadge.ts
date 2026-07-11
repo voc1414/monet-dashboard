@@ -12,6 +12,8 @@
  * - 例: 初登場月が 2026-04 → 2026-04, 2026-05, 2026-06 まで NEW
  */
 
+import { normalizeStaffKey as aliasStaffKey } from "@/lib/staffNameAlias";
+
 // 退社スタッフ管理（ハードコードフォールバック）
 // key: スタッフ名, value: 退社月 "YYYY-MM"（この月以降のデータを除外）
 const RETIRED_STAFF: Record<string, { store: string; retiredMonth: string }> = {
@@ -56,23 +58,16 @@ export function isRetiredStaff(staffName: string, storeName?: string, month?: st
 
   // DB連携マップが設定されている場合はDBデータを使用
   if (dbRetiredStaffMap && dbRetiredStaffMap.size > 0) {
-    // 店舗名指定ありの場合: 完全一致
-    if (storeName) {
-      const key = `${staffName}|${storeName}`;
-      const entry = dbRetiredStaffMap.get(key);
-      if (entry) {
-        if (entry.status !== "retired") return false;
-        if (entry.retiredMonth) return targetMonth >= entry.retiredMonth;
-        return true;
-      }
-    }
-
-    // 名前のみで検索（大文字小文字無視）
-    const nameLower = staffName.trim().toLowerCase();
+    // 名前は normalizeStaffKey で比較（全角/半角スペース・大小文字・エイリアスを吸収。
+    // 例: DB登録「佐々木 淳」と月末報告書「佐々木　淳」のスペース違いで退社判定を
+    // すり抜けていたバグへの対策 2026-07-10）
+    const nameKey = aliasStaffKey(staffName);
     for (const [mapKey, entry] of Array.from(dbRetiredStaffMap.entries())) {
-      const [mapName, mapStore] = mapKey.split("|");
-      if (mapName.trim().toLowerCase() !== nameLower) continue;
-      if (storeName && mapStore !== storeName) continue;
+      const sep = mapKey.lastIndexOf("|");
+      const mapName = mapKey.slice(0, sep);
+      const mapStore = mapKey.slice(sep + 1);
+      if (aliasStaffKey(mapName) !== nameKey) continue;
+      if (storeName && mapStore.trim() !== storeName.trim()) continue;
       if (entry.status !== "retired") return false;
       if (entry.retiredMonth) return targetMonth >= entry.retiredMonth;
       return true;

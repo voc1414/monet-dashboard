@@ -1,9 +1,39 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   isNewStaff,
+  isRetiredStaff,
+  setRetiredStaffMap,
   buildStaffFirstAppearanceMap,
   setStaffFirstAppearanceMap,
 } from "../client/src/lib/newBadge";
+
+describe("isRetiredStaff（DB退社判定の名寄せ）", () => {
+  afterEach(() => setRetiredStaffMap(null));
+
+  it("DB登録名と報告書名のスペース種別（半角/全角）が違っても退社判定される", () => {
+    setRetiredStaffMap(new Map([
+      ["佐々木 淳|土橋院", { status: "retired" as const, retiredMonth: "2026-07" }],
+    ]));
+    // 月末報告書側は全角スペース「佐々木　淳」
+    expect(isRetiredStaff("佐々木　淳", "土橋院", "2026-07")).toBe(true);
+    // 退社月より前のデータは表示される（在籍していた月）
+    expect(isRetiredStaff("佐々木　淳", "土橋院", "2026-06")).toBe(false);
+  });
+
+  it("エイリアス表記（坂手=坂手芳）でも退社判定が通る", () => {
+    setRetiredStaffMap(new Map([
+      ["坂手芳|堀江院2nd", { status: "retired" as const, retiredMonth: "2026-05" }],
+    ]));
+    expect(isRetiredStaff("坂手", "堀江院2nd", "2026-06")).toBe(true);
+  });
+
+  it("activeステータスは退社扱いしない", () => {
+    setRetiredStaffMap(new Map([
+      ["Mimi|堀江院2nd", { status: "active" as const, retiredMonth: null }],
+    ]));
+    expect(isRetiredStaff("Mimi", "堀江院2nd", "2026-06")).toBe(false);
+  });
+});
 
 describe("buildStaffFirstAppearanceMap", () => {
   it("各スタッフの最も古いreportMonthを初登場月として検出する（データ最古月のスタッフは除外）", () => {

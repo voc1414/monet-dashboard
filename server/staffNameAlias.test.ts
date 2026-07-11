@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { normalizeStaffKey, setStaffAliasMapFromDb } from "../client/src/lib/staffNameAlias";
+import { normalizeStaffKey, canonicalizeStaffName, setStaffAliasMapFromDb } from "../client/src/lib/staffNameAlias";
 
 describe("normalizeStaffKey", () => {
   it("空白除去＋小文字化する", () => {
@@ -26,6 +26,23 @@ describe("normalizeStaffKey", () => {
   it("エイリアスに無い名前はそのまま（空文字も安全）", () => {
     expect(normalizeStaffKey("中島真優")).toBe("中島真優");
     expect(normalizeStaffKey("")).toBe("");
+  });
+
+  it("本人入力ゆれ: 坂手 と 坂手芳 は同一キーになる", () => {
+    expect(normalizeStaffKey("坂手")).toBe(normalizeStaffKey("坂手芳"));
+  });
+});
+
+describe("canonicalizeStaffName（表示名の正準化）", () => {
+  it("エイリアス該当時は正準表示名を返す", () => {
+    expect(canonicalizeStaffName("坂手")).toBe("坂手芳");
+    expect(canonicalizeStaffName("akiko")).toBe("小池明子");
+    expect(canonicalizeStaffName("石原 ようこ")).toBe("石原葉子");
+  });
+
+  it("該当なしは元の名前をそのまま返す（表示を壊さない）", () => {
+    expect(canonicalizeStaffName("中島真優")).toBe("中島真優");
+    expect(canonicalizeStaffName("坂手芳")).toBe("坂手芳");
   });
 });
 

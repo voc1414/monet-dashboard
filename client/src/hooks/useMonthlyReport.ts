@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { registerNewStoresFromReports, isRetiredStaff } from "@/lib/newBadge";
+import { canonicalizeStaffName, useStaffAliasVersion } from "@/lib/staffNameAlias";
 
 // 新モネ月末報告書 スプレッドシート
 const SPREADSHEET_ID = "1DXAaFk0aLDZwXq28krOcrDSiTOwd6BeTzV-xFXbLuKI";
@@ -310,9 +311,21 @@ function deduplicateReports(reports: StaffReport[]): StaffReport[] {
 }
 
 export function useMonthlyReport() {
-  const [rawData, setRawData] = useState<StaffReport[]>([]);
+  const [parsedReports, setParsedReports] = useState<StaffReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // スタッフ名の表示名を正準化（本人入力ゆれ「坂手」→「坂手芳」等）してから重複排除する。
+  // 名前マッピング（DB）は非同期に届くため、aliasVersion の変化で名寄せをやり直す。
+  const aliasVersion = useStaffAliasVersion();
+  const rawData = useMemo(() => {
+    void aliasVersion; // 依存: エイリアスマップ更新で再計算
+    const canonicalized = parsedReports.map((r) => {
+      const c = canonicalizeStaffName(r.name);
+      return c === r.name ? r : { ...r, name: c };
+    });
+    return deduplicateReports(canonicalized);
+  }, [parsedReports, aliasVersion]);
 
   useEffect(() => {
     let cancelled = false;
@@ -326,7 +339,7 @@ export function useMonthlyReport() {
         const rows = parseCSV(text);
 
         if (rows.length < 2) {
-          setRawData([]);
+          setParsedReports([]);
           return;
         }
 
@@ -377,15 +390,13 @@ export function useMonthlyReport() {
           };
         });
 
-        // 同じスタッフ×同月の重複排除: 回答日時が新しい方を残す
-        const deduped = deduplicateReports(reports);
-
         // 新店舗自動検出: 未知の店舗名があれば自動的にNEW登録（初回検出月から6ヶ月間）
-        const storeNames = Array.from(new Set(deduped.map(r => r.storeNormalized).filter(Boolean)));
+        const storeNames = Array.from(new Set(reports.map(r => r.storeNormalized).filter(Boolean)));
         registerNewStoresFromReports(storeNames);
 
+        // 重複排除・名前正準化は rawData の useMemo 側で行う（エイリアス更新に追従するため）
         if (!cancelled) {
-          setRawData(deduped);
+          setParsedReports(reports);
           setError(null);
         }
       } catch (e) {
