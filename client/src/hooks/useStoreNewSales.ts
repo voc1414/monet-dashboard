@@ -32,7 +32,9 @@ async function fetchRows(): Promise<StoreNewSalesRow[]> {
           const c = lines[i].split(",").map((x) => x.replace(/^"|"$/g, "").trim());
           if (c.length < 3) continue;
           const v = parseInt((c[2] || "").replace(/[^\d-]/g, ""), 10);
-          if (!isNaN(v)) out.push({ storeName: c[0], yearMonth: c[1], newSales: v });
+          // 年月のゼロ埋めゆれ「2026-6」→「2026-06」を吸収（stylist_flatで実発生した形式）
+          const ym = (c[1] || "").replace(/\//g, "-").replace(/^(\d{4})-(\d)$/, "$1-0$2");
+          if (!isNaN(v)) out.push({ storeName: c[0], yearMonth: ym, newSales: v });
         }
       }
     } catch {

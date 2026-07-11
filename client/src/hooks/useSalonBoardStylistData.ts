@@ -141,9 +141,14 @@ function parseNum(val: string): number {
 }
 
 function normalizeYearMonth(raw: string): string {
-  const trimmed = (raw || "").trim().replace(/"/g, "");
+  const trimmed = (raw || "").trim().replace(/"/g, "").replace(/\//g, "-");
   if (!trimmed) return "";
-  return trimmed.replace("/", "-");
+  // 集計スクリプトの月ゼロ埋めゆれ「2026-6」→「2026-06」を吸収。
+  // stylist_flat に両形式が混在し、非ゼロ埋め行（全店46行）が集計から
+  // 欠落して新規数等がサロンボード公式と合わなくなっていた（2026-07-11発見）
+  const m = trimmed.match(/^(\d{4})-(\d{1,2})$/);
+  if (m) return `${m[1]}-${m[2].padStart(2, "0")}`;
+  return trimmed;
 }
 
 /**

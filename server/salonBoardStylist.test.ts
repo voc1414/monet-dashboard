@@ -31,6 +31,19 @@ describe("useSalonBoardStylistData / parseStylistFlatCsv", () => {
     expect(r.techSales + r.retailSales).toBe(r.sales);
   });
 
+  it("年月のゼロ埋めゆれ「2026-6」を「2026-06」に正規化する（実データで混在・新規数欠落の原因）", () => {
+    const csv = [
+      HEADER,
+      '"モネ-monet- 白髪染めと髪質改善のサロン 堀江院 2nd","Mimi",2026-6,100000,10,10000,1,5,5,90000,10000',
+      '"モネ-monet- 白髪染めと髪質改善のサロン 堀江院 2nd","Mayu",2026/6,100000,10,10000,1,5,5,90000,10000',
+    ].join("\n");
+    const rows = parseStylistFlatCsv(csv);
+    expect(rows).toHaveLength(2);
+    expect(rows[0].yearMonth).toBe("2026-06");
+    expect(rows[1].yearMonth).toBe("2026-06");
+    expect(rows[0].storeName).toBe("堀江院2nd");
+  });
+
   it("技術/店販列が無い旧フォーマットでも0で安全にパースする", () => {
     const csv = [
       "店舗,スタイリスト,年月,売上,客数,客単価,指名数,新規,再来",
