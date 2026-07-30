@@ -1,0 +1,23 @@
+# Render Blueprint — 無料プランでの本番構成（Railwayトライアル失効に伴う移行 2026-07-11）
+# GitHubリポジトリ連携でデプロイ。push で自動デプロイされる。
+services:
+  - type: web
+    name: monet-dashboard
+    runtime: node
+    plan: free
+    buildCommand: npm ci --legacy-peer-deps && npm run build && npx drizzle-kit migrate
+    startCommand: node dist/index.js
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false # TiDB Serverless の接続文字列（?ssl={"rejectUnauthorized":true} 付き）を手動設定
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CRON_SECRET
+        generateValue: true
+      - key: ADMIN_USERNAME
+        value: commit.1414@gmail.com
+      - key: ADMIN_PASSWORD
+        sync: false # 手動設定（林さんに共有する仮パスワード → 後で変更）
