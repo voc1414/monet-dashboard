@@ -19,6 +19,9 @@ import { normalizeStaffKey as aliasStaffKey } from "@/lib/staffNameAlias";
 const RETIRED_STAFF: Record<string, { store: string; retiredMonth: string }> = {
   "Hitomi": { store: "福島院", retiredMonth: "2026-04" },
   "hitomi": { store: "福島院", retiredMonth: "2026-04" },
+  // 旧本番DB(staff_status)の控え。静的ホスティング等でDBが無い構成でも退社判定が効くようにする(2026-07-11)
+  "Kazumi": { store: "堀江院2nd", retiredMonth: "2026-02" },
+  "佐々木 淳": { store: "土橋院", retiredMonth: "2026-07" },
 };
 
 /**
@@ -77,9 +80,9 @@ export function isRetiredStaff(staffName: string, storeName?: string, month?: st
     return false;
   }
 
-  // フォールバック: ハードコードデータを使用
+  // フォールバック: ハードコードデータを使用（比較はDB経路と同じ名寄せキー）
   const nameKey = Object.keys(RETIRED_STAFF).find(
-    k => k.toLowerCase() === staffName.trim().toLowerCase()
+    k => aliasStaffKey(k) === aliasStaffKey(staffName)
   );
   if (!nameKey) return false;
   const info = RETIRED_STAFF[nameKey];

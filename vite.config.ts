@@ -153,6 +153,9 @@ function vitePluginManusDebugCollector(): Plugin {
 const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
 
 export default defineConfig({
+  // GitHub Pages のプロジェクトサイト(/monet-dashboard/)配下で配信するためのベースパス。
+  // 通常ビルドは "/"（Railway等のルート配信）。Pages ビルド時のみ VITE_BASE を指定する。
+  base: process.env.VITE_BASE || "/",
   plugins,
   resolve: {
     alias: {

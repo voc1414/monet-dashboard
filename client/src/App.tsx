@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Route, Switch, Router as WouterRouter } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import ScrollToTop from "./components/ScrollToTop";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -61,7 +61,10 @@ function App() {
           <StoreDataProvider>
             <StaffStatusProvider />
             <Toaster />
-            <Router />
+            {/* GitHub Pages のサブパス配信に対応（BASE_URL="/"のときは実質無効） */}
+            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+              <Router />
+            </WouterRouter>
           </StoreDataProvider>
         </TooltipProvider>
       </ThemeProvider>
