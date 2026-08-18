@@ -17,12 +17,29 @@ import { normalizeStaffKey as aliasStaffKey } from "@/lib/staffNameAlias";
 // 退社スタッフ管理（ハードコードフォールバック）
 // key: スタッフ名, value: 退社月 "YYYY-MM"（この月以降のデータを除外）
 const RETIRED_STAFF: Record<string, { store: string; retiredMonth: string }> = {
-  "Hitomi": { store: "福島院", retiredMonth: "2026-04" },
-  "hitomi": { store: "福島院", retiredMonth: "2026-04" },
-  // 旧本番DB(staff_status)の控え。静的ホスティング等でDBが無い構成でも退社判定が効くようにする(2026-07-11)
-  "Kazumi": { store: "堀江院2nd", retiredMonth: "2026-02" },
-  "佐々木 淳": { store: "土橋院", retiredMonth: "2026-07" },
+  // 出典: Notion「全スタッフ一覧」の退職者 × サロンボード stylist_flat の最終稼働月（2026-08-18 突合）。
+  // key はデータ側の表示名。照合は aliasStaffKey（空白除去+小文字化）なので大小文字違いの別キーは不要。
+  "Hitomi": { store: "福島院", retiredMonth: "2026-04" },    // 尾﨑仁美
+  "Kazumi": { store: "堀江院2nd", retiredMonth: "2026-03" },  // 三宅和美（実績最終月に合わせ 2026-02 から訂正）
+  "Aki": { store: "堀江院2nd", retiredMonth: "2026-04" },     // 池内亜希子（従来この表から欠落）
+  "Hiromi": { store: "堀江院2nd", retiredMonth: "2026-07" },  // 満川宏美（従来この表から欠落）
 };
+
+/**
+ * 集計対象外スタッフ（退社とは別概念・店舗を問わず常に除外）。
+ *
+ * 「佐々木 淳」: 月末報告書に回答が3件あるが（最新 2026-08-04・楽々園院）、
+ * monet のスタッフ名簿には存在しない。土橋院と楽々園院の両方に回答があり
+ * 店舗別の RETIRED_STAFF では捕まえられないため、ここで一括除外する。
+ * 林さん判断により集計から完全に除外（2026-08-18）。
+ */
+const EXCLUDED_STAFF: string[] = ["佐々木 淳"];
+
+/** 集計対象外スタッフかどうか（店舗・月に関係なく判定） */
+function isExcludedStaff(staffName: string): boolean {
+  const key = aliasStaffKey(staffName);
+  return EXCLUDED_STAFF.some((n) => aliasStaffKey(n) === key);
+}
 
 /**
  * DB連携用: 退社スタッフのステータスマップ
@@ -57,6 +74,9 @@ export function hasRetiredStaffMap(): boolean {
  * @returns 退社済みなら true
  */
 export function isRetiredStaff(staffName: string, storeName?: string, month?: string): boolean {
+  // 集計対象外スタッフは店舗・月・DB連携の有無に関係なく常に除外する
+  if (isExcludedStaff(staffName)) return true;
+
   const targetMonth = month || getCurrentYearMonth();
 
   // DB連携マップが設定されている場合はDBデータを使用

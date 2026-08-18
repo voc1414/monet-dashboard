@@ -11,13 +11,27 @@ describe("isRetiredStaff（DB退社判定の名寄せ）", () => {
   afterEach(() => setRetiredStaffMap(null));
 
   it("DB登録名と報告書名のスペース種別（半角/全角）が違っても退社判定される", () => {
+    // 検体は「石橋 茜」。以前は「佐々木 淳」を使っていたが、同氏は
+    // EXCLUDED_STAFF（常時除外）に移ったため検体として使えない（2026-08-18）。
     setRetiredStaffMap(new Map([
-      ["佐々木 淳|土橋院", { status: "retired" as const, retiredMonth: "2026-07" }],
+      ["石橋 茜|姪浜院", { status: "retired" as const, retiredMonth: "2026-07" }],
     ]));
-    // 月末報告書側は全角スペース「佐々木　淳」
-    expect(isRetiredStaff("佐々木　淳", "土橋院", "2026-07")).toBe(true);
+    // 月末報告書側は全角スペース「石橋　茜」
+    expect(isRetiredStaff("石橋　茜", "姪浜院", "2026-07")).toBe(true);
     // 退社月より前のデータは表示される（在籍していた月）
-    expect(isRetiredStaff("佐々木　淳", "土橋院", "2026-06")).toBe(false);
+    expect(isRetiredStaff("石橋　茜", "姪浜院", "2026-06")).toBe(false);
+  });
+
+  it("集計対象外スタッフは店舗・月・DB連携に関係なく常に除外される", () => {
+    // DBで active と登録されていても除外が勝つ
+    setRetiredStaffMap(new Map([
+      ["佐々木 淳|楽々園院", { status: "active" as const, retiredMonth: null }],
+    ]));
+    expect(isRetiredStaff("佐々木　淳", "楽々園院", "2026-08")).toBe(true);
+    expect(isRetiredStaff("佐々木 淳", "土橋院", "2026-01")).toBe(true);
+    // DB連携なし（フォールバック経路）でも除外される
+    setRetiredStaffMap(null);
+    expect(isRetiredStaff("佐々木　淳", "楽々園院", "2026-05")).toBe(true);
   });
 
   it("エイリアス表記（坂手=坂手芳）でも退社判定が通る", () => {

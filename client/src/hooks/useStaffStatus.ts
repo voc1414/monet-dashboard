@@ -7,7 +7,7 @@
  */
 import { trpc } from "@/lib/trpc";
 import { useMemo, useEffect } from "react";
-import { setRetiredStaffMap } from "@/lib/newBadge";
+import { setRetiredStaffMap, isRetiredStaff } from "@/lib/newBadge";
 
 export type StaffStatusRecord = {
   staffName: string;
@@ -124,23 +124,16 @@ export function StaffStatusProvider() {
 
 // ─── Hardcoded fallback (same as original newBadge.ts) ───
 
-const RETIRED_STAFF_FALLBACK: Record<string, { store: string; retiredMonth: string }> = {
-  "Hitomi": { store: "福島院", retiredMonth: "2026-04" },
-  "hitomi": { store: "福島院", retiredMonth: "2026-04" },
-};
-
 function getCurrentYearMonth(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
+/**
+ * 退社スタッフの内蔵表は newBadge.ts の RETIRED_STAFF に一本化した（2026-08-18）。
+ * 以前はここにも別表があり、実際に中身がズレていた（池内・満川・佐々木が欠落）。
+ * DB が空のときだけ呼ばれるので、newBadge 側もフォールバック経路に入る（循環しない）。
+ */
 function hardcodedIsRetired(staffName: string, storeName?: string, month?: string): boolean {
-  const targetMonth = month || getCurrentYearMonth();
-  const nameKey = Object.keys(RETIRED_STAFF_FALLBACK).find(
-    (k) => k.toLowerCase() === staffName.trim().toLowerCase()
-  );
-  if (!nameKey) return false;
-  const info = RETIRED_STAFF_FALLBACK[nameKey];
-  if (storeName && info.store !== storeName) return false;
-  return targetMonth >= info.retiredMonth;
+  return isRetiredStaff(staffName, storeName, month);
 }
