@@ -14,7 +14,8 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
-    "sync:staff": "node scripts/sync-staff-master.mjs"
+    "sync:staff": "node scripts/sync-staff-master.mjs",
+    "sync:stores": "node scripts/sync-store-master.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.693.0",

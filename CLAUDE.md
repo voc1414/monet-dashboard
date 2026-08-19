@@ -59,6 +59,18 @@ FC共有前提でログイン不要の公開閲覧（管理ページ `/admin` �
 - 履歴書・労働契約書・雇用形態は人事の正本。**同期対象に含めない**（取得するのは
   名前・表示名・店舗・在籍状態・退職月 の5項目のみ。本リポジトリは public）
 
+### 3.2 店舗マスタの正本も Notion（2026-08-20〜）
+**店舗を増やす・エリアを直すときはコードを触らず Notion を編集する。**
+- 正本: Notion「DB_monet店舗一覧」 https://app.notion.com/p/354ab44d3cb98068ad2ac3a3aa2e2af2
+  （列＝名前／エリア／**開店日**／住所／電話／HPB URL／LP URL 等）
+- 反映: `npm run sync:stores`（`NOTION_TOKEN` 必須）→ `client/src/data/storeMaster.ts` を再生成 → commit & push
+- `useStores.ts` の店舗一覧はこのマスタから組み立てる。**手で書き足さない**
+- **開店日が未定(null)の店は「営業中の一覧」に出ない。** 開店日を Notion に入れれば、
+  その日から自動で店舗一覧・スタッフ一覧に並ぶ（開店のたびにコードを直す必要はない）
+- 店舗名は Notion の表記に合わせる（岡山エリアは「下伊福院」。「岡山下伊福院」ではない）
+- 広告(/ads)は開店前の店も数字が出るので、`useAdsData.ts` の `SINGLE_STORE_AREA` と
+  `Ads.tsx` の `HPB_START_MONTH` にも新店を足す（1エリア1店舗のときだけ店舗を特定できる）
+
 ## 4. 主要ファイル
 - `client/src/pages/Ads.tsx` … /ads。列順=1日予算→消化額→HPB費用→LINE登録→LINE単価→リード→新規数→CPA→ROAS→CPL→CTR→CPC→フリーク。**HPB費用=全店一律月額¥55,000×選択期間の月数（HPB_MONTHLY_FEE）。CPA=(集客広告費+HPB)÷新規来店、ROAS=新規売上÷(集客広告費+HPB)。CPLは広告費のみ**。求人はHPB/CPA/ROAS対象外。データ鮮度警告つき
 - `client/src/hooks/useSalonBoardData.ts` … 店舗カード値（store_official優先）

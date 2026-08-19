@@ -5,13 +5,15 @@
  */
 import { useMemo } from "react";
 import { trpc } from "@/lib/trpc";
+import { openedAreaStores } from "@/data/storeMaster";
 
-// Hardcoded fallback (used when DB query fails or returns empty)
-const FALLBACK_AREA_STORES: { area: string; stores: string[] }[] = [
-  { area: "大阪エリア", stores: ["堀江院", "堀江院2nd", "福島院", "高槻院"] },
-  { area: "福岡エリア", stores: ["姪浜院"] },
-  { area: "広島エリア", stores: ["楽々園院", "土橋院"] },
-];
+// DBが空/失敗のときのフォールバック。中身は Notion「DB_monet店舗一覧」から生成した
+// client/src/data/storeMaster.ts。店舗を増やすときは Notion を編集して
+// `npm run sync:stores` で再生成する（ここに直接書き足さない）。
+//
+// 開店日が未定の店（＝まだ開店していない）は含まれない。開店日を Notion に入れた
+// 時点で自動的に並ぶ。開店日を過ぎたら勝手に出てくるので、開店のたびに
+// コードを直す必要はない。
 
 export interface StoreData {
   id: number;
@@ -40,7 +42,7 @@ export function useStores() {
 
   const areaStores = useMemo(() => {
     if (grouped && grouped.length > 0) return grouped;
-    return FALLBACK_AREA_STORES;
+    return openedAreaStores();
   }, [grouped]);
 
   const allStores = useMemo(() => {
