@@ -238,6 +238,10 @@ export default function StaffList() {
     });
   }, [staffListActive, filterStore, searchQuery]);
 
+  // NPSの引き当ては「店舗＋名前」で行う（表示名は店舗をまたいで重複するため）
+  const npsKeyFor = (s: { name: string; storeNormalized: string }) =>
+    `${normalizeStaffKey(s.name)}__${s.storeNormalized}`;
+
   // スタッフごとのNPS情報を計算
   const staffNpsMap = useMemo(() => {
     const map = new Map<string, StaffNpsInfo>();
@@ -257,15 +261,17 @@ export default function StaffList() {
       });
     }
 
-    // スペース正規化＋小文字化してグルーピング（NPSシートは"Yoshie"、月末報告書は"yoshie"等の大小違いがある）
-    const normalizeStaffName = (n: string) => normalizeStaffKey(n);
+    // スペース正規化＋小文字化してグルーピング（NPSシートは"Yoshie"、月末報告書は"yoshie"等の大小違いがある）。
+    // キーには必ず店舗を含める。表示名は店舗をまたいで重複するため（例: Mika は堀江院=西本美華 と
+    // 福島院=松野美香 の別人）、名前だけで束ねると別人の口コミが混ざる（2026-08-19 修正）。
+    const npsKey = (name: string, store: string) => `${normalizeStaffKey(name)}__${store}`;
     const grouped = new Map<string, number[]>();
     for (const r of filteredNps) {
       const staffName = r.staff?.trim();
       if (!staffName) continue;
-      const normName = normalizeStaffName(staffName);
-      if (!grouped.has(normName)) grouped.set(normName, []);
-      grouped.get(normName)!.push(r.npsScore);
+      const k = npsKey(staffName, r.storeShort);
+      if (!grouped.has(k)) grouped.set(k, []);
+      grouped.get(k)!.push(r.npsScore);
     }
 
     for (const [name, scores] of Array.from(grouped.entries())) {
@@ -285,7 +291,7 @@ export default function StaffList() {
     const map = new Map<string, CompositeScoreResult>();
     for (const staff of staffFiltered) {
       const utilRate = calculateUtilizationRate(getMetrics(staff).totalCustomers, staff.employmentType);
-      const npsInfo = staffNpsMap.get(normalizeStaffKey(staff.name));
+      const npsInfo = staffNpsMap.get(npsKeyFor(staff));
 
 
 
@@ -325,8 +331,8 @@ export default function StaffList() {
         case "nextReservationRate":
           return (a.nextReservationRate - b.nextReservationRate) * dir;
         case "npsScore": {
-          const npsA = staffNpsMap.get(normalizeStaffKey(a.name))?.npsScore ?? -999;
-          const npsB = staffNpsMap.get(normalizeStaffKey(b.name))?.npsScore ?? -999;
+          const npsA = staffNpsMap.get(npsKeyFor(a))?.npsScore ?? -999;
+          const npsB = staffNpsMap.get(npsKeyFor(b))?.npsScore ?? -999;
           return (npsA - npsB) * dir;
         }
         case "compositeScore": {
@@ -532,7 +538,7 @@ export default function StaffList() {
               const staffKey = `${staff.answerId}-${i}`;
               const metrics = getMetrics(staff);
               const utilRate = calculateUtilizationRate(metrics.totalCustomers, staff.employmentType);
-              const npsInfo = staffNpsMap.get(normalizeStaffKey(staff.name));
+              const npsInfo = staffNpsMap.get(npsKeyFor(staff));
 
               return (
                 <motion.div
