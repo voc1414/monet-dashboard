@@ -299,7 +299,10 @@ export default function StaffList() {
       map.set(key, result);
     }
     return map;
-  }, [staffFiltered, staffNpsMap]);
+    // getMetrics はサロンボードCSVの到着で作り直される。依存に入れないと、
+    // 売上・稼働率の列（描画時に毎回計算）だけが更新され、総合点が
+    // 「稼働率0」で計算された古い値のまま残る（2026-08-19 修正）。
+  }, [staffFiltered, staffNpsMap, getMetrics]);
 
   // ソート適用
   const staffList = useMemo(() => {
