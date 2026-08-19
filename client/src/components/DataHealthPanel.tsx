@@ -22,6 +22,9 @@ const STALE_MONTHS = 2;
 
 type Issue = { kind: string; detail: string };
 
+// 「予約なし枠」など、人ではない担当名。重複していても問題ではない。
+const NOT_A_PERSON = ["フリー", "free", "選択しない"];
+
 function ymOf(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
@@ -39,11 +42,12 @@ export default function DataHealthPanel() {
   const { records: npsRecords, loading: l3 } = useNpsData();
   const loading = l1 || l2 || l3;
 
-  const { freshness, issues } = useMemo(() => {
+  const { freshness, issues, notes } = useMemo(() => {
     const today = new Date();
     const todayYm = ymOf(today);
     const fresh: { name: string; latest: string; ok: boolean; note: string }[] = [];
-    const found: Issue[] = [];
+    const found: Issue[] = []; // 直すもの
+    const notes: string[] = []; // 直すものではないが知っておく情報
 
     // ---- 鮮度 ----
     const sbLatest = stylistRows.map((r) => r.yearMonth).sort().pop() || "";
@@ -97,8 +101,10 @@ export default function DataHealthPanel() {
       byName.set(k, set);
     }
     for (const [k, stores] of Array.from(byName.entries())) {
-      if (stores.size > 1) {
-        found.push({ kind: "同じ表示名が複数店舗にいる", detail: `${k}（${Array.from(stores).join(" / ")}）— 突合は必ず店舗つきで` });
+      if (stores.size > 1 && !NOT_A_PERSON.includes(k)) {
+        // これは直すものではなく「構造的にそうなっている」事実。
+        // 警告に混ぜると毎回赤くなって誰も見なくなるので、情報として置くだけにする。
+        notes.push(`${k}（${Array.from(stores).join(" / ")}）`);
       }
     }
 
@@ -116,7 +122,7 @@ export default function DataHealthPanel() {
       found.push({ kind: "NPSが誰にも紐づかない", detail: `${r.storeShort} / ${staff}` });
     }
 
-    return { freshness: fresh, issues: found };
+    return { freshness: fresh, issues: found, notes };
   }, [reports, stylistRows, npsRecords]);
 
   if (loading) return null;
@@ -159,6 +165,22 @@ export default function DataHealthPanel() {
               </ul>
             </div>
           ))}
+
+          {notes.length > 0 && (
+            <div>
+              <div className="font-semibold text-foreground mb-1">
+                参考：同じ表示名が複数店舗にいます（{notes.length}件）
+              </div>
+              <p className="text-xs text-muted-foreground mb-1">
+                別人なので、突合は必ず「店舗＋表示名」の組で行う必要があります。異常ではありません。
+              </p>
+              <ul className="space-y-0.5 text-muted-foreground">
+                {notes.map((n, i) => (
+                  <li key={i}>・{n}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <div>
             <div className="font-semibold text-foreground mb-1">データの新しさ</div>
