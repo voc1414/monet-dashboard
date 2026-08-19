@@ -262,7 +262,10 @@ function getCampaignType(name: string): "集客" | "求人" | "" {
   if (name.indexOf("求人") === 0) return "求人";
   return "";
 }
-const KNOWN_REGIONS = ["大阪", "広島", "福岡"];
+// 「大阪」のようにエリア接尾辞なしで来た場合に補うための既知エリア。
+// 新エリアを開いたらここにも足す（データ側が「岡山エリア」と接尾辞つきで来ていれば
+// 下の /エリア$/ で拾えるが、接尾辞なしだと落ちるため）。
+const KNOWN_REGIONS = ["大阪", "広島", "福岡", "岡山", "兵庫"];
 export function normalizeRegion(r: string): string | null {
   if (!r) return null;
   for (const base of KNOWN_REGIONS) {
@@ -488,8 +491,16 @@ export function getDashboardData(raw: RawAds, period: string): DashboardData {
   };
 
   const storeList = Array.from(new Set([...chokuei, ...fc].map((s) => s.name))).sort();
+  // エリアフィルタの選択肢。集客の店舗行だけから作ると、求人しか出していない
+  // 新エリア（岡山・兵庫など、まだ開店していない出店予定地）が選べなくなるため、
+  // 求人のエリア行と合算する（2026-08-19 修正）。
   const regionList = Array.from(
-    new Set([...chokuei, ...fc].map((s) => normalizeRegion(s.region)).filter((r): r is string => !!r))
+    new Set(
+      [
+        ...[...chokuei, ...fc].map((s) => normalizeRegion(s.region)),
+        ...kyujinByRegionArr.map((r) => r.region),
+      ].filter((r): r is string => !!r)
+    )
   ).sort();
 
   return {
