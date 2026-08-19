@@ -537,7 +537,7 @@ export function regionFromCampaign(camp: string): string | null {
 // 大阪(4店)・広島(2店)のように複数店舗のエリアは特定できないので補完しない。
 // 新店がこのエリアに増えたら、ここから外して店舗欄をデータ側で埋めること。
 const SINGLE_STORE_AREA: Record<string, string> = {
-  "岡山エリア": "岡山下伊福院",
+  "岡山エリア": "下伊福院",
   "兵庫エリア": "岡本院",
 };
 
