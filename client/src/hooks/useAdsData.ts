@@ -521,6 +521,37 @@ export function getDashboardData(raw: RawAds, period: string): DashboardData {
   };
 }
 
+// ===== 店舗・地域の補完 =====
+// SyncWith から来る行は、開店前の新店だと「店舗」欄が空で届く（求人は元々エリア単位、
+// 集客も店舗欄が未設定のまま配信が始まる）。そのままだと店舗別一覧に立たず、
+// 消化額がどの店舗行にも入らない。キャンペーン名から補う。
+//
+// キャンペーン名の形式: {種別}/モネ/{地域}/{目的}/{区分}  例: 集客/モネ/岡山/リード/FC
+export function regionFromCampaign(camp: string): string | null {
+  const t = (camp || "").split("/");
+  const base = (t[2] || "").trim();
+  return base ? `${base}エリア` : null;
+}
+
+// 1エリア＝1店舗のエリアだけ、地域から店舗を特定できる。
+// 大阪(4店)・広島(2店)のように複数店舗のエリアは特定できないので補完しない。
+// 新店がこのエリアに増えたら、ここから外して店舗欄をデータ側で埋めること。
+const SINGLE_STORE_AREA: Record<string, string> = {
+  "岡山エリア": "岡山下伊福院",
+  "兵庫エリア": "岡本院",
+};
+
+/** 空の地域・店舗をキャンペーン名から補う。値が入っていれば必ずそちらを優先する。 */
+export function fillRegionAndStore(
+  camp: string,
+  rawRegion: string,
+  rawTenpo: string
+): { region: string; tenpo: string } {
+  const region = (rawRegion || "").trim() || regionFromCampaign(camp) || "";
+  const tenpo = (rawTenpo || "").trim() || SINGLE_STORE_AREA[region] || "";
+  return { region, tenpo };
+}
+
 // ===== raw データ構築 =====
 function buildRaw(monetCsv: string[][], lmsgCsv: string[][], metaCsv: string[][]): RawAds {
   // monet: ヘッダ名でマッピング
@@ -535,12 +566,14 @@ function buildRaw(monetCsv: string[][], lmsgCsv: string[][], metaCsv: string[][]
     if (!r || r.length === 0) continue;
     const date = toYmd(r[cDate]);
     if (!date) continue;
+    const camp = (r[cCamp] || "").trim();
+    const { region, tenpo } = fillRegionAndStore(camp, r[cRegion] || "", r[cTenpo] || "");
     monet.push({
       date,
       kubun: (r[cKubun] || "").trim(),
-      region: (r[cRegion] || "").trim(),
-      tenpo: (r[cTenpo] || "").trim(),
-      camp: (r[cCamp] || "").trim(),
+      region,
+      tenpo,
+      camp,
       adset: (r[cAdset] || "").trim(),
       spend: num(r[cSpend]),
       lead: num(r[cLead]),
