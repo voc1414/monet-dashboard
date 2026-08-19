@@ -17,6 +17,7 @@
  */
 import { useState, useEffect, useMemo } from "react";
 import { normalizeStylistName } from "@/hooks/useFankuruData";
+import { canonicalizeStaffName } from "@/lib/staffNameAlias";
 
 // 正本「サロンボード売上」スプレッドシートID（林さん作成・毎朝7:30自動更新の stylist_flat タブ）。
 // DB/設定から差し込みたい場合は setSalonBoardStylistSpreadsheetId() で上書き可能。
@@ -78,7 +79,13 @@ export function normalizeSalonBoardStore(raw: string): string {
  * 月末報告書（スペース無し）とサロンボード（スペース有り）の差を吸収する。
  */
 export function stylistKey(name: string): string {
-  return normalizeStylistName(name || "")
+  const raw = (name || "").trim();
+  // 名寄せ層は2つあり、正準名が食い違うことがある
+  // （例: ファンくる層は「坂手」、月末報告書/NPS層は「坂手芳」を正準としていた）。
+  // サロンボードの担当名はどちらの表記でも来るので、両方を通してからキーにする。
+  // canonicalizeStaffName は内部でスペース除去して引くので「石原 ようこ」→「石原葉子」も解決する。
+  const canonical = canonicalizeStaffName(raw);
+  return normalizeStylistName(canonical)
     .replace(/[\s　]/g, "")
     .toLowerCase();
 }

@@ -130,3 +130,30 @@ describe("稼働率の実客数切替（サロンボード優先・無ければ�
     expect(rate).toBe(45.5);
   });
 });
+
+describe("stylistKey / 名寄せ2層をまたぐ突合（2026-08-19 修正）", () => {
+  // 月末報告書側の氏名とサロンボード側の担当名が別表記でも、同じキーに落ちること。
+  // 落ちないと「サロンボードに実績が無い」と判定され、売上が ¥0 表示になる。
+  it("石原さん: 報告書『石原葉子』とサロンボード『石原 ようこ』が一致する", () => {
+    expect(stylistKey("石原葉子")).toBe(stylistKey("石原 ようこ"));
+  });
+
+  it("坂手さん: 報告書『坂手芳』とサロンボード『坂手』が一致する", () => {
+    // 名寄せ2層で正準名が食い違っていた（ファンくる層=坂手 / 報告書層=坂手芳）
+    expect(stylistKey("坂手芳")).toBe(stylistKey("坂手"));
+  });
+
+  it("小池さん: 報告書『小池明子』とサロンボード『Akiko』が一致する", () => {
+    expect(stylistKey("小池明子")).toBe(stylistKey("Akiko"));
+  });
+
+  it("スペース種別の違い（半角/全角）を吸収する", () => {
+    expect(stylistKey("井上　恵子")).toBe(stylistKey("井上 恵子"));
+    expect(stylistKey("石橋　茜")).toBe(stylistKey("石橋 茜"));
+  });
+
+  it("別人を同一視しない", () => {
+    expect(stylistKey("石原葉子")).not.toBe(stylistKey("井上 恵子"));
+    expect(stylistKey("坂手芳")).not.toBe(stylistKey("小池明子"));
+  });
+});
