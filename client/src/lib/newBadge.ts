@@ -13,17 +13,21 @@
  */
 
 import { normalizeStaffKey as aliasStaffKey } from "@/lib/staffNameAlias";
+import { RETIRED_FROM_MASTER } from "@/data/staffMaster";
 
-// 退社スタッフ管理（ハードコードフォールバック）
-// key: スタッフ名, value: 退社月 "YYYY-MM"（この月以降のデータを除外）
-const RETIRED_STAFF: Record<string, { store: string; retiredMonth: string }> = {
-  // 出典: Notion「全スタッフ一覧」の退職者 × サロンボード stylist_flat の最終稼働月（2026-08-18 突合）。
-  // key はデータ側の表示名。照合は aliasStaffKey（空白除去+小文字化）なので大小文字違いの別キーは不要。
-  "Hitomi": { store: "福島院", retiredMonth: "2026-04" },    // 尾﨑仁美
-  "Kazumi": { store: "堀江院2nd", retiredMonth: "2026-03" },  // 三宅和美（実績最終月に合わせ 2026-02 から訂正）
-  "Aki": { store: "堀江院2nd", retiredMonth: "2026-04" },     // 池内亜希子（従来この表から欠落）
-  "Hiromi": { store: "堀江院2nd", retiredMonth: "2026-07" },  // 満川宏美（従来この表から欠落）
-};
+// 退社スタッフ管理（DB連携が無いときのフォールバック）
+//
+// 中身は Notion「全スタッフ一覧」から生成した client/src/data/staffMaster.ts。
+// ここに直接書き足さないこと。退社・在籍を直すときは Notion を編集して
+// `npm run sync:staff` で再生成する。
+//
+// 表示名（Akiko / Mika / Yu ...）は複数店舗に重複するので、必ず store とセットで照合する。
+const RETIRED_STAFF: { name: string; store: string; retiredMonth: string }[] =
+  RETIRED_FROM_MASTER.map((s) => ({
+    name: s.displayName,
+    store: s.store,
+    retiredMonth: s.retiredMonth,
+  }));
 
 /**
  * 集計対象外スタッフ（退社とは別概念・店舗を問わず常に除外）。
@@ -100,13 +104,12 @@ export function isRetiredStaff(staffName: string, storeName?: string, month?: st
     return false;
   }
 
-  // フォールバック: ハードコードデータを使用（比較はDB経路と同じ名寄せキー）
-  const nameKey = Object.keys(RETIRED_STAFF).find(
-    k => aliasStaffKey(k) === aliasStaffKey(staffName)
+  // フォールバック: スタッフマスタを使用（比較はDB経路と同じ名寄せキー）
+  const key = aliasStaffKey(staffName);
+  const info = RETIRED_STAFF.find(
+    (e) => aliasStaffKey(e.name) === key && (!storeName || e.store === storeName)
   );
-  if (!nameKey) return false;
-  const info = RETIRED_STAFF[nameKey];
-  if (storeName && info.store !== storeName) return false;
+  if (!info) return false;
   return targetMonth >= info.retiredMonth;
 }
 

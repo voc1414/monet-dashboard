@@ -44,6 +44,21 @@ FC共有前提でログイン不要の公開閲覧（管理ページ `/admin` �
   - NPSサロン名判定 `parseStoreName` は**長いエイリアス優先＋空白除去**（「堀江院 2nd」が堀江院に誤配賦されるバグを2026-07-06修正済み。同型バグに注意）
 - 退職者（堀江院2nd AKI・姪浜院 藤田）は名簿外のため未紐付けが正常
 
+### 3.1 退社スタッフの正本は Notion（2026-08-19〜）
+**退社・在籍を直すときはコードを触らず Notion を編集する。**
+- 正本: Notion「全スタッフ一覧」DB https://app.notion.com/p/2dfab44d3cb98031a890e8de4ed0d1ff
+  （「スタッフ管理」ページ配下。列＝サロンボード表示名／退職月(YYYY-MM)／ダッシュボード対象）
+- 反映: `npm run sync:staff`（`NOTION_TOKEN` 必須）→ `client/src/data/staffMaster.ts` を再生成 → commit & push
+- `newBadge.ts` の `RETIRED_STAFF` はこのマスタから組み立てる。**手で書き足さない**（次の同期で消える）
+- 未接続だと Notion API が 404 を返す。Notion 側で対象DBをインテグレーションに接続すること（1回だけ）
+- **照合は必ず「店舗＋表示名」の組**。表示名はローマ字が多く `Akiko` `Mika` `Yu` `Nao` `Mayu`
+  `Minaho` `Yukiko` が複数店舗に別人として存在する。名前だけで引くと別人を巻き込む
+- 退社月が不明なときは `stylist_flat` の最終稼働月から復元できる（実績が途切れた月＝退社月）
+- 名簿に居ない人（例: 佐々木 淳）は `newBadge.ts` の `EXCLUDED_STAFF` で常時除外。
+  人事DBに非従業員を登録しないための逃がし先で、店舗・月・DB連携に関係なく効く
+- 履歴書・労働契約書・雇用形態は人事の正本。**同期対象に含めない**（取得するのは
+  名前・表示名・店舗・在籍状態・退職月 の5項目のみ。本リポジトリは public）
+
 ## 4. 主要ファイル
 - `client/src/pages/Ads.tsx` … /ads。列順=1日予算→消化額→HPB費用→LINE登録→LINE単価→リード→新規数→CPA→ROAS→CPL→CTR→CPC→フリーク。**HPB費用=全店一律月額¥55,000×選択期間の月数（HPB_MONTHLY_FEE）。CPA=(集客広告費+HPB)÷新規来店、ROAS=新規売上÷(集客広告費+HPB)。CPLは広告費のみ**。求人はHPB/CPA/ROAS対象外。データ鮮度警告つき
 - `client/src/hooks/useSalonBoardData.ts` … 店舗カード値（store_official優先）

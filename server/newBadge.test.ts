@@ -7,6 +7,34 @@ import {
   setStaffFirstAppearanceMap,
 } from "../client/src/lib/newBadge";
 
+describe("スタッフマスタ（Notion由来）からの退社判定", () => {
+  afterEach(() => setRetiredStaffMap(null));
+
+  it("マスタの退社者4名が店舗つきで判定される", () => {
+    expect(isRetiredStaff("Hitomi", "福島院", "2026-04")).toBe(true);
+    expect(isRetiredStaff("Kazumi", "堀江院2nd", "2026-03")).toBe(true);
+    expect(isRetiredStaff("Aki", "堀江院2nd", "2026-04")).toBe(true);
+    expect(isRetiredStaff("Hiromi", "堀江院2nd", "2026-07")).toBe(true);
+  });
+
+  it("退社月より前の月は在籍扱いのまま", () => {
+    expect(isRetiredStaff("Hiromi", "堀江院2nd", "2026-06")).toBe(false);
+    expect(isRetiredStaff("Kazumi", "堀江院2nd", "2026-02")).toBe(false);
+  });
+
+  it("表示名が複数店舗に重複しても他店を巻き込まない", () => {
+    // Hiromi は堀江院2nd の退社者。福島院の同名を退社扱いにしてはいけない
+    expect(isRetiredStaff("Hiromi", "福島院", "2026-08")).toBe(false);
+    // 在籍者は退社にならない（Mika は堀江院・福島院の両方に居る）
+    expect(isRetiredStaff("Mika", "堀江院", "2026-08")).toBe(false);
+    expect(isRetiredStaff("Mika", "福島院", "2026-08")).toBe(false);
+  });
+
+  it("マスタに居ない名前は在籍扱い", () => {
+    expect(isRetiredStaff("存在しない人", "堀江院", "2026-08")).toBe(false);
+  });
+});
+
 describe("isRetiredStaff（DB退社判定の名寄せ）", () => {
   afterEach(() => setRetiredStaffMap(null));
 
