@@ -75,6 +75,15 @@ const canonicalStore = (name: string) => (name || "").replace(/院/g, "").replac
 // HPB（ホットペッパービューティー）掲載費: 全店一律の月額。CPA/ROASの分母に集客広告費と合算する（林 確定仕様 2026-07-05）
 const HPB_MONTHLY_FEE = 55000;
 
+// HPB掲載の開始月（YYYY-MM）。ここに載っていない店は最初から掲載しているものとして扱う。
+// 開店前の新店は掲載費が発生しないので、開始月より前の月には HPB費用 を計上しない
+// （計上すると合計の CPA が悪化し ROAS が下がって見える）。
+// 林さん確認 2026-08-19: 岡山下伊福院は2026-08から、岡本院は2026-09から。
+const HPB_START_MONTH: Record<string, string> = {
+  "岡山下伊福院": "2026-08",
+  "岡本院": "2026-09",
+};
+
 // 選択期間(since〜until)が重なる年月("YYYY-MM")の一覧。
 function monthsBetween(since: string, until: string): string[] {
   const out: string[] = [];
@@ -150,7 +159,7 @@ function MetricTable({
   byRegion,
   newByStore,
   newSalesByStore,
-  hpbCost,
+  hpbCostOf,
   firstColLabel,
 }: {
   typeKey: TypeKey;
@@ -161,8 +170,8 @@ function MetricTable({
   byRegion?: Record<string, number>;
   newByStore?: Record<string, number>;
   newSalesByStore?: Record<string, number>;
-  /** HPB費用（全店一律・選択期間分＝月額×月数）。集客の店舗別テーブルのみ。CPA/ROASの分母に加算 */
-  hpbCost?: number;
+  /** HPB費用を店舗名から返す（掲載開始月より前の月は計上しない）。集客の店舗別テーブルのみ。CPA/ROASの分母に加算 */
+  hpbCostOf?: (storeName: string) => number;
   firstColLabel?: string;
 }) {
   const showLine = typeKey === "shukyaku" ? !!byStore : !!byRegion;
@@ -172,8 +181,8 @@ function MetricTable({
   const salesOf = (name: string): number | null =>
     newSalesByStore ? (newSalesByStore[canonicalStore(name)] ?? null) : null;
   const showCpaRoas = showNew; // 集客（新規来店がある）時のみ CPA / ROAS を表示
-  const hpb = hpbCost ?? 0;
-  const showHpb = hpbCost != null;
+  const showHpb = hpbCostOf != null;
+  const hpbOf = (name: string) => (hpbCostOf ? hpbCostOf(name) : 0);
   // 合計
   const tot = rows.reduce(
     (a, r) => {
@@ -192,7 +201,7 @@ function MetricTable({
   );
   const totCpl = cpl(tot.spend, tot.lead);
   const totCtr = ctr(tot.click, tot.impr);
-  const totHpb = hpb * rows.length; // 全店一律×店舗数
+  const totHpb = rows.reduce((a, r) => a + hpbOf(r.name), 0); // 店舗ごとに掲載開始月を見て合算
 
   const firstCol = firstColLabel || (typeKey === "shukyaku" ? "店舗" : "エリア");
   return (
@@ -254,7 +263,7 @@ function MetricTable({
                   <td className="text-right px-3 py-2 tabular-nums">{b.dailyBudget && b.dailyBudget > 0 ? yen(b.dailyBudget) : "—"}</td>
                   <td className="text-right px-3 py-2 tabular-nums">{YB(b.spend)}</td>
                   {showHpb && (
-                    <td className="text-right px-3 py-2 tabular-nums">{yen(hpb)}</td>
+                    <td className="text-right px-3 py-2 tabular-nums">{yen(hpbOf(r.name))}</td>
                   )}
                   {showLine && <td className="text-right px-3 py-2 tabular-nums">{line != null ? numf(line) : "—"}</td>}
                   {showLine && <td className="text-right px-3 py-2 tabular-nums">{tanka != null ? yen(tanka) : "—"}</td>}
@@ -272,7 +281,8 @@ function MetricTable({
                       {(() => {
                         // CPA = (集客広告費 + HPB費用) ÷ 新規来店数
                         const nv = newOf(r.name);
-                        return nv && nv > 0 && b.spend + hpb > 0 ? yen(Math.round((b.spend + hpb) / nv)) : "—";
+                        const h = hpbOf(r.name);
+                        return nv && nv > 0 && b.spend + h > 0 ? yen(Math.round((b.spend + h) / nv)) : "—";
                       })()}
                     </td>
                   )}
@@ -281,7 +291,8 @@ function MetricTable({
                       {(() => {
                         // ROAS = 新規売上 ÷ (集客広告費 + HPB費用) × 100
                         const ns = salesOf(r.name);
-                        return ns != null && b.spend + hpb > 0 ? `${Math.round((ns / (b.spend + hpb)) * 100)}%` : "—";
+                        const h = hpbOf(r.name);
+                        return ns != null && b.spend + h > 0 ? `${Math.round((ns / (b.spend + h)) * 100)}%` : "—";
                       })()}
                     </td>
                   )}
@@ -453,10 +464,16 @@ export default function Ads() {
     return map;
   }, [D, newSalesData]);
 
-  // HPB費用: 全店一律 月額¥55,000 × 選択期間に重なる月数（集客のCPA/ROAS分母に加算。求人は対象外）
-  const hpbCost = useMemo(() => {
-    if (!D) return 0;
-    return HPB_MONTHLY_FEE * monthsBetween(D.period.since, D.period.until).length;
+  // HPB費用: 月額¥55,000 × 選択期間のうち「その店が掲載している月」の数。
+  // 開店前で未掲載の店は0になる（集客のCPA/ROAS分母に加算。求人は対象外）
+  const hpbCostOf = useMemo(() => {
+    if (!D) return () => 0;
+    const months = monthsBetween(D.period.since, D.period.until);
+    return (storeName: string) => {
+      const start = HPB_START_MONTH[canonicalStore(storeName)] ?? HPB_START_MONTH[storeName];
+      const billed = start ? months.filter((m) => m >= start).length : months.length;
+      return HPB_MONTHLY_FEE * billed;
+    };
   }, [D]);
 
   // データ鮮度: スプシに入っている日次データの最新日付。同期(SyncWith)停止の検知用。
@@ -597,7 +614,7 @@ export default function Ads() {
           <div className="space-y-6">
             {showShukyaku &&
               (view === "store" ? (
-                <MetricTable typeKey="shukyaku" rows={storeRows} title="店舗別 一覧（直営・FC統合）" badge="集客" byStore={D.lmessage.byStoreShort} newByStore={newByStore} newSalesByStore={newSalesByStore} hpbCost={hpbCost} />
+                <MetricTable typeKey="shukyaku" rows={storeRows} title="店舗別 一覧（直営・FC統合）" badge="集客" byStore={D.lmessage.byStoreShort} newByStore={newByStore} newSalesByStore={newSalesByStore} hpbCostOf={hpbCostOf} />
               ) : (
                 <NonStoreTable typeKey="shukyaku" rows={view === "campaign" ? D.byCampaign : D.byAdset} title={view === "campaign" ? "キャンペーン別 一覧" : "広告セット別 一覧"} badge="集客" labelCol={view === "campaign" ? "キャンペーン名" : "広告セット名"} />
               ))}
@@ -610,7 +627,7 @@ export default function Ads() {
           </div>
 
           <div className="mt-6 rounded-xl border border-border/40 bg-muted/30 p-4 text-xs text-muted-foreground">
-            出典: Meta広告データ（SyncWith）＋ L Message 流入タグ。CPL警告しきい値=集客¥350超・求人¥3,000超、CTR=集客3%未満・求人2%未満で赤表示。LINE登録数は流入タグ友だちの期間内増分。「新規（新規来店数）」はサロンボード実績。日次データ(daily_new)があれば選択期間に厳密一致で合算、未反映の間は月次(該当月計)にフォールバック（KPIの注記に出所と範囲を表示）。HPB費用=全店一律 月額¥55,000×選択期間の月数。CPA=(集客広告費+HPB費用)÷新規来店数、ROAS=新規売上÷(集客広告費+HPB費用)。CPL（リード単価）は広告費のみ。集計値のみで個人情報は含みません。
+            出典: Meta広告データ（SyncWith）＋ L Message 流入タグ。CPL警告しきい値=集客¥350超・求人¥3,000超、CTR=集客3%未満・求人2%未満で赤表示。LINE登録数は流入タグ友だちの期間内増分。「新規（新規来店数）」はサロンボード実績。日次データ(daily_new)があれば選択期間に厳密一致で合算、未反映の間は月次(該当月計)にフォールバック（KPIの注記に出所と範囲を表示）。HPB費用=月額¥55,000×選択期間のうちその店が掲載している月数（開店前で未掲載の店は0）。CPA=(集客広告費+HPB費用)÷新規来店数、ROAS=新規売上÷(集客広告費+HPB費用)。CPL（リード単価）は広告費のみ。集計値のみで個人情報は含みません。
           </div>
         </motion.div>
       )}
