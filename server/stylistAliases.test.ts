@@ -93,3 +93,24 @@ describe("Stylist Alias normalization integration", () => {
     expect(result).toBe("存在しない名前");
   });
 });
+
+describe("matchesStylist / 敬称つきの担当者名（2026-08-19 追加）", () => {
+  it("「石橋様」が石橋茜さんに紐づく", async () => {
+    const { matchesStylist } = await import("../client/src/hooks/useFankuruData");
+    expect(matchesStylist("石橋様", "石橋 茜")).toBe(true);
+    expect(matchesStylist("石橋さま", "石橋 茜")).toBe(true);
+  });
+
+  it("既存の会話調も引き続き通る", async () => {
+    const { matchesStylist } = await import("../client/src/hooks/useFankuruData");
+    expect(matchesStylist("サユリさんです。", "Sayuri")).toBe(true);
+    expect(matchesStylist("Yukikoさんです。", "Yukiko")).toBe(true);
+    expect(matchesStylist("山口", "山口 純奈")).toBe(true);
+  });
+
+  it("敬称を外しても別人には当たらない", async () => {
+    const { matchesStylist } = await import("../client/src/hooks/useFankuruData");
+    expect(matchesStylist("石橋様", "金田 あゆみ")).toBe(false);
+    expect(matchesStylist("石橋様", "山口 純奈")).toBe(false);
+  });
+});
