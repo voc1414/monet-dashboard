@@ -618,13 +618,9 @@ export default function StoreDetail() {
                             {i + 1}
                           </div>
                           {/* アバター */}
-                          {sr.photoUrl2 ? (
-                            <img src={sr.photoUrl2} alt={sr.name} className="w-9 h-9 rounded-full object-cover object-center shrink-0" />
-                          ) : (
-                            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                              <span className="text-primary font-bold text-sm">{sr.name.charAt(0)}</span>
-                            </div>
-                          )}
+                          <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                            <span className="text-primary font-bold text-sm">{sr.name.charAt(0)}</span>
+                          </div>
                           {/* 名前 */}
                           <div className="flex-1 min-w-0">
                             <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">{sr.name}</span>
@@ -695,13 +691,9 @@ export default function StoreDetail() {
                   <CardContent className="p-4">
                     <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                       <div className="flex items-center gap-3 sm:w-48 shrink-0">
-                        {sr.photoUrl2 ? (
-                          <img src={sr.photoUrl2} alt={sr.name} className="w-10 h-10 rounded-full object-cover object-center shrink-0" />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                            <span className="text-primary font-bold text-sm">{sr.name.charAt(0)}</span>
-                          </div>
-                        )}
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                          <span className="text-primary font-bold text-sm">{sr.name.charAt(0)}</span>
+                        </div>
                         <div>
                           <div className="font-bold text-sm text-foreground flex items-center gap-1.5">
                             {sr.name}

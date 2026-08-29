@@ -264,13 +264,6 @@ export default function StaffDetail() {
   // ファンくるデータ（店舗名で絞り込み、同姓同名対策）
   const { pdfs: fankuruPdfs, loading: fankuruLoading } = useFankuruDataByStaff(staffName, staffStore);
 
-  // スタッフの写真URLを取得
-  const staffPhoto = useMemo(() => {
-    const staffData = rawData.find(r => r.name === staffName && r.storeNormalized === staffStore && r.photoUrl2)
-      || rawData.find(r => r.name === staffName && r.photoUrl2);
-    return staffData?.photoUrl2 || "";
-  }, [rawData, staffName, staffStore]);
-
   // スタッフの雇用形態を取得
   const staffEmploymentType = useMemo(() => {
     const staffData = rawData.find(r => r.name === staffName && r.storeNormalized === staffStore)
@@ -518,13 +511,9 @@ export default function StaffDetail() {
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8">
         <div>
           <div className="flex items-center gap-4 mb-2">
-            {staffPhoto ? (
-              <img src={staffPhoto} alt={staffName} className="w-14 h-14 rounded-xl object-cover object-center shrink-0" />
-            ) : (
-              <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                <User className="w-7 h-7 text-primary" />
-              </div>
-            )}
+            <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <User className="w-7 h-7 text-primary" />
+            </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
                 {staffName}

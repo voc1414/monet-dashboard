@@ -556,13 +556,9 @@ export default function StaffList() {
                       <div className="hidden md:grid grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.5fr)] gap-3 items-center px-5 py-3">
                         {/* 氏名 */}
                         <div className="flex items-center gap-3">
-                          {staff.photoUrl2 ? (
-                            <img src={staff.photoUrl2} alt={staff.name} className="w-9 h-9 rounded-full object-cover object-center shrink-0" />
-                          ) : (
-                            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                              <span className="text-primary font-bold text-sm">{staff.name.charAt(0)}</span>
-                            </div>
-                          )}
+                          <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                            <span className="text-primary font-bold text-sm">{staff.name.charAt(0)}</span>
+                          </div>
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5">
                               <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors truncate">{staff.name}</span>
@@ -678,13 +674,9 @@ export default function StaffList() {
                       {/* Mobile Layout */}
                       <div className="md:hidden px-3 py-2">
                         <div className="flex items-start gap-2">
-                          {staff.photoUrl2 ? (
-                            <img src={staff.photoUrl2} alt={staff.name} className="w-8 h-8 rounded-full object-cover object-center shrink-0 mt-0.5" />
-                          ) : (
-                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                              <span className="text-primary font-bold text-xs">{staff.name.charAt(0)}</span>
-                            </div>
-                          )}
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                            <span className="text-primary font-bold text-xs">{staff.name.charAt(0)}</span>
+                          </div>
                           <div className="flex-1 min-w-0">
                             {/* 1行目: 名前 + 総合点 + 売上 */}
                             <div className="flex items-center justify-between">
