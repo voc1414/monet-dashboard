@@ -7,7 +7,7 @@ import { useParams } from "wouter";
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  User, Calendar, BarChart3, DollarSign, Scissors,
+  Calendar, BarChart3, DollarSign, Scissors,
   FileText, ExternalLink, Loader2, FolderOpen, Eye,
   Lightbulb, CheckCircle2, Target, ArrowUpRight,
   Trophy, ThumbsUp, AlertTriangle, AlertCircle,
@@ -512,7 +512,7 @@ export default function StaffDetail() {
         <div>
           <div className="flex items-center gap-4 mb-2">
             <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-              <User className="w-7 h-7 text-primary" />
+              <span className="text-primary font-bold text-2xl">{staffName.charAt(0)}</span>
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
