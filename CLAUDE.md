@@ -16,7 +16,7 @@ FC共有前提でログイン不要の公開閲覧（管理ページ `/admin` �
 - デプロイ: `npx --yes @railway/cli up --detach --service monet-dashboard`（プロジェクト 63c9060f…）
   - ビルドは `nixpacks.toml` で `npm ci --legacy-peer-deps` に固定済み。**pnpm/yarn のロックファイルを置かないこと**（過去にビルダーがpnpmを誤検知してビルド失敗）
   - env: JWT_SECRET / CRON_SECRET / ADMIN_USERNAME(commit.1414@gmail.com) / ADMIN_PASSWORD(林設定) / NODE_ENV / DATABASE_URL=${{MySQL.MYSQL_URL}}。Node22。preDeployで drizzle-kit migrate
-- git: **push可**（2026-07-06 SSH化済み。remote `git@github.com:voc1414/monet-dashboard.git`、鍵 `~/.ssh/id_ed25519`）。関心事ごとにコミットし、デプロイ前に push する。CI（GitHub Actions）が push ごとに tsc+vitest を自動実行
+- git: **push可**（2026-08-29 HTTPS化。remote `https://github.com/voc1414/monet-dashboard.git`、認証は `gh`＝GitHub CLI の credential helper）。**旧SSH鍵 `~/.ssh/id_ed25519` は GitHub 側で失効済み**（提示はされるが拒否される）ため SSH は使えない。関心事ごとにコミットし、デプロイ前に push する。CI（GitHub Actions）が push ごとに tsc+vitest を自動実行
 - Drive同期で node_modules / package-lock.json が壊れることがある → `rm -rf node_modules package-lock.json && npm install --legacy-peer-deps` で復旧
 
 ## 2. データソース（すべて gviz 匿名CSV読み・集計値のみPIIなし）
