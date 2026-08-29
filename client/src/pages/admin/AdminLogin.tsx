@@ -6,7 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
 
-const MONET_LOGO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663489426081/aLPZvLfFDC4rFYToBquZNR/monet-logo_cd6a82da.png";
+import monetLogo from "@/assets/monet-logo.png";
+
+const MONET_LOGO = monetLogo;
 const ADMIN_TOKEN_KEY = "monet_admin_token";
 
 export default function AdminLogin() {

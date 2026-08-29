@@ -9,7 +9,9 @@ import { ChevronRight, RefreshCw, Home, Users, ClipboardList, MessageSquareText,
 import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 
-const MONET_LOGO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663489426081/aLPZvLfFDC4rFYToBquZNR/monet-logo_cd6a82da.png";
+import monetLogo from "@/assets/monet-logo.png";
+
+const MONET_LOGO = monetLogo;
 
 interface Breadcrumb {
   label: string;

@@ -43,7 +43,6 @@ import { validateStoreReport, getAlertSummary } from "@/lib/reportValidation";
 import type { ReportAlert } from "@/lib/reportValidation";
 import { normalizeStaffKey } from "@/lib/staffNameAlias";
 
-const NPS_HEADER_IMAGE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663489426081/aLPZvLfFDC4rFYToBquZNR/nps-header-6cTohzoTSmSjrDCLc4VzHg.webp";
 
 const formatCurrency = (n: number) => {
   return `¥${n.toLocaleString()}`;

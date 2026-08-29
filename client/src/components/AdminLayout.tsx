@@ -16,7 +16,9 @@ import { useState, type ReactNode } from "react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { Button } from "@/components/ui/button";
 
-const MONET_LOGO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663489426081/aLPZvLfFDC4rFYToBquZNR/monet-logo_cd6a82da.png";
+import monetLogo from "@/assets/monet-logo.png";
+
+const MONET_LOGO = monetLogo;
 
 interface Breadcrumb {
   label: string;

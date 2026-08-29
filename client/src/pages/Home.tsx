@@ -20,7 +20,10 @@ import { getNpsClass, NPS_INDUSTRY_AVERAGE } from "@/lib/npsClass";
 import { validateStoreReport, getAlertSummary } from "@/lib/reportValidation";
 import { useStores } from "@/hooks/useStores";
 
-const HERO_IMAGE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663489426081/aLPZvLfFDC4rFYToBquZNR/monet-salon_83a99286.jpg";
+import heroImage from "@/assets/monet-salon.jpg";
+import storeThumb from "@/assets/monet-store.jpg";
+
+const HERO_IMAGE = heroImage;
 
 const formatMonth = (ym: string) => {
   const [y, m] = ym.split("-");
@@ -360,7 +363,7 @@ export default function Home() {
                               <div className="flex-1 p-4 md:p-5">
                                 <div className="flex items-center gap-3 mb-3">
                                   <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0">
-                                    <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663489426081/aLPZvLfFDC4rFYToBquZNR/monet-parasol_bfd1d990.jpg" alt="monet" className="w-full h-full object-cover" />
+                                    <img src={storeThumb} alt="monet" className="w-full h-full object-cover" />
                                   </div>
                                   <div>
                                     <h3 className="font-bold text-foreground text-sm group-hover:text-primary transition-colors flex items-center gap-1.5">
