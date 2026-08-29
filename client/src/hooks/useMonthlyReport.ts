@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { registerNewStoresFromReports, isRetiredStaff } from "@/lib/newBadge";
 import { canonicalizeStaffName, useStaffAliasVersion } from "@/lib/staffNameAlias";
+import { isTestReportRow } from "@/lib/testDataFilter";
 
 // 新モネ月末報告書 スプレッドシート
 const SPREADSHEET_ID = "1DXAaFk0aLDZwXq28krOcrDSiTOwd6BeTzV-xFXbLuKI";
@@ -30,7 +31,8 @@ const COL = {
   FANKURU_COMMENT: 18,
 } as const;
 
-// テストデータ除外: 2026-04-01以前の回答を除外
+// テストデータ除外(1): 2026-04-01以前の回答を除外
+// テストデータ除外(2): 名前が「テスト」の回答を除外 → @/lib/testDataFilter
 const DATA_START_DATE = "2026-04-01";
 
 function isAfterStartDate(answerDateStr: string): boolean {
@@ -344,6 +346,8 @@ export function useMonthlyReport() {
 
         const reports: StaffReport[] = dataRows
           .filter((r) => isAfterStartDate(r[COL.ANSWER_DATE] || ""))
+          // テスト回答を除外（スプシから行を消せないため・ルールは testDataFilter.ts）
+          .filter((r) => !isTestReportRow(r))
           .map((r) => {
           const techSales = parseNumber(r[COL.TECH_SALES] || "");
           const retailSales = parseNumber(r[COL.RETAIL_SALES] || "");

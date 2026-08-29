@@ -28,6 +28,8 @@ FC共有前提でログイン不要の公開閲覧（管理ページ `/admin` �
   - salonboard-scraper（../salonboard-scraper、Mac mini常駐 launchd 毎朝7:30）が生成→Drive→GAS（1nR36にbound、refreshAll=毎朝8:54、refreshStoreExtras=毎時）
 - 広告正本スプシ「monet Meta広告」= `1z5JU-Onf6wiqydFUeYYoQ0czXByyZbqH4JODWkYh6Ts`（シート monet / lmessage / adset_meta）。**SyncWith が Meta から同期**（管理はCowork側）。集客/求人はキャンペーン名の接頭辞で判定。/ads ヘッダにデータ最新日付を表示し、3日以上遅れると赤警告が出る
 - 月末報告書スプシ = `1DXAaFk0aLDZwXq28krOcrDSiTOwd6BeTzV-xFXbLuKI`（スタッフ自己申告。**次回予約率はここ由来**）
+  - **テスト回答の除外ルール（林さん決定 2026-08-29・恒久）**: L Message の仕組み上、テスト送信した行をスプシから削除できず、今後もテストは行われる。よって **名前が「テスト」の回答はダッシュボードに表示しない**。判定の正本は `client/src/lib/testDataFilter.ts`（判定列＝5 システム表示名／6 氏名／20 ニックネーム。LINE名は本人の実アカウント名なので判定に使わない）。除外は `useMonthlyReport.ts` のデータ入口1箇所で行うため全画面に効く。テスト値を増やすときは `TEST_NAME_TOKENS` に足す
+  - 列19・20 はヘッダーが空欄。L Message は設問を差し替えると列は残してヘッダー文字だけを消すため、**空ヘッダー＝設問削除ではない**。列20 は 2026-08-29 に「写真」→「ニックネーム」へ差し替え済（それ以前の行は写真URLが入っている）
 - NPSスプシ = `1xSm2poTIeRPFviVmINdWNWmLT5d9pXXL2XzWEQsxiRU`（タブ「全店舗」。スタッフ選択肢はHPB掲載名連動）
 - ファンくるスプシ = `1bbQT7eBb2Om1ODgsL_g0dx_bcw55j3RHRRJGr7xSwsg`（担当者名はお客様申告＝表記ゆれ前提）
 
