@@ -42,6 +42,7 @@ import type { StaffReport } from "@/hooks/useMonthlyReport";
 import { validateStoreReport, getAlertSummary } from "@/lib/reportValidation";
 import type { ReportAlert } from "@/lib/reportValidation";
 import { normalizeStaffKey } from "@/lib/staffNameAlias";
+import { resolveStaffDisplayName } from "@/lib/staffDisplayName";
 
 
 const formatCurrency = (n: number) => {
@@ -434,7 +435,7 @@ export default function StoreDetail() {
                   )}
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className="font-bold text-foreground">{alert.staffName}</span>
+                      <span className="font-bold text-foreground">{resolveStaffDisplayName(alert.staffName, storeId)}</span>
                       <span
                         className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
                         style={{
@@ -546,7 +547,7 @@ export default function StoreDetail() {
                     <Link key={`award-${staff.name}`} href={`/staff/${encodeURIComponent(staff.store)}/${encodeURIComponent(staff.name)}`}>
                       <div className="flex items-center gap-1.5 py-1 px-1.5 rounded-md hover:bg-amber-100/40 transition-colors cursor-pointer group">
                         <span className={`w-4 text-[10px] font-bold text-center shrink-0 ${i === 0 ? "text-amber-500" : i === 1 ? "text-gray-400" : i === 2 ? "text-amber-700" : "text-muted-foreground"}`}>{i + 1}</span>
-                        <span className="text-xs font-medium text-foreground group-hover:text-primary transition-colors truncate flex-1">{staff.name}</span>
+                        <span className="text-xs font-medium text-foreground group-hover:text-primary transition-colors truncate flex-1">{resolveStaffDisplayName(staff.name, staff.store)}</span>
                         <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300/80 rounded-full px-1.5 py-px shadow-sm shrink-0">
                           {i === 0 && <Trophy className="w-2 h-2 text-amber-500" />}
                           {staff.score}点
@@ -618,11 +619,11 @@ export default function StoreDetail() {
                           </div>
                           {/* アバター */}
                           <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                            <span className="text-primary font-bold text-sm">{sr.name.charAt(0)}</span>
+                            <span className="text-primary font-bold text-sm">{resolveStaffDisplayName(sr.name, storeId).charAt(0)}</span>
                           </div>
                           {/* 名前 */}
                           <div className="flex-1 min-w-0">
-                            <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">{sr.name}</span>
+                            <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">{resolveStaffDisplayName(sr.name, storeId)}</span>
                             <div className="text-[10px] text-muted-foreground">{sr.employmentType}</div>
                           </div>
                           {/* スコアバッジ */}
@@ -676,6 +677,8 @@ export default function StoreDetail() {
             {reportStats.staffReports.map((sr: StaffReport, i: number) => {
               // 実績はサロンボード優先（無ければ月末報告書）。新規はサロンボードのみ（無ければ0）。
               const sb = getSbStylistMonth(sr.storeNormalized, sr.name, sr.reportMonth);
+              // 画面に出す呼び名。sr.name は照合キー・URLなので触らない
+              const shownName = resolveStaffDisplayName(sr.name, sr.storeNormalized);
               const m = {
                 totalSales: sb ? sb.sales : sr.totalSales,
                 totalCustomers: sb ? sb.customers : sr.totalCustomers,
@@ -691,11 +694,11 @@ export default function StoreDetail() {
                     <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                       <div className="flex items-center gap-3 sm:w-48 shrink-0">
                         <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                          <span className="text-primary font-bold text-sm">{sr.name.charAt(0)}</span>
+                          <span className="text-primary font-bold text-sm">{shownName.charAt(0)}</span>
                         </div>
                         <div>
                           <div className="font-bold text-sm text-foreground flex items-center gap-1.5">
-                            {sr.name}
+                            {shownName}
                             {isNewStaff(sr.name, storeId) && (
                               <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none">NEW</span>
                             )}

@@ -29,6 +29,7 @@ import { getNpsClass } from "@/lib/npsClass";
 import { calculateCompositeScore, getCompositeRank } from "@/lib/compositeScore";
 import type { CompositeScoreResult } from "@/lib/compositeScore";
 import { normalizeStaffKey } from "@/lib/staffNameAlias";
+import { resolveStaffDisplayName } from "@/lib/staffDisplayName";
 
 
 const formatCurrency = (n: number) => {
@@ -232,7 +233,13 @@ export default function StaffList() {
       // 名前検索
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
-        return s.name.toLowerCase().includes(q) || s.storeNormalized.toLowerCase().includes(q);
+        // 画面はニックネーム表示なので、見えている呼び名でも氏名でも引けるようにする
+        const shown = resolveStaffDisplayName(s.name, s.storeNormalized).toLowerCase();
+        return (
+          shown.includes(q) ||
+          s.name.toLowerCase().includes(q) ||
+          s.storeNormalized.toLowerCase().includes(q)
+        );
       }
       return true;
     });
@@ -539,6 +546,8 @@ export default function StaffList() {
               const metrics = getMetrics(staff);
               const utilRate = calculateUtilizationRate(metrics.totalCustomers, staff.employmentType);
               const npsInfo = staffNpsMap.get(npsKeyFor(staff));
+              // 画面に出す呼び名。staff.name は照合キーなので触らない
+              const shownName = resolveStaffDisplayName(staff.name, staff.storeNormalized);
 
               return (
                 <motion.div
@@ -557,11 +566,11 @@ export default function StaffList() {
                         {/* 氏名 */}
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                            <span className="text-primary font-bold text-sm">{staff.name.charAt(0)}</span>
+                            <span className="text-primary font-bold text-sm">{shownName.charAt(0)}</span>
                           </div>
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors truncate">{staff.name}</span>
+                              <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors truncate">{shownName}</span>
                               {isNewStaff(staff.name, staff.storeNormalized) && (
                                 <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none shrink-0">NEW</span>
                               )}
@@ -675,13 +684,13 @@ export default function StaffList() {
                       <div className="md:hidden px-3 py-2">
                         <div className="flex items-start gap-2">
                           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                            <span className="text-primary font-bold text-xs">{staff.name.charAt(0)}</span>
+                            <span className="text-primary font-bold text-xs">{shownName.charAt(0)}</span>
                           </div>
                           <div className="flex-1 min-w-0">
                             {/* 1行目: 名前 + 総合点 + 売上 */}
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-1.5 min-w-0">
-                                <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors truncate">{staff.name}</span>
+                                <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors truncate">{shownName}</span>
                                 {isNewStaff(staff.name, staff.storeNormalized) && (
                                   <span className="text-[9px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none shrink-0">NEW</span>
                                 )}

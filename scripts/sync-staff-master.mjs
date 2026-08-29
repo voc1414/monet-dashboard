@@ -10,7 +10,11 @@
  *       接続手順 = Notion で「スタッフ管理」ページ → 右上「…」→ 接続 → 対象の
  *       インテグレーションを選ぶ（1回だけ・30秒）。
  *
- * 取り込む列は5つだけ。履歴書・労働契約書・雇用形態は人事の正本なので取得しない。
+ * 取り込む列は6つだけ（名前・店舗・サロンボード表示名・ニックネーム・退職月・進捗）。
+ * 履歴書・労働契約書・雇用形態は人事の正本なので取得しない。
+ *
+ * 「ニックネーム」列が Notion 側に無い／空のあいだは null になり、画面は氏名表示に
+ * フォールバックする（client/src/lib/staffDisplayName.ts）。同期は壊れない。
  */
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -64,9 +68,11 @@ const staff = pages
     const name = plain(props["名前"]);
     const store = props["店舗"]?.select?.name ?? "";
     const displayName = plain(props["サロンボード表示名"]) || name;
+    // 画面表示用。照合には使わない（照合キーは name / displayName のまま）
+    const nickname = plain(props["ニックネーム"]) || null;
     const retiredMonth = plain(props["退職月"]) || null;
     const status = props["進捗"]?.select?.name === "退職" ? "retired" : "active";
-    return { name, store, displayName, status, retiredMonth };
+    return { name, store, displayName, nickname, status, retiredMonth };
   })
   .filter((s) => s.name)
   .sort((a, b) => a.store.localeCompare(b.store, "ja") || a.name.localeCompare(b.name, "ja"));
@@ -96,6 +102,8 @@ const body = `/**
  *
  * 注意: displayName（サロンボード表示名）はローマ字が多く、Akiko / Mika / Yu / Nao /
  * Mayu / Minaho / Yukiko が複数店舗に重複する。照合は必ず store とセットで行う。
+ *
+ * nickname は画面表示専用。照合キーには使わない（lib/staffDisplayName.ts 参照）。
  */
 
 export type StaffMasterEntry = {
@@ -105,6 +113,11 @@ export type StaffMasterEntry = {
   store: string;
   /** サロンボード・月末報告書に出る表示名 */
   displayName: string;
+  /**
+   * 画面に出す呼び名（Notion「ニックネーム」列）。未入力なら null。
+   * 表示専用。照合キーには一切使わない（lib/staffDisplayName.ts が氏名へフォールバック）
+   */
+  nickname: string | null;
   status: "active" | "retired";
   /** "YYYY-MM"。この月以降のデータを除外する。在籍者は null */
   retiredMonth: string | null;
@@ -114,7 +127,9 @@ export const STAFF_MASTER: StaffMasterEntry[] = [
 ${staff
   .map(
     (s) =>
-      `  { name: ${j(s.name)}, store: ${j(s.store)}, displayName: ${j(s.displayName)}, status: ${j(
+      `  { name: ${j(s.name)}, store: ${j(s.store)}, displayName: ${j(
+        s.displayName
+      )}, nickname: ${s.nickname ? j(s.nickname) : "null"}, status: ${j(
         s.status
       )}, retiredMonth: ${s.retiredMonth ? j(s.retiredMonth) : "null"} },`
   )

@@ -20,6 +20,7 @@ import { fetchPdfData, matchesStylist, normalizeStylistName } from "@/hooks/useF
 import type { FankuruPdf } from "@/hooks/useFankuruData";
 import { getNpsClass } from "@/lib/npsClass";
 import { isNewStaff, isRetiredStaff } from "@/lib/newBadge";
+import { resolveStaffDisplayName } from "@/lib/staffDisplayName";
 import { useStores } from "@/hooks/useStores";
 import { PeriodSelector, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
 import type { PeriodSelection } from "@/components/PeriodSelector";
@@ -338,7 +339,14 @@ export default function SurveyList() {
       if (filterStore !== "all" && s.store !== filterStore) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.trim().toLowerCase();
-        if (!s.name.toLowerCase().includes(q) && !s.store.toLowerCase().includes(q)) return false;
+        // 画面はニックネーム表示なので、見えている呼び名でも氏名でも引けるようにする
+        const shown = resolveStaffDisplayName(s.name, s.store).toLowerCase();
+        if (
+          !shown.includes(q) &&
+          !s.name.toLowerCase().includes(q) &&
+          !s.store.toLowerCase().includes(q)
+        )
+          return false;
       }
       return true;
     });
@@ -541,7 +549,7 @@ export default function SurveyList() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <h3 className="font-semibold text-base flex items-center gap-1.5 flex-wrap">
-                            {staff.name}
+                            {resolveStaffDisplayName(staff.name, staff.store)}
                             {isNewStaff(staff.name, staff.store) && (
                               <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none">NEW</span>
                             )}

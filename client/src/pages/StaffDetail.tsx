@@ -37,6 +37,7 @@ import type { CompositeScoreResult } from "@/lib/compositeScore";
 import { generateStaffAdvice } from "@/lib/staffAdvice";
 import type { StaffAdvice } from "@/lib/staffAdvice";
 import { normalizeStaffKey } from "@/lib/staffNameAlias";
+import { resolveStaffDisplayName } from "@/lib/staffDisplayName";
 import type { FankuruPdf } from "@/hooks/useFankuruData";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -495,9 +496,12 @@ export default function StaffDetail() {
     });
   }, [compositeScore, staffReport, staffNpsStats]);
 
+  // 画面に出す呼び名。staffName は URL 由来の照合キーなので触らない
+  const shownName = resolveStaffDisplayName(staffName, staffStore);
+
   const breadcrumbs = [
     { label: "スタッフ一覧", href: "/staff" },
-    { label: staffName },
+    { label: shownName },
   ];
 
   return (
@@ -512,11 +516,11 @@ export default function StaffDetail() {
         <div>
           <div className="flex items-center gap-4 mb-2">
             <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-              <span className="text-primary font-bold text-2xl">{staffName.charAt(0)}</span>
+              <span className="text-primary font-bold text-2xl">{shownName.charAt(0)}</span>
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
-                {staffName}
+                {shownName}
                 {staffStore && isNewStaff(staffName, staffStore) && (
                   <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none">NEW</span>
                 )}
