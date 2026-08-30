@@ -218,7 +218,7 @@ function UnmatchedSuggestPanel({
         const stylist = pdf.stylist?.trim();
         if (!stylist) continue;
         const hit =
-          storeRoster.some((n) => matchesStylist(stylist, n)) ||
+          storeRoster.some((n) => matchesStylist(stylist, n, storeName)) ||
           rosterKeys.has(resolveKey(stylist));
         if (hit) continue;
         const k = `ファンくる__${resolveKey(stylist)}__${storeName}`;

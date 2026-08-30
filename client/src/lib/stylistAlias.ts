@@ -357,6 +357,44 @@ export function partialAliasesForStaff(staffName: string): Set<string> | undefin
 }
 
 /**
+ * 店舗＋（氏名または表示名）→ その人。
+ *
+ * 上の ALIASES_BY_STAFF は表示名が複数店舗で重複する人（"Mika" = 堀江院の西本 美華 と
+ * 福島院の松野 美香）を**わざと引かせない**。名前だけで引くと別人を巻き込むためだが、
+ * 店舗が分かっている画面（アンケート一覧は店舗ごとに束ねている）では引けないと困る:
+ * 堀江院のファンくる「ミカ」が西本 美華のカードに合流せず、独立した「ミカ」カードになる。
+ * そこで店舗をキーに含めた索引を別に持ち、店舗が分かる呼び出しではこちらを使う。
+ */
+const BY_STORE_AND_NAME = new Map<string, StaffAlias>();
+{
+  const dupInStore = new Set<string>();
+  for (const s of STAFF_ALIASES) {
+    for (const key of [aliasKey(s.name), aliasKey(s.displayName)]) {
+      if (!key) continue;
+      const k = `${s.store} ${key}`;
+      const prev = BY_STORE_AND_NAME.get(k);
+      // 同一店舗で同じ呼び名の人が2人いたら、どちらにも引かせない（誤配賦より未マッチ）
+      if (prev && prev.name !== s.name) dupInStore.add(k);
+      else BY_STORE_AND_NAME.set(k, s);
+    }
+  }
+  for (const k of dupInStore) BY_STORE_AND_NAME.delete(k);
+}
+
+/**
+ * 店舗を絞ってスタッフの別名集合を引く。氏名でも表示名でもよい。
+ * その店舗にその名前の人が居ない（または同名2人）ときは undefined。
+ */
+export function aliasSetsForStaffInStore(
+  store: string,
+  staffName: string
+): { name: string; aliases: Set<string>; partial: Set<string> } | undefined {
+  if (!store) return undefined;
+  const s = BY_STORE_AND_NAME.get(`${store} ${aliasKey(staffName)}`);
+  return s ? { name: s.name, aliases: s.aliases, partial: s.partial } : undefined;
+}
+
+/**
  * 別名 → 氏名 の逆引き表。**全店舗を通して一意な別名だけ**を載せる。
  * 例:「みか」は堀江院の西本 美華と福島院の松野 美香の両方に当たるので載せない
  *（店舗が分かる文脈では aliasesForStaff を使う。こちらは店舗が分からない場面用）。

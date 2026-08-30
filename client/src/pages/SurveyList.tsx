@@ -127,7 +127,7 @@ export default function SurveyList() {
       let matched = false;
       for (const [, existingEntry] of Array.from(merged.entries())) {
         if (existingEntry.store === entry.store && (
-          matchesStylist(entry.name, existingEntry.name) ||
+          matchesStylist(entry.name, existingEntry.name, entry.store) ||
           normalizeName(entry.name) === normalizeName(existingEntry.name)
         )) {
           matched = true;
@@ -193,7 +193,7 @@ export default function SurveyList() {
         }
         for (const staff of staffList) {
           if (staff.store !== storeName) continue;
-          if (matchesStylist(pdf.stylist, staff.name)) {
+          if (matchesStylist(pdf.stylist, staff.name, staff.store)) {
             const key = `${normalizeName(staff.name)}__${staff.store}`;
             map.set(key, (map.get(key) || 0) + 1);
             break;
@@ -217,7 +217,7 @@ export default function SurveyList() {
         }
         for (const staff of staffList) {
           if (staff.store !== storeName) continue;
-          if (matchesStylist(pdf.stylist, staff.name)) {
+          if (matchesStylist(pdf.stylist, staff.name, staff.store)) {
             const key = `${normalizeName(staff.name)}__${staff.store}`;
             if (!map.has(key)) {
               map.set(key, {
@@ -293,7 +293,7 @@ export default function SurveyList() {
         let matched = false;
         for (const staff of staffList) {
           if (staff.store !== storeName) continue;
-          if (matchesStylist(pdf.stylist, staff.name)) {
+          if (matchesStylist(pdf.stylist, staff.name, staff.store)) {
             matched = true;
             break;
           }

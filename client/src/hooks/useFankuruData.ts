@@ -10,6 +10,7 @@ import {
   aliasKey,
   aliasesForStaff,
   partialAliasesForStaff,
+  aliasSetsForStaffInStore,
   isAmbiguousPartialInput,
   GENERATED_ALIAS_TO_CANONICAL,
   STAFF_STORE_BY_NAME,
@@ -366,7 +367,14 @@ export function isRetiredInMonth(staffName: string, store: string, yearMonth: st
   return names.some((n) => isRetiredStaff(n, store, yearMonth));
 }
 
-export function matchesStylist(stylistRaw: string, staffName: string): boolean {
+/**
+ * 担当者名（お客様の自由記述）が、そのスタッフのものか。
+ *
+ * store を渡せる場面では必ず渡すこと。表示名は複数店舗で別人として存在するため
+ * （"Mika" = 堀江院 西本 美華 / 福島院 松野 美香）、店舗を渡さないとその人の別名を
+ * 引けず、かな書きの「ミカ」が本人に当たらない。渡せば店舗内で人が一意に決まる。
+ */
+export function matchesStylist(stylistRaw: string, staffName: string, store?: string): boolean {
   if (!stylistRaw || !staffName) return false;
   const sClean = cleanName(stylistRaw);
   const tClean = cleanName(staffName);
@@ -383,8 +391,17 @@ export function matchesStylist(stylistRaw: string, staffName: string): boolean {
   // 管理画面の検出パネルに出る（人が判断する）。
   const key = aliasKey(sClean);
 
+  // 店舗が分かるなら店舗内で人を特定してから別名を引く。表示名が複数店舗で重複する人
+  // （"Mika"）は名前だけでは引けないので、この経路が無いと本人に当たらない。
+  const scoped = store ? aliasSetsForStaffInStore(normalizeStoreName(store), tClean) : undefined;
+  const exactSet = scoped?.aliases ?? aliasesForStaff(tClean);
+  const partialSet = scoped?.partial ?? partialAliasesForStaff(tClean);
+  const staffStore = scoped
+    ? normalizeStoreName(store as string)
+    : STAFF_STORE_MAP[aliasKey(tClean)] ?? "";
+
   // ①完全一致: 生成した別名にそのまま一致する（"ヒロコ"・"sayuri"・"みなほ" 等）
-  if (aliasesForStaff(tClean)?.has(key)) return true;
+  if (exactSet?.has(key)) return true;
 
   // ②部分一致: お客様の自由記述は読みの一部しか書かないことがあり
   //   （"ナオ"←なおえ／"ユウ"←ゆうか）、逆に字が足されることもある
@@ -393,9 +410,8 @@ export function matchesStylist(stylistRaw: string, staffName: string): boolean {
   //   （土橋院 "まゆ" ⊂ "まゆこ"）ため、ここでは取り違えが起きない。
   //   加えて、入力そのものが同一店舗の2人に当たる語（楽々園院 "けいこ" は
   //   "いのうえけいこ" と "まえだけいこ" の両方に含まれる）は部分一致を諦める＝未マッチにする。
-  const partial = partialAliasesForStaff(tClean);
-  if (partial && !isAmbiguousPartialInput(STAFF_STORE_MAP[aliasKey(tClean)] ?? "", key)) {
-    for (const alias of partial) {
+  if (partialSet && !isAmbiguousPartialInput(staffStore, key)) {
+    for (const alias of partialSet) {
       if (nameContain(key, alias)) return true;
     }
   }
@@ -448,7 +464,7 @@ export function useFankuruDataByStaff(staffName: string, storeName?: string) {
       // 店舗名が指定されている場合、その店舗のPDFのみ対象
       if (effectiveStore && pdfStoreName !== effectiveStore) continue;
       for (const pdf of storePdfs) {
-        if (!pdf.stylist || !matchesStylist(pdf.stylist, staffName)) continue;
+        if (!pdf.stylist || !matchesStylist(pdf.stylist, staffName, pdfStoreName)) continue;
         // 退社後の月の調査は紐づけない。読みから別名を機械生成した結果、退職者の
         // 短い読み（例: 池内亜希子 の "Aki"）が在籍中の月以外にも当たるようになったため、
         // 在籍期間で切る（判定は newBadge の isRetiredStaff＝DB優先・マスタfallback）。

@@ -15,7 +15,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { STAFF_MASTER } from "../client/src/data/staffMaster";
 import { aliasesForStaff, INTRA_STORE_AMBIGUOUS } from "../client/src/lib/stylistAlias";
 
-let matchesStylist: (stylist: string, target: string) => boolean;
+let matchesStylist: (stylist: string, target: string, store?: string) => boolean;
 let isRetiredInMonth: (staffName: string, store: string, yearMonth: string) => boolean;
 
 beforeAll(async () => {
@@ -42,7 +42,7 @@ describe("生成別名の取り違え検査（店舗内総当たり）", () => {
       for (const owner of roster) {
         for (const alias of aliasesForStaff(owner.name) ?? []) {
           checked++;
-          const hit = roster.filter((s) => matchesStylist(alias, s.name));
+          const hit = roster.filter((s) => matchesStylist(alias, s.name, store));
           if (hit.length > 1) {
             collisions.push(
               `${store} "${alias}"（${owner.name}の別名） → ${hit.map((s) => s.name).join(" / ")}`
@@ -85,7 +85,7 @@ describe("生成別名の取り違え検査（店舗内総当たり）", () => {
       }
       for (const input of candidates) {
         checked++;
-        const hit = roster.filter((s) => matchesStylist(input, s.name));
+        const hit = roster.filter((s) => matchesStylist(input, s.name, store));
         if (hit.length > 1) {
           collisions.push(`${store} "${input}" → ${hit.map((s) => s.name).join(" / ")}`);
         }
@@ -94,6 +94,25 @@ describe("生成別名の取り違え検査（店舗内総当たり）", () => {
 
     expect(checked).toBeGreaterThan(1000); // 候補生成が空回りしていないことの下限
     expect(collisions).toEqual([]);
+  });
+
+  /*
+   * アンケート一覧のカードは、NPS側が表示名（"Mika"）・ファンくる側が氏名（西本 美華）で
+   * 立つことがある。同一人物が2枚に割れないよう、店舗を渡せば氏名⇄表示名が必ず
+   * 同一人物として合流できなければならない。
+   */
+  it("氏名と表示名は、店舗を渡せば必ず同一人物として合流する", () => {
+    const bad: string[] = [];
+    for (const s of STAFF_MASTER) {
+      if (s.name === s.displayName) continue;
+      if (!matchesStylist(s.name, s.displayName, s.store)) {
+        bad.push(`${s.store} 氏名"${s.name}" → 表示名"${s.displayName}"`);
+      }
+      if (!matchesStylist(s.displayName, s.name, s.store)) {
+        bad.push(`${s.store} 表示名"${s.displayName}" → 氏名"${s.name}"`);
+      }
+    }
+    expect(bad).toEqual([]);
   });
 
   it("土橋院の「まゆ」と「まゆこ」は完全一致でそれぞれの本人にだけ当たる", () => {
@@ -142,6 +161,30 @@ describe("実データで直った/維持できた着地（ファンくるスプ
   it("元データ側の打ち間違いは MANUAL_EXCEPTIONS で拾う", () => {
     expect(matchesStylist("Minato", "天野美奈穂")).toBe(true); // Minaho の打ち間違い
     expect(matchesStylist("純菜", "山口純奈")).toBe(true); // 純奈 の書き間違い
+  });
+
+  /*
+   * 表示名が複数店舗で別人として存在する場合（"Mika" = 堀江院 西本 美華 /
+   * 福島院 松野 美香）、名前だけではどちらの読みも引けない＝かな書きの「ミカ」が
+   * 本人に当たらない。アンケート一覧は店舗ごとに束ねているので店舗を渡して解く。
+   * 2026-08-30 実画面で発覚: 堀江院 2026-07 のファンくる「ミカ」が西本 美華の
+   * カードに合流せず、独立した「ミカ」カードになっていた。
+   */
+  it("表示名が複数店舗で重複する人は、店舗を渡せば読みで当たる", () => {
+    expect(matchesStylist("ミカ", "Mika", "堀江院")).toBe(true); // 西本 美華
+    expect(matchesStylist("ミカ", "Mika", "福島院")).toBe(true); // 松野 美香
+    expect(matchesStylist("みか", "Mika", "堀江院")).toBe(true);
+    // 氏名で呼ばれるなら店舗は要らない（氏名は全店で一意）
+    expect(matchesStylist("ミカ", "西本 美華")).toBe(true);
+    // 店舗を渡しても、その店舗の別人には当たらない
+    expect(matchesStylist("ミカ", "Kaede", "堀江院")).toBe(false);
+    expect(matchesStylist("ミカ", "Yoshie", "福島院")).toBe(false);
+  });
+
+  it("店舗を渡しても、同一店舗で読みが衝突する2人は救わない", () => {
+    // 楽々園院「けいこ」は店舗が分かっても誰か1人には決まらない＝未マッチのまま
+    expect(matchesStylist("けいこ", "井上 恵子", "楽々園院")).toBe(false);
+    expect(matchesStylist("けいこ", "前田 慶子", "楽々園院")).toBe(false);
   });
 
   it("名簿に居ない人には当たらない", () => {
