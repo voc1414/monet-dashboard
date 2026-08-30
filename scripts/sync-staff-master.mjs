@@ -10,11 +10,15 @@
  *       接続手順 = Notion で「スタッフ管理」ページ → 右上「…」→ 接続 → 対象の
  *       インテグレーションを選ぶ（1回だけ・30秒）。
  *
- * 取り込む列は6つだけ（名前・店舗・サロンボード表示名・ニックネーム・退職月・進捗）。
+ * 取り込む列は7つだけ（名前・店舗・サロンボード表示名・ニックネーム・かな・退職月・進捗）。
  * 履歴書・労働契約書・雇用形態は人事の正本なので取得しない。
  *
  * 「ニックネーム」列が Notion 側に無い／空のあいだは null になり、画面は氏名表示に
  * フォールバックする（client/src/lib/staffDisplayName.ts）。同期は壊れない。
+ *
+ * 「かな」列（"せい めい" 形式）は表記ゆれ照合の材料。ここから カタカナ・ローマ字ゆれを
+ * 機械生成するので、別名を手で並べる表はもう増やさない（client/src/lib/stylistAlias.ts）。
+ * 空のままでもクラッシュはしないが、その人はローマ字・かな表記で当たらなくなる。
  */
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -70,9 +74,11 @@ const staff = pages
     const displayName = plain(props["サロンボード表示名"]) || name;
     // 画面表示用。照合には使わない（照合キーは name / displayName のまま）
     const nickname = plain(props["ニックネーム"]) || null;
+    // 表記ゆれ照合の材料。"せい めい"（半角スペース区切り）。全角スペースも受ける
+    const kana = plain(props["かな"]).replace(/[\s　]+/g, " ").trim();
     const retiredMonth = plain(props["退職月"]) || null;
     const status = props["進捗"]?.select?.name === "退職" ? "retired" : "active";
-    return { name, store, displayName, nickname, status, retiredMonth };
+    return { name, store, displayName, nickname, kana, status, retiredMonth };
   })
   .filter((s) => s.name)
   .sort((a, b) => a.store.localeCompare(b.store, "ja") || a.name.localeCompare(b.name, "ja"));
@@ -82,6 +88,13 @@ const missing = staff.filter((s) => s.status === "retired" && !s.retiredMonth);
 if (missing.length) {
   console.warn(`⚠ 退社月が空の退職者 ${missing.length}名: ${missing.map((s) => s.name).join(", ")}`);
   console.warn("  → Notion で退職月(YYYY-MM)を入れてください。空のままだと在籍扱いで表示され続けます。");
+}
+// 取りこぼしの検知: かなが無い人は、ローマ字・かな表記の担当者名で当たらなくなる
+const noKana = staff.filter((s) => !/^[ぁ-んー]+ [ぁ-んー]+$/.test(s.kana));
+if (noKana.length) {
+  console.warn(`⚠ かなが未入力／形式外 ${noKana.length}名: ${noKana.map((s) => `${s.name}(${s.kana || "空"})`).join(", ")}`);
+  console.warn('  → Notion「かな」に ひらがなで "せい めい"（半角スペース区切り）を入れてください。');
+  console.warn("    空のままだと、その人はローマ字・かな表記のアンケート回答に紐づきません。");
 }
 if (!staff.length) {
   console.error("0件でした。書き出しを中止します（誤って全員を消さないため）。");
@@ -104,6 +117,9 @@ const body = `/**
  * Mayu / Minaho / Yukiko が複数店舗に重複する。照合は必ず store とセットで行う。
  *
  * nickname は画面表示専用。照合キーには使わない（lib/staffDisplayName.ts 参照）。
+ *
+ * kana（"せい めい"）は表記ゆれ照合の材料。カタカナ・ローマ字のゆれは lib/stylistAlias.ts が
+ * ここから機械生成する。別名を手で並べた表は増やさない（読みを直すなら Notion の「かな」）。
  */
 
 export type StaffMasterEntry = {
@@ -118,6 +134,11 @@ export type StaffMasterEntry = {
    * 表示専用。照合キーには一切使わない（lib/staffDisplayName.ts が氏名へフォールバック）
    */
   nickname: string | null;
+  /**
+   * 氏名の読み。"せい めい"（ひらがな・半角スペース区切り）。Notion「かな」列が正本。
+   * 表記ゆれ照合の材料で、未入力なら空文字（照合はできるが かな・ローマ字では当たらない）
+   */
+  kana: string;
   status: "active" | "retired";
   /** "YYYY-MM"。この月以降のデータを除外する。在籍者は null */
   retiredMonth: string | null;
@@ -129,9 +150,11 @@ ${staff
     (s) =>
       `  { name: ${j(s.name)}, store: ${j(s.store)}, displayName: ${j(
         s.displayName
-      )}, nickname: ${s.nickname ? j(s.nickname) : "null"}, status: ${j(
-        s.status
-      )}, retiredMonth: ${s.retiredMonth ? j(s.retiredMonth) : "null"} },`
+      )}, nickname: ${s.nickname ? j(s.nickname) : "null"}, kana: ${j(
+        s.kana
+      )}, status: ${j(s.status)}, retiredMonth: ${
+        s.retiredMonth ? j(s.retiredMonth) : "null"
+      } },`
   )
   .join("\n")}
 ];
