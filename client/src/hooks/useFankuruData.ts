@@ -6,6 +6,17 @@
  * スプレッドシートCSVカラム: 店舗名,年月,日付,ファイル名,表示名,driveFileId,previewUrl,viewUrl
  */
 import { useState, useEffect, useMemo, useCallback } from "react";
+import {
+  aliasKey,
+  aliasesForStaff,
+  partialAliasesForStaff,
+  isAmbiguousPartialInput,
+  GENERATED_ALIAS_TO_CANONICAL,
+  STAFF_STORE_BY_NAME,
+} from "@/lib/stylistAlias";
+import { canonicalizeStaffName } from "@/lib/staffNameAlias";
+import { isRetiredStaff } from "@/lib/newBadge";
+import { STAFF_MASTER } from "@/data/staffMaster";
 
 export interface FankuruPdf {
   id: string;
@@ -255,163 +266,25 @@ export async function fetchPdfData(): Promise<Record<string, FankuruPdf[]>> {
 // ファンくるフォルダが設定されている店舗（動的判定に移行済み — hasFolderMappingはデータの有無で判定）
 
 /**
- * ファンくるのスタイリスト名（ひらがな/カタカナ/略称/ローマ字）と
- * 月末報告書のスタッフ名を紐づけるマッピングテーブル。
- * キー: ダッシュボード上のスタッフ名（正式名）
- * 値: ファンくるPDFに記載されうる別名一覧
+ * 担当者名の表記ゆれ（ひらがな/カタカナ/略称/ローマ字）は、スタッフマスタの「かな」から
+ * 機械生成する。lib/stylistAlias.ts が正本。
  *
- * パターン: 姓のみ、名のみ、ひらがな、カタカナ、ローマ字（ヘボン式/訓令式）、漢字違い
+ * 2026-08-30: 手で並べたエイリアス表（旧 STYLIST_NAME_ALIASES・約30キー）を廃止した。
+ * 表は腐るため — 名簿から消えた人のキーが3つ残り（藤田・石原葉子・かよ）、
+ * 「坂手」は読みが清音で誤登録されていた（正しくは さかで）。
+ * **別名を足したいときはコードを触らず、Notion「全スタッフ一覧」の「かな」を直す。**
+ * 元データ側の打ち間違い（例: Minaho→Minato）だけは
+ * lib/stylistAlias.ts の MANUAL_EXCEPTIONS に置く。
  */
-const STYLIST_NAME_ALIASES: Record<string, string[]> = {
-  // === 姪浜院 ===
-  "山口純奈": [
-    "山口", "やまぐち", "ヤマグチ", "yamaguchi", "yamaguti",
-    "純奈", "じゅんな", "ジュンナ", "junna", "jyunna",
-    "純菜", "やまぐちじゅんな", "ヤマグチジュンナ",
-  ],
-  "金田あゆみ": [
-    "金田", "かねだ", "カネダ", "kaneda",
-    "あゆみ", "アユミ", "ayumi",
-    "かねだあゆみ", "カネダアユミ",
-  ],
-  "石橋茜": [
-    "石橋", "いしばし", "イシバシ", "ishibashi",
-    "あかね", "アカネ", "akane",
-    "いしばしあかね", "イシバシアカネ",
-  ],
-  // 藤田（過去スタッフ）
-  "藤田": ["ふじた", "フジタ", "fujita", "ふじたみほ", "フジタミホ", "藤田美穂"],
-  "尾上みゆき": [
-    "尾上", "おがみ", "オガミ", "ogami",
-    "みゆき", "ミユキ", "miyuki",
-    "おがみみゆき", "オガミミユキ",
-  ],
-
-  // === 楽々園院 ===
-  "井上 恵子": [
-    "井上", "いのうえ", "イノウエ", "inoue",
-    "恵子", "けいこ", "ケイコ", "keiko",
-    "いのうえけいこ", "イノウエケイコ",
-  ],
-  "前田慶子": [
-    "前田", "まえだ", "マエダ", "maeda",
-    "慶子", "けいこ", "ケイコ", "keiko",
-    "まえだけいこ", "マエダケイコ",
-  ],
-  "千葉祐子": [
-    "千葉", "ちば", "チバ", "chiba",
-    "祐子", "ゆうこ", "ユウコ", "yuuko", "yuko",
-    "ちばゆうこ", "チバユウコ",
-  ],
-  "石原葉子": [
-    "石原", "いしはら", "イシハラ", "ishihara",
-    "葉子", "ようこ", "ヨウコ", "youko", "yoko",
-    "いしはらようこ", "イシハラヨウコ",
-  ],
-  // 田中 江梨子（楽々園院のファンくる担当）
-  "田中 江梨子": [
-    "田中", "たなか", "タナカ", "tanaka",
-    "江梨子", "えりこ", "エリコ", "eriko",
-    "たなかえりこ", "タナカエリコ",
-    "田中江梨子",
-  ],
-
-  // === 堀江院 ===
-  "Kaede": ["かえで", "カエデ", "kaede", "楓"],
-  // ファンくる側で "Akiko" と表記されるケースあり（林 確認済み 2026-07-06）
-  "小池明子": ["akiko", "Akiko", "AKIKO", "あきこ", "アキコ", "小池", "こいけ", "コイケ", "koike", "こいけあきこ", "コイケアキコ", "小池明子"],
-  // 堀江院のMika（スプレッドシートで「大阪|堀江院」として登録）
-  // STAFF_STORE_MAPで福島院のMikaと区別
-
-  // === 堀江院2nd ===
-  "Mimi": ["みみ", "ミミ", "mimi"],
-  "sayuri": ["さゆり", "サユリ", "sayuri", "小百合", "Sayuri"],
-  "Aki": ["あき", "アキ", "aki", "AKI"],
-  "Kazumi": ["かずみ", "カズミ", "kazumi"],
-  "Hiromi": ["ひろみ", "ヒロミ", "hiromi"],
-  // ファンくる側で "Minato" と表記されるケースあり（林 確認済み 2026-07-06）
-  "Minaho": ["みなほ", "ミナホ", "minaho", "minato"],
-  "坂手": ["さかて", "サカテ", "sakate"],
-
-  // === 高槻院 ===
-  "Yuko": ["ゆうこ", "ユウコ", "yuko", "yuuko"],
-  "Asuka": ["あすか", "アスカ", "asuka"],
-  "Mariko": ["まりこ", "マリコ", "mariko"],
-  "Nao": ["なお", "ナオ", "nao"],
-
-  // === 福島院 ===
-  "Yu": ["ゆう", "ユウ", "yu", "yuu"],
-  "Yukiko": ["ゆきこ", "ユキコ", "yukiko"],
-  "yoshie": ["よしえ", "ヨシエ", "yoshie", "由恵（よしえさん）", "由恵"],
-  // 杉本＝Hiroko（月末報告書の登録名はHiroko。林 確認済み 2026-07-06）
-  "Hiroko": ["ひろこ", "ヒロコ", "hiroko", "杉本", "すぎもと", "スギモト", "sugimoto"],
-  "Mika": ["みか", "ミカ", "mika"],
-  "Hitomi": ["ひとみ", "ヒトミ", "hitomi"],
-  "かよ": ["カヨ", "kayo"],
-
-  // === 高槻院 追加エイリアス ===
-  // ファンくるで「アスカさんです。」と記載されるケース対応
-  // Asukaのエイリアスに追加
-};
-
-// Asukaのエイリアスにファンくる特有の表記を追加
-STYLIST_NAME_ALIASES["Asuka"] = [
-  ...(STYLIST_NAME_ALIASES["Asuka"] || []),
-  "アスカさんです。", "アスカさんです", "アスカさん",
-];
 
 /**
- * スタッフ名と所属店舗の紐づけテーブル。
- * 同姓同名がある場合に、ファンくるのPDFがどの店舗のスタッフのものか判別するために使用。
- * キー: ダッシュボード表示名, 値: 所属店舗名
+ * スタッフ名 → 所属店舗（旧 STAFF_STORE_MAP。スタッフマスタから自動生成）。
+ * 表示名が複数店舗で重複する場合（Mika / Yu / Nao 等）は引けない＝全店舗を対象にする。
  */
-const STAFF_STORE_MAP: Record<string, string> = {
-  // 姪浜院
-  "山口純奈": "姪浜院",
-  "金田あゆみ": "姪浜院",
-  "石橋茜": "姪浜院",
-  "藤田": "姪浜院",
-  "尾上みゆき": "姪浜院",
-  // 楽々園院
-  "井上 恵子": "楽々園院",
-  "前田慶子": "楽々園院",
-  "千葉祐子": "楽々園院",
-  "石原葉子": "楽々園院",
-  "田中 江梨子": "楽々園院",
-  // 堀江院
-  "Kaede": "堀江院",
-  // 堀江院2nd
-  "Mimi": "堀江院2nd",
-  "sayuri": "堀江院2nd",
-  "Aki": "堀江院2nd",
-  "Kazumi": "堀江院2nd",
-  "Hiromi": "堀江院2nd",
-  "坂手": "堀江院2nd",
-  // 高槻院
-  "Yuko": "高槻院",
-  "Asuka": "高槻院",
-  "Mariko": "高槻院",
-  "Nao": "高槻院",
-  // 福島院
-  "Yu": "福島院",
-  "Yukiko": "福島院",
-  "yoshie": "福島院",
-  "Hiroko": "福島院",
-  "Mika": "福島院",
-  "Hitomi": "福島院",
-  "杉本": "福島院",
-  "かよ": "福島院",
-};
+const STAFF_STORE_MAP: Record<string, string> = STAFF_STORE_BY_NAME;
 
-// 逆引きマップを構築（エイリアス → 正式名）
-const ALIAS_TO_CANONICAL: Record<string, string> = {};
-for (const [canonical, aliases] of Object.entries(STYLIST_NAME_ALIASES)) {
-  for (const alias of aliases) {
-    ALIAS_TO_CANONICAL[alias.toLowerCase()] = canonical;
-  }
-  // 正式名自身も登録
-  ALIAS_TO_CANONICAL[canonical.toLowerCase()] = canonical;
-}
+/** 別名 → 氏名 の逆引き（全店舗を通して一意な別名だけが載る） */
+const ALIAS_TO_CANONICAL: Record<string, string> = GENERATED_ALIAS_TO_CANONICAL;
 
 /**
  * 統合エイリアスマップを返す（ハードコード + DB）。
@@ -424,11 +297,21 @@ function getMergedAliasMap(): Record<string, string> {
 /**
  * スタイリスト名を正規化する。
  * エイリアスがあれば正式名に変換、なければそのまま返す。
+ *
+ * 引き方が2通りあるのは、キーの作り方が2系統あるため:
+ *   DB(stylist_aliases) … 小文字化のみ（空白を残す）
+ *   機械生成            … aliasKey = 空白除去＋小文字化
+ * 先に生の小文字で引き、外したら空白除去キーで引く。
+ *
+ * 最後に canonicalizeStaffName を通すのは、月末報告書・NPS 側の名寄せと
+ * 同じ氏名に着地させるため（例: "坂手" → 坂手芳）。ここを通さないと
+ * ファンくるだけ別の氏名になり、同じ人が2人に見える。
  */
 export function normalizeStylistName(name: string): string {
-  const lower = name.trim().toLowerCase();
+  const trimmed = name.trim();
   const merged = getMergedAliasMap();
-  return merged[lower] || name.trim();
+  const hit = merged[trimmed.toLowerCase()] ?? merged[aliasKey(trimmed)];
+  return canonicalizeStaffName(hit ?? trimmed);
 }
 
 /**
@@ -465,6 +348,24 @@ function cleanName(s: string): string {
     .trim();
 }
 
+/**
+ * その月、その人はもう在籍していないか。
+ *
+ * 判定は newBadge の isRetiredStaff に任せる（DB優先・マスタfallback）が、
+ * あちらのマスタ側フォールバックは **表示名**（Aki / Mika 等）をキーにしており、
+ * DB側は氏名で登録されることがある。どちらの名前で呼ばれても効くように、
+ * マスタで人を特定してから氏名・表示名の両方で問い合わせる。
+ */
+export function isRetiredInMonth(staffName: string, store: string, yearMonth: string): boolean {
+  if (!yearMonth) return false;
+  const key = aliasKey(staffName);
+  const entry = STAFF_MASTER.find(
+    (s) => s.store === store && (aliasKey(s.name) === key || aliasKey(s.displayName) === key)
+  );
+  const names = entry ? [entry.name, entry.displayName] : [staffName];
+  return names.some((n) => isRetiredStaff(n, store, yearMonth));
+}
+
 export function matchesStylist(stylistRaw: string, staffName: string): boolean {
   if (!stylistRaw || !staffName) return false;
   const sClean = cleanName(stylistRaw);
@@ -474,6 +375,30 @@ export function matchesStylist(stylistRaw: string, staffName: string): boolean {
   if (!stylist || !target) return false;
 
   if (nameContain(stylist, target)) return true;
+
+  // かな/カタカナ/ローマ字のゆれ: そのスタッフの読みから生成した別名に当てる。
+  // 例: 徳永さゆり の "sayuri"・木下夕季子 の "Yukiko"・谷口楓 の "かえで"。
+  // 同一店舗内でぶつかる読み（楽々園院 井上恵子 と 前田慶子 の "けいこ"）は
+  // stylistAlias.ts が落としてあるので、ここでは誰にも当たらない＝未マッチとして
+  // 管理画面の検出パネルに出る（人が判断する）。
+  const key = aliasKey(sClean);
+
+  // ①完全一致: 生成した別名にそのまま一致する（"ヒロコ"・"sayuri"・"みなほ" 等）
+  if (aliasesForStaff(tClean)?.has(key)) return true;
+
+  // ②部分一致: お客様の自由記述は読みの一部しか書かないことがあり
+  //   （"ナオ"←なおえ／"ユウ"←ゆうか）、逆に字が足されることもある
+  //   （"由恵（よしえさん）"←よしえ）。実データにどちらもあるので部分一致は必要。
+  //   ただし同一店舗の別人と紛れる別名は stylistAlias 側で外してある
+  //   （土橋院 "まゆ" ⊂ "まゆこ"）ため、ここでは取り違えが起きない。
+  //   加えて、入力そのものが同一店舗の2人に当たる語（楽々園院 "けいこ" は
+  //   "いのうえけいこ" と "まえだけいこ" の両方に含まれる）は部分一致を諦める＝未マッチにする。
+  const partial = partialAliasesForStaff(tClean);
+  if (partial && !isAmbiguousPartialInput(STAFF_STORE_MAP[aliasKey(tClean)] ?? "", key)) {
+    for (const alias of partial) {
+      if (nameContain(key, alias)) return true;
+    }
+  }
 
   // エイリアス経由: 両方を正規化して比較（cleanNameで表記ゆれを吸収してから）
   const normalizedStylist = normalizeStylistName(sClean).toLowerCase();
@@ -511,8 +436,9 @@ export function useFankuruDataByStaff(staffName: string, storeName?: string) {
     loadData();
   }, [loadData]);
 
-  // スタッフの所属店舗を特定（引数 > STAFF_STORE_MAP > 全店舗）
-  const effectiveStore = storeName || STAFF_STORE_MAP[staffName] || "";
+  // スタッフの所属店舗を特定（引数 > スタッフマスタ > 全店舗）
+  // マスタ側のキーは空白除去＋小文字化なので aliasKey を通してから引く
+  const effectiveStore = storeName || STAFF_STORE_MAP[aliasKey(staffName)] || "";
 
   // スタッフ名でPDFをフィルタリング（エイリアス対応 + 店舗紞り込み）
   const pdfs = useMemo(() => {
@@ -522,9 +448,12 @@ export function useFankuruDataByStaff(staffName: string, storeName?: string) {
       // 店舗名が指定されている場合、その店舗のPDFのみ対象
       if (effectiveStore && pdfStoreName !== effectiveStore) continue;
       for (const pdf of storePdfs) {
-        if (pdf.stylist && matchesStylist(pdf.stylist, staffName)) {
-          result.push(pdf);
-        }
+        if (!pdf.stylist || !matchesStylist(pdf.stylist, staffName)) continue;
+        // 退社後の月の調査は紐づけない。読みから別名を機械生成した結果、退職者の
+        // 短い読み（例: 池内亜希子 の "Aki"）が在籍中の月以外にも当たるようになったため、
+        // 在籍期間で切る（判定は newBadge の isRetiredStaff＝DB優先・マスタfallback）。
+        if (isRetiredInMonth(staffName, pdfStoreName, pdf.yearMonth)) continue;
+        result.push(pdf);
       }
     }
     return result.sort((a, b) => b.date.localeCompare(a.date));
