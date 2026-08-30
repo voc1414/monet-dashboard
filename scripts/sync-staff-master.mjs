@@ -2,13 +2,24 @@
 /**
  * Notion「全スタッフ一覧」DB → client/src/data/staffMaster.ts を再生成する。
  *
- *   NOTION_TOKEN=ntn_xxx node scripts/sync-staff-master.mjs
- *   （npm run sync:staff）
+ * 入力経路は2つある。どちらでも同じ staffMaster.ts が出る。
  *
- * 前提: 対象DBが Notion 側でインテグレーションに接続されていること。
- *       接続していないと 404「Make sure the relevant pages ... are shared」が返る。
- *       接続手順 = Notion で「スタッフ管理」ページ → 右上「…」→ 接続 → 対象の
- *       インテグレーションを選ぶ（1回だけ・30秒）。
+ * ①インテグレーション・トークン経路（自動・CIから回せる）
+ *   NOTION_TOKEN=ntn_xxx node scripts/sync-staff-master.mjs
+ *   前提: 対象DBがそのインテグレーションに接続されていること。未接続だと
+ *   404「Make sure the relevant pages ... are shared」が返る。
+ *   2026-08-30時点、手元の2トークン（hayashin-guard / gf-crm）はどちらも未接続で404。
+ *   注意: Notion の「Claudeコネクタ」(OAuth) を接続してもこの経路は通らない。
+ *   別物なので、コネクタ側で接続済みでも下の②を使う。
+ *
+ * ②スナップショット経路（Claudeコネクタ／MCPで読めている場合。トークン不要）
+ *   node scripts/sync-staff-master.mjs --from-json <path.json>
+ *   JSON は Notion の列名そのままの配列。取得日を添える（鮮度が分かるように）:
+ *     { "取得日": "2026-08-30",
+ *       "rows": [ { "名前": "坂手 芳", "店舗": "堀江院2nd",
+ *                   "サロンボード表示名": "坂手", "ニックネーム": null,
+ *                   "かな": "さかで かおる", "進捗": "入社済", "退職月": null } ] }
+ *   「ダッシュボード対象」の絞り込みは読み出し側で済ませておく（rows は対象者のみ）。
  *
  * 取り込む列は7つだけ（名前・店舗・サロンボード表示名・ニックネーム・かな・退職月・進捗）。
  * 履歴書・労働契約書・雇用形態は人事の正本なので取得しない。
@@ -20,7 +31,7 @@
  * 機械生成するので、別名を手で並べる表はもう増やさない（client/src/lib/stylistAlias.ts）。
  * 空のままでもクラッシュはしないが、その人はローマ字・かな表記で当たらなくなる。
  */
-import { writeFileSync } from "node:fs";
+import { writeFileSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
@@ -28,9 +39,18 @@ const DATABASE_ID = "2dfab44d3cb98031a890e8de4ed0d1ff";
 const NOTION_VERSION = "2022-06-28";
 const OUT = resolve(dirname(fileURLToPath(import.meta.url)), "../client/src/data/staffMaster.ts");
 
+const jsonArgIndex = process.argv.indexOf("--from-json");
+const jsonPath = jsonArgIndex >= 0 ? process.argv[jsonArgIndex + 1] : null;
 const token = process.env.NOTION_TOKEN;
-if (!token) {
-  console.error("NOTION_TOKEN が未設定です。NOTION_TOKEN=... node scripts/sync-staff-master.mjs");
+
+if (jsonArgIndex >= 0 && !jsonPath) {
+  console.error("--from-json の後にJSONのパスを渡してください。");
+  process.exit(1);
+}
+if (!jsonPath && !token) {
+  console.error("入力がありません。次のどちらかで実行してください:");
+  console.error("  ① NOTION_TOKEN=... node scripts/sync-staff-master.mjs");
+  console.error("  ② node scripts/sync-staff-master.mjs --from-json <path.json>");
   process.exit(1);
 }
 
@@ -64,20 +84,54 @@ async function fetchAll() {
   return out;
 }
 
-const pages = await fetchAll();
-
-const staff = pages
-  .map((p) => {
+/**
+ * 入力を「Notionの列名そのままのオブジェクト」の配列に揃える。
+ * ①API経路は properties を剥がし、②JSON経路はそのまま使う。
+ */
+async function readRows() {
+  if (jsonPath) {
+    const raw = JSON.parse(readFileSync(jsonPath, "utf-8"));
+    const rows = Array.isArray(raw) ? raw : raw.rows;
+    if (!Array.isArray(rows)) {
+      console.error(`${jsonPath} の形式が違います。配列か { "rows": [...] } を渡してください。`);
+      process.exit(1);
+    }
+    const asOf = Array.isArray(raw) ? null : raw["取得日"];
+    console.log(
+      `入力: ${jsonPath}（${rows.length}行${asOf ? ` / 取得日 ${asOf}` : " / 取得日なし"}）`
+    );
+    if (!asOf) {
+      console.warn('⚠ 「取得日」が無いスナップショットです。いつのNotionか分からないので添えてください。');
+    }
+    return rows;
+  }
+  return (await fetchAll()).map((p) => {
     const props = p.properties;
-    const name = plain(props["名前"]);
-    const store = props["店舗"]?.select?.name ?? "";
-    const displayName = plain(props["サロンボード表示名"]) || name;
+    return {
+      名前: plain(props["名前"]),
+      店舗: props["店舗"]?.select?.name ?? "",
+      サロンボード表示名: plain(props["サロンボード表示名"]),
+      ニックネーム: plain(props["ニックネーム"]) || null,
+      かな: plain(props["かな"]),
+      進捗: props["進捗"]?.select?.name ?? "",
+      退職月: plain(props["退職月"]) || null,
+    };
+  });
+}
+
+const rows = await readRows();
+
+const staff = rows
+  .map((r) => {
+    const name = (r["名前"] ?? "").trim();
+    const store = (r["店舗"] ?? "").trim();
+    const displayName = (r["サロンボード表示名"] ?? "").trim() || name;
     // 画面表示用。照合には使わない（照合キーは name / displayName のまま）
-    const nickname = plain(props["ニックネーム"]) || null;
+    const nickname = (r["ニックネーム"] ?? "").trim() || null;
     // 表記ゆれ照合の材料。"せい めい"（半角スペース区切り）。全角スペースも受ける
-    const kana = plain(props["かな"]).replace(/[\s　]+/g, " ").trim();
-    const retiredMonth = plain(props["退職月"]) || null;
-    const status = props["進捗"]?.select?.name === "退職" ? "retired" : "active";
+    const kana = (r["かな"] ?? "").replace(/[\s　]+/g, " ").trim();
+    const retiredMonth = (r["退職月"] ?? "").trim() || null;
+    const status = (r["進捗"] ?? "").trim() === "退職" ? "retired" : "active";
     return { name, store, displayName, nickname, kana, status, retiredMonth };
   })
   .filter((s) => s.name)
