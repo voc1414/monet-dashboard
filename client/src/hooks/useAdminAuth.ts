@@ -1,4 +1,5 @@
 import { trpc } from "@/lib/trpc";
+import { withBasePath } from "@/lib/basePath";
 import { useCallback, useEffect, useMemo } from "react";
 
 const ADMIN_TOKEN_KEY = "monet_admin_token";
@@ -17,7 +18,7 @@ export function useAdminAuth(options?: UseAdminAuthOptions) {
 
   const logout = useCallback(() => {
     localStorage.removeItem(ADMIN_TOKEN_KEY);
-    window.location.href = "/admin/login";
+    window.location.href = withBasePath("/admin/login");
   }, []);
 
   const state = useMemo(() => {
@@ -34,7 +35,7 @@ export function useAdminAuth(options?: UseAdminAuthOptions) {
     if (meQuery.isLoading || meQuery.isFetching) return;
     if (state.admin) return;
     // Not authenticated, redirect to login
-    window.location.href = "/admin/login";
+    window.location.href = withBasePath("/admin/login");
   }, [
     redirectOnUnauthenticated,
     meQuery.isLoading,

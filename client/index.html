@@ -3,6 +3,26 @@
 
   <head>
     <meta charset="UTF-8" />
+    <script>
+      /*
+       * GitHub Pages はサイト直下の 404.html しか使わないので、深いパスを直接開く／
+       * リロードすると 404.html に落ちる。その 404.html が ?p=<元のパス> の形で
+       * ここへ飛ばしてくるので、元のURLに戻してからアプリを起動する。
+       * （?p= が無い通常アクセスでは何もしない）
+       */
+      (function () {
+        var m = /[?&]p=([^&]*)/.exec(window.location.search);
+        if (!m) return;
+        try {
+          var target = decodeURIComponent(m[1]);
+          if (target.charAt(0) === "/") {
+            window.history.replaceState(null, "", target);
+          }
+        } catch (e) {
+          /* 壊れたパラメータは無視してトップを出す */
+        }
+      })();
+    </script>
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1" />

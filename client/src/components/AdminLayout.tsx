@@ -1,20 +1,10 @@
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
-import {
-  AlertTriangle,
-  Store,
-  Users,
-  ClipboardList,
-  LogOut,
-  Home,
-  Shield,
-  ChevronRight,
-  Menu,
-  X,
-} from "lucide-react";
+import { LogOut, Shield, ChevronRight, Menu, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { Button } from "@/components/ui/button";
+import { MAIN_TABS, SETTINGS_PAGES, SETTINGS_TAB } from "@/lib/navItems";
 
 import monetLogo from "@/assets/monet-logo.png";
 
@@ -31,13 +21,12 @@ interface AdminLayoutProps {
   title?: string;
 }
 
-const NAV_ITEMS = [
-  { href: "/admin", label: "アラート一覧", icon: AlertTriangle, exact: true },
-  { href: "/admin/stores", label: "店舗情報", icon: Store, exact: false },
-  { href: "/admin/staff", label: "スタッフ情報", icon: Users, exact: false },
-  { href: "/admin/surveys", label: "アンケート情報", icon: ClipboardList, exact: false },
-];
-
+/*
+ * 管理者向け画面（＝「設定」タブの中身）。
+ * タブの並びは client/src/lib/navItems.ts が正本。ここは「設定」が現在地の状態で
+ * 主タブ（店舗一覧／スタッフ一覧／アンケート／カウンセリング／広告）を同じ並びで見せ、
+ * その下に設定の中身（従来の管理ページ4枚）をサブタブとして並べる。
+ */
 export default function AdminLayout({ children, breadcrumbs = [], title }: AdminLayoutProps) {
   const [location] = useLocation();
   const { logout, loading } = useAdminAuth({ redirectOnUnauthenticated: true });
@@ -86,31 +75,23 @@ export default function AdminLayout({ children, breadcrumbs = [], title }: Admin
             </Link>
           </div>
 
-          {/* Desktop Nav */}
+          {/* Desktop Nav（管理者は主タブ全部＋広告＋設定が並ぶ） */}
           <nav className="hidden md:flex items-center gap-1">
-            {NAV_ITEMS.map((item) => (
-              <Link key={item.href} href={item.href}>
-                <span
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    isActive(item.href, item.exact)
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                  }`}
-                >
-                  <item.icon className="w-4 h-4" />
-                  {item.label}
+            {MAIN_TABS.map((tab) => (
+              <Link key={tab.href} href={tab.href}>
+                <span className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-muted-foreground hover:text-foreground hover:bg-accent/50">
+                  <tab.icon className="w-4 h-4" />
+                  {tab.label}
                 </span>
               </Link>
             ))}
+            <span className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-primary/10 text-primary">
+              <SETTINGS_TAB.icon className="w-4 h-4" />
+              {SETTINGS_TAB.label}
+            </span>
           </nav>
 
           <div className="flex items-center gap-2">
-            <Link href="/">
-              <span className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors px-2 py-1.5 rounded-lg hover:bg-accent/50">
-                <Home className="w-3.5 h-3.5" />
-                ダッシュボード
-              </span>
-            </Link>
             <Button
               variant="ghost"
               size="sm"
@@ -133,7 +114,10 @@ export default function AdminLayout({ children, breadcrumbs = [], title }: Admin
           className="md:hidden border-b border-border/40 bg-white/95 backdrop-blur-md z-40"
         >
           <div className="container py-2 space-y-1">
-            {NAV_ITEMS.map((item) => (
+            <p className="px-3 pt-1 pb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground/70">
+              設定
+            </p>
+            {SETTINGS_PAGES.map((item) => (
               <Link key={item.href} href={item.href}>
                 <div
                   onClick={() => setMobileMenuOpen(false)}
@@ -148,27 +132,54 @@ export default function AdminLayout({ children, breadcrumbs = [], title }: Admin
                 </div>
               </Link>
             ))}
-            <Link href="/">
-              <div
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/50"
-              >
-                <Home className="w-4 h-4" />
-                ダッシュボードに戻る
-              </div>
-            </Link>
+            <p className="px-3 pt-2 pb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground/70">
+              ダッシュボード
+            </p>
+            {MAIN_TABS.map((tab) => (
+              <Link key={tab.href} href={tab.href}>
+                <div
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                >
+                  <tab.icon className="w-4 h-4" />
+                  {tab.label}
+                </div>
+              </Link>
+            ))}
           </div>
         </motion.div>
       )}
+
+      {/* 設定の中身（従来の管理ページ4枚）。狭い画面では横スクロールさせる */}
+      <div className="border-b border-border/40 bg-white/60">
+        <div className="container">
+          <nav className="flex items-center gap-1 overflow-x-auto py-2">
+            {SETTINGS_PAGES.map((item) => (
+              <Link key={item.href} href={item.href}>
+                <span
+                  className={`flex items-center gap-2 shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                    isActive(item.href, item.exact)
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                  }`}
+                >
+                  <item.icon className="w-4 h-4" />
+                  {item.label}
+                </span>
+              </Link>
+            ))}
+          </nav>
+        </div>
+      </div>
 
       {/* Breadcrumbs */}
       {breadcrumbs.length > 0 && (
         <div className="border-b border-border/40 bg-white/40">
           <div className="container py-3">
             <nav className="flex items-center gap-1.5 text-sm">
-              <Link href="/admin">
+              <Link href={SETTINGS_TAB.href}>
                 <span className="text-muted-foreground hover:text-primary transition-colors cursor-pointer">
-                  管理画面
+                  {SETTINGS_TAB.label}
                 </span>
               </Link>
               {breadcrumbs.map((crumb, i) => (

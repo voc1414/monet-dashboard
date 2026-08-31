@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
+import { withBasePath } from "@/lib/basePath";
 
 import monetLogo from "@/assets/monet-logo.png";
 
@@ -26,7 +27,7 @@ export default function AdminLogin() {
 
   useEffect(() => {
     if (meQuery.data) {
-      window.location.href = "/admin";
+      window.location.href = withBasePath("/admin");
     }
   }, [meQuery.data]);
 
@@ -35,7 +36,7 @@ export default function AdminLogin() {
       if (data.token) {
         localStorage.setItem(ADMIN_TOKEN_KEY, data.token);
         // Full page reload to ensure the token is picked up by the tRPC client
-        window.location.href = "/admin";
+        window.location.href = withBasePath("/admin");
       }
     },
     onError: (err) => {
@@ -173,7 +174,7 @@ export default function AdminLogin() {
             {/* Back to Dashboard Link */}
             <div className="mt-6 text-center">
               <a
-                href="/"
+                href={withBasePath("/")}
                 className="text-xs text-muted-foreground hover:text-primary transition-colors"
               >
                 ダッシュボードに戻る

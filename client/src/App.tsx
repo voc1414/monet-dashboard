@@ -4,6 +4,7 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch, Router as WouterRouter } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import ScrollToTop from "./components/ScrollToTop";
+import { IS_ADMIN_BUILD } from "./lib/appRole";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { StaffStatusProvider } from "./hooks/useStaffStatus";
 import { StoreDataProvider } from "./components/StoreDataProvider";
@@ -28,7 +29,7 @@ function Router() {
     <>
       <ScrollToTop />
       <Switch>
-        {/* Public Dashboard Routes */}
+        {/* スタッフ向け（ログイン不要）。広告は管理者だけ */}
         <Route path="/" component={Home} />
         <Route path="/store/:storeId" component={StoreDetail} />
         <Route path="/staff" component={StaffList} />
@@ -36,15 +37,18 @@ function Router() {
         <Route path="/survey" component={SurveyList} />
         <Route path="/survey/:storeId" component={SurveyDetail} />
         <Route path="/counseling" component={Counseling} />
-        <Route path="/ads" component={Ads} />
         <Route path="/store/:storeId/nps" component={NpsOverview} />
 
-        {/* Admin Routes */}
-        <Route path="/admin/login" component={AdminLogin} />
-        <Route path="/admin" component={AdminAlerts} />
-        <Route path="/admin/stores" component={AdminStores} />
-        <Route path="/admin/staff" component={AdminStaff} />
-        <Route path="/admin/surveys" component={AdminSurveys} />
+        {/*
+          広告と設定は管理者向けビルドにだけ登録する。
+          スタッフ向けビルドではルートが存在しないので、URL を直打ちしても 404 になる。
+        */}
+        {IS_ADMIN_BUILD && <Route path="/ads" component={Ads} />}
+        {IS_ADMIN_BUILD && <Route path="/admin/login" component={AdminLogin} />}
+        {IS_ADMIN_BUILD && <Route path="/admin" component={AdminAlerts} />}
+        {IS_ADMIN_BUILD && <Route path="/admin/stores" component={AdminStores} />}
+        {IS_ADMIN_BUILD && <Route path="/admin/staff" component={AdminStaff} />}
+        {IS_ADMIN_BUILD && <Route path="/admin/surveys" component={AdminSurveys} />}
 
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />

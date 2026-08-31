@@ -5,10 +5,12 @@
  * Typography: Noto Sans JP (body), Inter (data)
  */
 import { Link, useLocation } from "wouter";
-import { ChevronRight, RefreshCw, Home, Users, ClipboardList, MessageSquareText, Megaphone, Settings } from "lucide-react";
+import { ChevronRight, RefreshCw } from "lucide-react";
 import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 
+import { SETTINGS_TAB, visibleMainTabs } from "@/lib/navItems";
+import { IS_ADMIN_BUILD } from "@/lib/appRole";
 import monetLogo from "@/assets/monet-logo.png";
 
 const MONET_LOGO = monetLogo;
@@ -34,6 +36,9 @@ export default function DashboardLayout({
   loading,
 }: DashboardLayoutProps) {
   const [location] = useLocation();
+  // 広告・設定タブは管理者向けビルドにしか無い（スタッフ向けバンドルには存在しない）
+  const isAdmin = IS_ADMIN_BUILD;
+  const tabs = visibleMainTabs(isAdmin);
 
   return (
     <div className="min-h-screen bg-background">
@@ -59,65 +64,29 @@ export default function DashboardLayout({
           </Link>
 
           <nav className="hidden md:flex items-center gap-6">
-            <Link href="/">
-              <span
-                className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary ${
-                  location === "/" ? "text-foreground" : "text-muted-foreground"
-                }`}
-              >
-                <Home className="w-4 h-4" />
-                店舗一覧
-              </span>
-            </Link>
-            <Link href="/staff">
-              <span
-                className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary ${
-                  location.startsWith("/staff") ? "text-foreground" : "text-muted-foreground"
-                }`}
-              >
-                <Users className="w-4 h-4" />
-                スタッフ一覧
-              </span>
-            </Link>
-            <Link href="/survey">
-              <span
-                className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary ${
-                  location.startsWith("/survey") ? "text-foreground" : "text-muted-foreground"
-                }`}
-              >
-                <ClipboardList className="w-4 h-4" />
-                アンケート
-              </span>
-            </Link>
-            <Link href="/counseling">
-              <span
-                className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary ${
-                  location.startsWith("/counseling") ? "text-foreground" : "text-muted-foreground"
-                }`}
-              >
-                <MessageSquareText className="w-4 h-4" />
-                カウンセリング
-              </span>
-            </Link>
-            <Link href="/ads">
-              <span
-                className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary ${
-                  location.startsWith("/ads") ? "text-foreground" : "text-muted-foreground"
-                }`}
-              >
-                <Megaphone className="w-4 h-4" />
-                広告（Meta）
-              </span>
-            </Link>
-            <div className="w-px h-5 bg-border/60" />
-            <Link href="/admin">
-              <span
-                className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground/70 hover:text-primary transition-colors px-2.5 py-1.5 rounded-md border border-border/50 hover:border-primary/30 hover:bg-primary/5"
-              >
-                <Settings className="w-3.5 h-3.5" />
-                管理者ページ
-              </span>
-            </Link>
+            {tabs.map((tab) => (
+              <Link key={tab.href} href={tab.href}>
+                <span
+                  className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary ${
+                    tab.isActive(location) ? "text-foreground" : "text-muted-foreground"
+                  }`}
+                >
+                  <tab.icon className="w-4 h-4" />
+                  {tab.label}
+                </span>
+              </Link>
+            ))}
+            {isAdmin && (
+              <>
+                <div className="w-px h-5 bg-border/60" />
+                <Link href={SETTINGS_TAB.href}>
+                  <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground/70 hover:text-primary transition-colors px-2.5 py-1.5 rounded-md border border-border/50 hover:border-primary/30 hover:bg-primary/5">
+                    <SETTINGS_TAB.icon className="w-3.5 h-3.5" />
+                    {SETTINGS_TAB.label}
+                  </span>
+                </Link>
+              </>
+            )}
           </nav>
 
           <div className="flex items-center gap-3">
@@ -182,52 +151,26 @@ export default function DashboardLayout({
       {/* Mobile Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden border-t border-border/60 bg-white/95 backdrop-blur-md safe-area-bottom">
         <div className="flex items-center justify-around h-14">
-          <Link href="/">
-            <div className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-colors ${
-              (location === "/" || (location.startsWith("/store") && !location.includes("/nps"))) ? "text-primary" : "text-muted-foreground"
-            }`}>
-              <Home className="w-5 h-5" />
-              <span className="text-[10px] font-medium">店舗一覧</span>
-            </div>
-          </Link>
-          <Link href="/staff">
-            <div className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-colors ${
-              location.startsWith("/staff") ? "text-primary" : "text-muted-foreground"
-            }`}>
-              <Users className="w-5 h-5" />
-              <span className="text-[10px] font-medium">スタッフ</span>
-            </div>
-          </Link>
-          <Link href="/survey">
-            <div className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-colors ${
-              location.startsWith("/survey") ? "text-primary" : "text-muted-foreground"
-            }`}>
-              <ClipboardList className="w-5 h-5" />
-              <span className="text-[10px] font-medium">アンケート</span>
-            </div>
-          </Link>
-          <Link href="/counseling">
-            <div className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-colors ${
-              location.startsWith("/counseling") ? "text-primary" : "text-muted-foreground"
-            }`}>
-              <MessageSquareText className="w-5 h-5" />
-              <span className="text-[10px] font-medium">カウンセリング</span>
-            </div>
-          </Link>
-          <Link href="/ads">
-            <div className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-colors ${
-              location.startsWith("/ads") ? "text-primary" : "text-muted-foreground"
-            }`}>
-              <Megaphone className="w-5 h-5" />
-              <span className="text-[10px] font-medium">広告</span>
-            </div>
-          </Link>
-          <Link href="/admin">
-            <div className="flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-colors text-muted-foreground/60">
-              <Settings className="w-5 h-5" />
-              <span className="text-[10px] font-medium">管理者</span>
-            </div>
-          </Link>
+          {tabs.map((tab) => (
+            <Link key={tab.href} href={tab.href}>
+              <div
+                className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-colors ${
+                  tab.isActive(location) ? "text-primary" : "text-muted-foreground"
+                }`}
+              >
+                <tab.icon className="w-5 h-5" />
+                <span className="text-[10px] font-medium">{tab.shortLabel}</span>
+              </div>
+            </Link>
+          ))}
+          {isAdmin && (
+            <Link href={SETTINGS_TAB.href}>
+              <div className="flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-colors text-muted-foreground/60">
+                <SETTINGS_TAB.icon className="w-5 h-5" />
+                <span className="text-[10px] font-medium">{SETTINGS_TAB.shortLabel}</span>
+              </div>
+            </Link>
+          )}
         </div>
       </nav>
     </div>

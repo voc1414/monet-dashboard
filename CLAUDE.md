@@ -2,7 +2,17 @@
 
 monet（白髪染め・髪質改善サロン・全7店舗）の経営ダッシュボード。
 FC共有前提でログイン不要の公開閲覧（管理ページ `/admin` のみ要ログイン）。
-本番: https://monet-dashboard-production.up.railway.app/
+
+**本番は GitHub Pages（静的配信・サーバAPIなし）。同じコードを2回ビルドして2つの入口で配信する（2026-08-31 スタッフ向け／管理者向けの仕分け）:**
+- スタッフ向け（既存URL・スタッフに配る）: https://voc1414.github.io/monet-dashboard/
+  … 店舗一覧／スタッフ一覧／アンケート／カウンセリングの4タブ。**広告と設定はビルドに含まれない**（URL直打ちでも 404）
+- 管理者向け（林さん専用）: https://voc1414.github.io/monet-dashboard/admin-view/
+  … 上の4タブ＋広告（Meta）＋設定（従来の `/admin` 4枚）
+- 判定は `client/src/lib/appRole.ts`（`VITE_ROLE=admin` のときだけ管理者ビルド。既定は staff＝安全側）。
+  タブ定義の正本は `client/src/lib/navItems.ts`。2回ビルドとスタッフ側の広告コード混入検査は `.github/workflows/pages.yml`
+- URLを隠すことが目的ではない（repoは public）。**目的はスタッフの画面に広告費・CPAを出さないこと**
+- `window.location` で画面遷移する箇所は必ず `withBasePath()` を通す（`/admin/login` へ直に飛ぶとサイトの外へ出る）
+- 旧 Railway 本番 https://monet-dashboard-production.up.railway.app/ はトライアル失効で停止済み
 
 **コード実装・ビルド・テスト・デプロイ・git は Claude Code 側で完結**させる。ブラウザ操作/CAPTCHA/Notion/SyncWith・GAS等の外部SaaS管理画面は Cowork（はやしん）側の担当。
 

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ja">
+
+  <head>
+    <meta charset="UTF-8" />
+    <title>monet Dashboard</title>
+    <script>
+      /*
+       * スタッフ向け／管理者向けの2ビルドを1サイトで配信するための振り分け（2026-08-31）。
+       *
+       *   /monet-dashboard/             … スタッフ向け（広告・設定なし）
+       *   /monet-dashboard/admin-view/  … 管理者向け（既存の全タブ＋広告＋設定）
+       *
+       * GitHub Pages はサイト直下の 404.html しか使わない（サブディレクトリの
+       * 404.html は無視される）。そのため深いパスを直接開く／リロードすると、
+       * 管理者向けのURLでもこのファイルに落ちてくる。
+       * ここでパスを見てそれぞれの入口へ送り、元のパスは ?p= で渡す。
+       * 復元は client/index.html 冒頭のスクリプトが行う。
+       */
+      (function () {
+        var STAFF = "/monet-dashboard/";
+        var ADMIN = "/monet-dashboard/admin-view/";
+        var here = window.location.pathname + window.location.search + window.location.hash;
+
+        // 入口自体が見つからない場合に無限リダイレクトさせない
+        if (window.location.search.indexOf("p=") !== -1) return;
+
+        var entry = window.location.pathname.indexOf(ADMIN) === 0 ? ADMIN : STAFF;
+        window.location.replace(entry + "?p=" + encodeURIComponent(here));
+      })();
+    </script>
+  </head>
+
+  <body>
+    <p style="font-family: sans-serif; padding: 24px">読み込み中…</p>
+  </body>
+
+</html>

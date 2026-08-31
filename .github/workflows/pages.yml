@@ -28,10 +28,20 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --legacy-peer-deps
-      - name: 静的ビルド（/monet-dashboard/ 配下で配信）
-        run: VITE_BASE=/monet-dashboard/ npx vite build
-      - name: SPAルーティング用の404.html
-        run: cp dist/public/index.html dist/public/404.html
+      # 同じコードを2回ビルドして別URLで配信する（2026-08-31 スタッフ向け／管理者向けの仕分け）。
+      # スタッフ向けバンドルには広告・設定のコードがそもそも含まれない（VITE_ROLE で分岐＋tree-shake）。
+      - name: スタッフ向けビルド（既存URL /monet-dashboard/）
+        run: VITE_BASE=/monet-dashboard/ VITE_ROLE=staff npx vite build
+      - name: スタッフ向けに広告コードが混ざっていないか検査
+        run: |
+          if grep -rq -e '1z5JU' -e 'adset_meta' -e 'ROAS' dist/public/assets; then
+            echo "::error::スタッフ向けバンドルに広告コードが含まれています"
+            exit 1
+          fi
+      - name: 管理者向けビルド（新URL /monet-dashboard/admin-view/）
+        run: VITE_BASE=/monet-dashboard/admin-view/ VITE_ROLE=admin npx vite build --outDir "$PWD/dist/admin-view"
+      - name: 管理者向けを配信先へ配置
+        run: mv dist/admin-view dist/public/admin-view
       - uses: actions/configure-pages@v5
         with:
           enablement: true
