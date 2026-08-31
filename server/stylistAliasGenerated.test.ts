@@ -12,8 +12,10 @@
  * 別名を足したくなったらこのファイルではなく Notion の「かな」を直す。
  */
 import { describe, it, expect, beforeAll } from "vitest";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { STAFF_MASTER } from "../client/src/data/staffMaster";
-import { aliasesForStaff, INTRA_STORE_AMBIGUOUS } from "../client/src/lib/stylistAlias";
+import { aliasesForStaff, INTRA_STORE_AMBIGUOUS, ambiguousOwnersFor } from "../client/src/lib/stylistAlias";
 
 let matchesStylist: (stylist: string, target: string, store?: string) => boolean;
 let isRetiredInMonth: (staffName: string, store: string, yearMonth: string) => boolean;
@@ -191,6 +193,60 @@ describe("実データで直った/維持できた着地（ファンくるスプ
     // 姪浜院の過去スタッフ「ふじたみほ」。名簿から消えているので未マッチが正しい
     const meinohama = STAFF_MASTER.filter((s) => s.store === "姪浜院");
     expect(meinohama.filter((s) => matchesStylist("ふじたみほ", s.name))).toEqual([]);
+  });
+});
+
+/*
+ * 2026-08-31 独立監査の重大①: 「捨てた事実は管理画面に出す」と書いてあるのに、
+ * INTRA_STORE_AMBIGUOUS を読む画面が1つも無かった（＝理由が誰にも見えず、
+ * 判別不能な名前に［登録］が押せた）。押されると DB 由来の別名が生成別名より
+ * 優先されるため、取り違えが確定して機械では戻せない。ここで配線を固定する。
+ */
+describe("判別不能な名前を管理画面に出すための入口", () => {
+  it("完全一致から捨てた別名は、衝突している氏名つきで引ける", () => {
+    const owners = ambiguousOwnersFor("楽々園院", "けいこ");
+    expect(owners).toBeDefined();
+    expect(owners!.length).toBeGreaterThan(1);
+    expect(owners!.some((n) => n.includes("恵子"))).toBe(true);
+    expect(owners!.some((n) => n.includes("慶子"))).toBe(true);
+  });
+
+  it("カタカナ・ローマ字・空白ゆれでも同じ判定になる", () => {
+    for (const input of ["ケイコ", "keiko", " けいこ ", "Keiko"]) {
+      expect(ambiguousOwnersFor("楽々園院", input), input).toBeDefined();
+    }
+  });
+
+  it("判定は店舗ごと。衝突が無い店舗は他店舗の衝突を持ち込まない", () => {
+    // 「けいこ」が判別不能なのは楽々園院だけ。堀江院に恵子/慶子は居ない
+    expect(ambiguousOwnersFor("楽々園院", "けいこ")).toBeDefined();
+    expect(ambiguousOwnersFor("堀江院", "けいこ")).toBeUndefined();
+    // 店舗が分からない/マスタに無い場合だけ、安全側に倒して全店舗の合併で見る
+    expect(ambiguousOwnersFor("", "けいこ")).toBeDefined();
+  });
+
+  it("普通に当たる名前・名簿外の名前は判別不能にしない", () => {
+    expect(ambiguousOwnersFor("堀江院2nd", "さかで")).toBeUndefined();
+    expect(ambiguousOwnersFor("姪浜院", "ふじたみほ")).toBeUndefined(); // 名簿外＝登録で直せる側
+    expect(ambiguousOwnersFor("楽々園院", "")).toBeUndefined();
+  });
+
+  /*
+   * 画面側の配線そのものを固定する。この repo に DOM テスト環境が無いため
+   * （vitest.config.ts の environment: "node" / include: server/**）ソースを
+   * 文字列で検査している。落ちたときは「配線が外れた」を意味する。
+   */
+  it("管理画面の未マッチパネルが実際にこの判定を使っている", () => {
+    const src = readFileSync(
+      path.resolve(import.meta.dirname, "../client/src/pages/admin/AdminSurveys.tsx"),
+      "utf8"
+    );
+    expect(src).toContain('from "@/lib/stylistAlias"');
+    expect(src).toContain("ambiguousOwnersFor(u.store, u.name)");
+    // 該当行では Select と［登録］を出さない（三項の別枝で理由文を出す）
+    expect(src).toContain("ambiguousOwners ? (");
+    // 押せない状態でも登録処理側で二重に止める
+    expect(src).toContain("ambiguousRows.get(rowKey)");
   });
 });
 

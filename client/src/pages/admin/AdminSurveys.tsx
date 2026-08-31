@@ -27,6 +27,7 @@ import { useNpsData, calculateStoreStats, filterByMonth, getAvailableMonths, typ
 import { useFankuruData, fetchPdfData, matchesStylist, type FankuruPdf } from "@/hooks/useFankuruData";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { normalizeStaffKey } from "@/lib/staffNameAlias";
+import { ambiguousOwnersFor } from "@/lib/stylistAlias";
 import { toast } from "sonner";
 import { useStores } from "@/hooks/useStores";
 import { trpc } from "@/lib/trpc";
@@ -230,10 +231,29 @@ function UnmatchedSuggestPanel({
     return Array.from(agg.values()).sort((a, b) => b.count - a.count);
   }, [npsRecords, fankuruAll, reportRawData, rosterAll, rosterByStore, resolveKey]);
 
-  // 読み仮名ベースの候補推定（サーバ側）
+  /*
+   * 未マッチのうち「同じ店舗に同じ読みの人が2人以上いるため、意図的にどちらにも
+   * 紐づけなかった」行（stylistAlias.ts の判断）。行キー → 衝突している氏名。
+   * この行は登録させない: DB登録した別名は生成別名より優先されるため（useFankuruData の
+   * getMergedAliasMap）、登録すると取り違えが確定して機械では戻せなくなる。
+   */
+  const ambiguousRows = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const u of unmatched) {
+      const owners = ambiguousOwnersFor(u.store, u.name);
+      if (owners && owners.length > 1) map.set(`${u.source}__${u.name}__${u.store}`, owners);
+    }
+    return map;
+  }, [unmatched]);
+
+  // 読み仮名ベースの候補推定（サーバ側）。判別不能な行は候補を出さない（誤登録を誘うため）
+  const suggestTargets = useMemo(
+    () => unmatched.filter((u) => !ambiguousRows.has(`${u.source}__${u.name}__${u.store}`)),
+    [unmatched, ambiguousRows]
+  );
   const suggestQuery = trpc.admin.suggestStaffMatches.useQuery(
-    { names: unmatched.map((u) => u.name), roster: rosterAll },
-    { enabled: unmatched.length > 0 && rosterAll.length > 0, staleTime: 5 * 60 * 1000, retry: 1 }
+    { names: suggestTargets.map((u) => u.name), roster: rosterAll },
+    { enabled: suggestTargets.length > 0 && rosterAll.length > 0, staleTime: 5 * 60 * 1000, retry: 1 }
   );
   const suggestions = useMemo(() => {
     const map = new Map<string, { suggested: string | null; confidence: "high" | "mid" | null }>();
@@ -252,6 +272,14 @@ function UnmatchedSuggestPanel({
 
   const handleRegister = (u: UnmatchedEntry) => {
     const rowKey = `${u.source}__${u.name}__${u.store}`;
+    const owners = ambiguousRows.get(rowKey);
+    if (owners) {
+      // UI上ボタンは出していないが、安全策を壊せないよう二重に止める
+      toast.error("この名前は登録できません", {
+        description: `${u.store} に同じ読みの人が${owners.length}人います（${owners.join("／")}）。元データに氏名を書いてもらってください。`,
+      });
+      return;
+    }
     const canonical = selections[rowKey] ?? suggestions.get(u.name)?.suggested ?? "";
     if (!canonical) {
       toast.error("正式名を選択してください");
@@ -355,6 +383,13 @@ function UnmatchedSuggestPanel({
           読み仮名から候補を自動推定しています（<Sparkles className="w-3 h-3 inline text-amber-500" />=候補あり）。
           正しければそのまま「登録」、違えばプルダウンで正式名を選んで登録してください。
         </p>
+        {ambiguousRows.size > 0 && (
+          <p className="text-[11px] text-amber-800 bg-amber-100/60 border border-amber-200 rounded-md px-2 py-1.5 mb-3">
+            うち{ambiguousRows.size}件は、同じ店舗に同じ読みの人が2人以上いるため<strong>意図的に未マッチ</strong>にしています。
+            どちらかに紐づけると売上・NPSが誤って配賦されるので、登録はできません（下の行に理由を出しています）。
+            直すには元データ（ファンくる／NPSの担当者欄）に氏名を書いてもらってください。
+          </p>
+        )}
         <div className="space-y-2">
           {unmatched.map((u) => {
             const rowKey = `${u.source}__${u.name}__${u.store}`;
@@ -362,14 +397,32 @@ function UnmatchedSuggestPanel({
             const value = selections[rowKey] ?? sug?.suggested ?? "";
             const storeRoster = Array.from(rosterByStore.get(u.store) || []);
             const others = rosterAll.filter((n) => !storeRoster.includes(n));
+            const ambiguousOwners = ambiguousRows.get(rowKey);
             return (
-              <div key={rowKey} className="flex flex-col sm:flex-row sm:items-center gap-2 bg-white/80 border border-border/40 rounded-lg px-3 py-2">
+              <div
+                key={rowKey}
+                className={
+                  ambiguousOwners
+                    ? "flex flex-col gap-1 bg-amber-100/40 border border-amber-300/70 rounded-lg px-3 py-2"
+                    : "flex flex-col sm:flex-row sm:items-center gap-2 bg-white/80 border border-border/40 rounded-lg px-3 py-2"
+                }
+              >
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <Badge variant="outline" className="text-[10px] shrink-0">{u.source}</Badge>
                   <span className="text-sm font-medium truncate">{u.name}</span>
                   <span className="text-[11px] text-muted-foreground shrink-0">（{u.store}・{u.count}件）</span>
-                  {sug?.confidence === "high" && <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
+                  {!ambiguousOwners && sug?.confidence === "high" && <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
+                  {ambiguousOwners && (
+                    <Badge className="text-[10px] shrink-0 bg-amber-600 hover:bg-amber-600">判別不能</Badge>
+                  )}
                 </div>
+                {ambiguousOwners ? (
+                  <p className="text-[11px] text-amber-800">
+                    {u.store}に同じ読みの人が{ambiguousOwners.length}人います（{ambiguousOwners.join("／")}）。
+                    取り違えを防ぐため、どちらにも紐づけていません。<strong>登録はできません</strong>——
+                    元データの担当者欄に氏名（フルネーム）を書いてもらうと自動で紐づきます。
+                  </p>
+                ) : (
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground shrink-0">→</span>
                   <Select value={value} onValueChange={(v) => setSelections((p) => ({ ...p, [rowKey]: v }))}>
@@ -397,6 +450,7 @@ function UnmatchedSuggestPanel({
                     登録
                   </Button>
                 </div>
+                )}
               </div>
             );
           })}

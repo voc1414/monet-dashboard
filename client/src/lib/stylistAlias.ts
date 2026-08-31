@@ -250,14 +250,14 @@ const STAFF_ALIASES: StaffAlias[] = (() => {
  * 同一店舗で2人以上が持つものを「部分一致の入力に使ってはいけない語」として禁止する。
  * 完全一致は別経路なので、「まゆ」→中島真優 のように本人が一意に決まる分は残る。
  */
-const AMBIGUOUS_PARTIAL_INPUTS: Map<string, Set<string>> = (() => {
+const AMBIGUOUS_PARTIAL_INPUTS: Map<string, Map<string, string[]>> = (() => {
   const byStore = new Map<string, StaffAlias[]>();
   for (const s of STAFF_ALIASES) {
     const list = byStore.get(s.store) ?? [];
     list.push(s);
     byStore.set(s.store, list);
   }
-  const out = new Map<string, Set<string>>();
+  const out = new Map<string, Map<string, string[]>>();
   for (const [store, list] of byStore) {
     // 部分文字列 → それを持つ人の氏名
     const owners = new Map<string, Set<string>>();
@@ -278,8 +278,9 @@ const AMBIGUOUS_PARTIAL_INPUTS: Map<string, Set<string>> = (() => {
         owners.set(sub, names);
       }
     }
-    const banned = new Set<string>();
-    for (const [sub, names] of owners) if (names.size > 1) banned.add(sub);
+    // 禁止語 → それを含む2人以上の氏名（管理画面で理由を出すため氏名も残す）
+    const banned = new Map<string, string[]>();
+    for (const [sub, names] of owners) if (names.size > 1) banned.set(sub, Array.from(names));
     out.set(store, banned);
   }
   return out;
@@ -321,6 +322,58 @@ export const INTRA_STORE_AMBIGUOUS: Array<{ store: string; alias: string; names:
   }
   return out;
 })();
+
+/** INTRA_STORE_AMBIGUOUS を店舗→別名→氏名で引ける索引に畳んだもの */
+const INTRA_STORE_AMBIGUOUS_INDEX: Map<string, Map<string, string[]>> = (() => {
+  const out = new Map<string, Map<string, string[]>>();
+  for (const { store, alias, names } of INTRA_STORE_AMBIGUOUS) {
+    const byAlias = out.get(store) ?? new Map<string, string[]>();
+    byAlias.set(alias, names);
+    out.set(store, byAlias);
+  }
+  return out;
+})();
+
+/**
+ * その担当者名が「同じ店舗に同じ読みの人が2人以上いるため、意図的にどちらにも
+ * 紐づけなかった」名前か。該当すれば衝突している氏名を返し、しなければ undefined。
+ *
+ * 管理画面の未マッチ検出パネルがこれを使う。未マッチの理由が「名簿に居ない」なのか
+ * 「読みが衝突していて機械では決められない」なのかで、人がやることが正反対になる:
+ * 前者は別名を登録すれば直るが、後者は**登録してはいけない**（DB由来の別名は
+ * 生成別名より優先されるため、登録すると取り違えが確定して元に戻せない）。
+ * 後者の直し方は元データ（ファンくる／NPSの担当者欄）に氏名を書いてもらうことだけ。
+ *
+ * store がマスタに無いときは全店舗の合併で判断する（安全側に倒す）。
+ */
+export function ambiguousOwnersFor(store: string, input: string): string[] | undefined {
+  const key = aliasKey(input);
+  if (!key) return undefined;
+
+  // 店舗がマスタに在るか。AMBIGUOUS_PARTIAL_INPUTS は在籍者の居る全店舗を必ず持つ
+  // （衝突が無い店舗も空の Map を持つ）ので、ここで「店舗を知っているか」を判定できる。
+  // 衝突が無いだけの店舗を「未知の店舗」と誤判定して他店舗の衝突を返さないための分岐。
+  if (AMBIGUOUS_PARTIAL_INPUTS.has(store)) {
+    // ① 完全一致から捨てた別名（楽々園院の「けいこ」型）
+    const hit = INTRA_STORE_AMBIGUOUS_INDEX.get(store)?.get(key);
+    if (hit) return hit;
+    // ② 部分一致の入力として禁止した語（「いのうえけいこ」「まえだけいこ」に共通する部分）
+    if (key.length < 2) return undefined;
+    return AMBIGUOUS_PARTIAL_INPUTS.get(store)!.get(key);
+  }
+
+  // 店舗が分からない／マスタに無いときは全店舗の合併で判断する（安全側に倒す）
+  for (const byAlias of INTRA_STORE_AMBIGUOUS_INDEX.values()) {
+    const hit = byAlias.get(key);
+    if (hit) return hit;
+  }
+  if (key.length < 2) return undefined;
+  for (const byKey of AMBIGUOUS_PARTIAL_INPUTS.values()) {
+    const hit = byKey.get(key);
+    if (hit) return hit;
+  }
+  return undefined;
+}
 
 /** 氏名／表示名 → その人の別名集合 */
 const ALIASES_BY_STAFF = new Map<string, Set<string>>();
