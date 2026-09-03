@@ -418,6 +418,14 @@ export default function StaffDetail() {
 
   const hasFankuruData = filteredFankuruPdfs.length > 0 || filteredFankuruComments.length > 0;
 
+  // 口コミ・NPS・ファンくるの件数（期間セレクタ連動）
+  // 口コミ件数＝NPSシートでレビュー本文がある回答数 / NPS件数＝NPSシートの回答数 / ファンくる件数＝調査PDF＋本人の調査結果コメント
+  const feedbackCounts = useMemo(() => ({
+    reviewCount: staffNpsRecords.filter(r => r.review && r.review.trim().length > 0).length,
+    npsCount: staffNpsRecords.length,
+    fankuruCount: filteredFankuruPdfs.length + filteredFankuruComments.length,
+  }), [staffNpsRecords, filteredFankuruPdfs, filteredFankuruComments]);
+
   // トップ3レビュー
   const topReviews = useMemo(() => {
     return staffNpsRecords
@@ -940,6 +948,40 @@ export default function StaffDetail() {
             </CardContent>
           </Card>
         )}
+
+        {/* 口コミ・NPS・ファンくるの件数（月末報告書の有無に関わらず出す） */}
+        <Card className="border-border/50 shadow-sm mt-4">
+          <CardContent className="p-5">
+            <div className="mb-3">
+              <span className="text-[10px] font-medium text-sage/80 bg-sage/5 border border-sage/20 rounded px-1.5 py-0.5">
+                NPSシート・ファンくる{!isAllPeriod ? `（${getPeriodLabel(periodSelection)}）` : ""}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <div className="text-[10px] text-muted-foreground mb-1 flex items-center gap-1">
+                  <MessageSquare className="w-3 h-3" />口コミ
+                </div>
+                <div className="font-mono-data text-lg font-bold text-foreground">{feedbackCounts.reviewCount}件</div>
+              </div>
+              <div>
+                <div className="text-[10px] text-muted-foreground mb-1 flex items-center gap-1">
+                  <Gauge className="w-3 h-3" />NPS
+                </div>
+                <div className="font-mono-data text-lg font-bold text-foreground">{feedbackCounts.npsCount}件</div>
+              </div>
+              <div>
+                <div className="text-[10px] text-muted-foreground mb-1 flex items-center gap-1">
+                  <FolderOpen className="w-3 h-3" />ファンくる
+                </div>
+                <div className="font-mono-data text-lg font-bold text-foreground">{feedbackCounts.fankuruCount}件</div>
+              </div>
+            </div>
+            <p className="text-[10px] text-muted-foreground/70 mt-3 leading-relaxed">
+              口コミ＝NPSシートでレビュー本文がある回答数。NPS＝NPSシートの回答数。ファンくる＝調査PDF＋本人が書いた調査結果コメントの合計。
+            </p>
+          </CardContent>
+        </Card>
       </section>
 
 
