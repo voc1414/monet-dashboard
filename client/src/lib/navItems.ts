@@ -4,10 +4,11 @@
  * ここ1箇所を直せば DashboardLayout（スタッフ向け）と AdminLayout（管理者の設定画面）の
  * 両方に効く。ページを物理的に複製せず、`adminOnly` の出し分けだけで仕分ける。
  *   - スタッフ向け … 店舗一覧／スタッフ一覧／アンケート／カウンセリング
- *   - 管理者向け   … 上記すべて ＋ 広告（Meta） ＋ 設定
+ *   - 管理者向け   … 上記すべて ＋ 雇用形態別の売上 ＋ 広告（Meta） ＋ 設定
  */
 import {
   AlertTriangle,
+  BarChart3,
   ClipboardList,
   Home,
   Megaphone,
@@ -65,6 +66,15 @@ export const MAIN_TABS: NavItem[] = [
     icon: MessageSquareText,
     adminOnly: false,
     isActive: (l) => l.startsWith("/counseling"),
+  },
+  {
+    href: "/employment",
+    label: "雇用形態別の売上",
+    shortLabel: "雇用形態",
+    icon: BarChart3,
+    // 雇用形態は人事情報。スタッフ同士で見えると比較・詮索の元になるので管理者だけ（2026-09-01）
+    adminOnly: true,
+    isActive: (l) => l.startsWith("/employment"),
   },
   {
     href: "/ads",

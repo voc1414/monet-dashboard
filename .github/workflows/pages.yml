@@ -38,6 +38,15 @@ jobs:
             echo "::error::スタッフ向けバンドルに広告コードが含まれています"
             exit 1
           fi
+      # 雇用形態別の売上（管理者専用・2026-09-01）。ページ本体の文字列で見る。
+      # navItems.ts のタブ定義（ラベルと adminOnly フラグ）は共有モジュールなので
+      # スタッフ向けにも文字列として残る（/ads と同じ）。ルートが無いので到達はできない。
+      - name: スタッフ向けに雇用形態別売上のページが混ざっていないか検査
+        run: |
+          if grep -rq -e '1人あたり月間平均売上' -e '雇用形態の中での個人ランキング' dist/public/assets; then
+            echo "::error::スタッフ向けバンドルに雇用形態別売上のページが含まれています"
+            exit 1
+          fi
       - name: 管理者向けビルド（新URL /monet-dashboard/admin-view/）
         run: VITE_BASE=/monet-dashboard/admin-view/ VITE_ROLE=admin npx vite build --outDir "$PWD/dist/admin-view"
       - name: 管理者向けを配信先へ配置

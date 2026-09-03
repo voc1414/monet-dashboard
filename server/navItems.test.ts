@@ -22,22 +22,27 @@ describe("画面の仕分け（スタッフ向け／管理者向け）", () => {
     const staffTabs = visibleMainTabs(false);
     expect(staffTabs.map((t) => t.href)).toEqual(["/", "/staff", "/survey", "/counseling"]);
     expect(staffTabs.some((t) => t.href === "/ads")).toBe(false);
+    expect(staffTabs.some((t) => t.href === "/employment")).toBe(false);
   });
 
-  it("管理者向けは既存の全タブ＋広告", () => {
+  it("管理者向けは既存の全タブ＋雇用形態別の売上＋広告", () => {
     const adminTabs = visibleMainTabs(true);
     expect(adminTabs.map((t) => t.href)).toEqual([
       "/",
       "/staff",
       "/survey",
       "/counseling",
+      "/employment",
       "/ads",
     ]);
   });
 
-  it("広告と設定は管理者専用フラグが立っている", () => {
+  it("雇用形態別の売上・広告・設定は管理者専用フラグが立っている", () => {
     const ads = MAIN_TABS.find((t) => t.href === "/ads");
     expect(ads?.adminOnly).toBe(true);
+    // 雇用形態は人事情報。スタッフ同士で見えてはいけない（2026-09-01）
+    const employment = MAIN_TABS.find((t) => t.href === "/employment");
+    expect(employment?.adminOnly).toBe(true);
     expect(SETTINGS_TAB.adminOnly).toBe(true);
   });
 
@@ -81,6 +86,7 @@ describe("画面の仕分け（スタッフ向け／管理者向け）", () => {
   it("広告と設定のルートは管理者向けビルドにしか登録されない", () => {
     const app = readClientSource("App.tsx");
     const adminOnlyRoutes = [
+      "/employment",
       "/ads",
       "/admin/login",
       "/admin",
@@ -97,6 +103,7 @@ describe("画面の仕分け（スタッフ向け／管理者向け）", () => {
     }
     // 素の <Route path="/ads"> が残っていたら常時登録されてしまう
     expect(app).not.toMatch(/^\s*<Route path="\/ads"/m);
+    expect(app).not.toMatch(/^\s*<Route path="\/employment"/m);
     expect(app).not.toMatch(/^\s*<Route path="\/admin/m);
   });
 

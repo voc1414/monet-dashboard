@@ -39,6 +39,10 @@ export default function DashboardLayout({
   // 広告・設定タブは管理者向けビルドにしか無い（スタッフ向けバンドルには存在しない）
   const isAdmin = IS_ADMIN_BUILD;
   const tabs = visibleMainTabs(isAdmin);
+  // モバイル下部ナビは1行あたり5個までしか横に並ばない（375px幅・和文ラベル）。
+  // それを超えたら2行グリッドに切り替える。1行に詰めると「カウンセリング」等が
+  // 3行に折り返して56pxのバーからはみ出し、末尾の1文字が切れる（2026-09-01 実測）。
+  const compactBottomNav = tabs.length + (isAdmin ? 1 : 0) > 5;
 
   return (
     <div className="min-h-screen bg-background">
@@ -63,16 +67,23 @@ export default function DashboardLayout({
             </div>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-6">
+          {/*
+            上部タブは lg（1024px）以上だけ。md（768px）では管理者の7タブが
+            ロゴに重なるため、lg 未満は下部ナビに任せる。
+            lg〜xl 未満はまだ幅が足りないので短いラベル・狭い gap にする
+            （1024px でフルラベルにするとロゴとの隙間が 0 になる・2026-09-01 実測）。
+          */}
+          <nav className="hidden lg:flex items-center gap-3 xl:gap-6">
             {tabs.map((tab) => (
               <Link key={tab.href} href={tab.href}>
                 <span
-                  className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary ${
+                  className={`flex items-center gap-1.5 xl:gap-2 whitespace-nowrap text-sm font-medium transition-colors hover:text-primary ${
                     tab.isActive(location) ? "text-foreground" : "text-muted-foreground"
                   }`}
                 >
-                  <tab.icon className="w-4 h-4" />
-                  {tab.label}
+                  <tab.icon className="w-4 h-4 shrink-0" />
+                  <span className="xl:hidden">{tab.shortLabel}</span>
+                  <span className="hidden xl:inline">{tab.label}</span>
                 </span>
               </Link>
             ))}
@@ -80,8 +91,8 @@ export default function DashboardLayout({
               <>
                 <div className="w-px h-5 bg-border/60" />
                 <Link href={SETTINGS_TAB.href}>
-                  <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground/70 hover:text-primary transition-colors px-2.5 py-1.5 rounded-md border border-border/50 hover:border-primary/30 hover:bg-primary/5">
-                    <SETTINGS_TAB.icon className="w-3.5 h-3.5" />
+                  <span className="flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-muted-foreground/70 hover:text-primary transition-colors px-2.5 py-1.5 rounded-md border border-border/50 hover:border-primary/30 hover:bg-primary/5">
+                    <SETTINGS_TAB.icon className="w-3.5 h-3.5 shrink-0" />
                     {SETTINGS_TAB.label}
                   </span>
                 </Link>
@@ -143,31 +154,46 @@ export default function DashboardLayout({
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, ease: "easeOut" }}
-        className="container py-6 pb-24 md:pb-16"
+        className={`container py-6 lg:pb-16 ${compactBottomNav ? "pb-32" : "pb-24"}`}
       >
         {children}
       </motion.main>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden border-t border-border/60 bg-white/95 backdrop-blur-md safe-area-bottom">
-        <div className="flex items-center justify-around h-14">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden border-t border-border/60 bg-white/95 backdrop-blur-md safe-area-bottom">
+        <div
+          className={
+            compactBottomNav
+              ? "grid grid-cols-4 py-1"
+              : "flex items-center justify-around h-14"
+          }
+        >
           {tabs.map((tab) => (
             <Link key={tab.href} href={tab.href}>
               <div
-                className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-colors ${
-                  tab.isActive(location) ? "text-primary" : "text-muted-foreground"
-                }`}
+                className={`flex flex-col items-center gap-0.5 py-1.5 rounded-lg transition-colors ${
+                  compactBottomNav ? "px-1" : "px-4"
+                } ${tab.isActive(location) ? "text-primary" : "text-muted-foreground"}`}
               >
-                <tab.icon className="w-5 h-5" />
-                <span className="text-[10px] font-medium">{tab.shortLabel}</span>
+                <tab.icon className="w-5 h-5 shrink-0" />
+                {/* 和文ラベルを途中で折り返さない（「カウンセリン／グ」を防ぐ） */}
+                <span className="text-[10px] font-medium whitespace-nowrap">
+                  {tab.shortLabel}
+                </span>
               </div>
             </Link>
           ))}
           {isAdmin && (
             <Link href={SETTINGS_TAB.href}>
-              <div className="flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-colors text-muted-foreground/60">
-                <SETTINGS_TAB.icon className="w-5 h-5" />
-                <span className="text-[10px] font-medium">{SETTINGS_TAB.shortLabel}</span>
+              <div
+                className={`flex flex-col items-center gap-0.5 py-1.5 rounded-lg transition-colors text-muted-foreground/60 ${
+                  compactBottomNav ? "px-1" : "px-4"
+                }`}
+              >
+                <SETTINGS_TAB.icon className="w-5 h-5 shrink-0" />
+                <span className="text-[10px] font-medium whitespace-nowrap">
+                  {SETTINGS_TAB.shortLabel}
+                </span>
               </div>
             </Link>
           )}

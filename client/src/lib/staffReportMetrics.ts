@@ -47,6 +47,14 @@ export interface StaffReportMetrics {
 }
 
 /**
+ * 報告書1行の売上（総売上 ＝ 技術売上 + 店販売上。林さん承認 2026-09-03）。
+ * 報告書に「総売上」の列は無いのでここで足す。合算する画面はこの1箇所を使う。
+ */
+export function reportRowSales(r: { techSales: number; retailSales: number }): number {
+  return (r.techSales || 0) + (r.retailSales || 0);
+}
+
+/**
  * 同じ対象月に複数の回答があるときは回答日が新しい1行だけ残す（二重計上を防ぐ）。
  * 実データに重複あり（例: 石原葉子の 2026-07）。返り値は対象月の降順。
  */
@@ -77,7 +85,7 @@ export function aggregateStaffReportMetrics(rows: StaffReportMetricsInput[]): St
 
   const techSales = sum(r => r.techSales);
   const retailSales = sum(r => r.retailSales);
-  const totalSales = techSales + retailSales;
+  const totalSales = sum(reportRowSales);
   const newCustomers = sum(r => r.newCustomers);
   const returnCustomers = sum(r => r.returnCustomers);
   const totalCustomers = newCustomers + returnCustomers;

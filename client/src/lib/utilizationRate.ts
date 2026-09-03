@@ -38,7 +38,7 @@ const EMPLOYMENT_ALIASES: Record<string, string> = {
  * 5. 半角プラス→全角プラス
  * 6. 名称と括弧の間のスペースを除去（例: "時短社員 （7時間）" → "時短社員（7時間）"）
  */
-function normalizeEmploymentType(raw: string): string {
+export function normalizeEmploymentType(raw: string): string {
   return raw
     .trim()
     .replace(/　/g, " ")             // 全角スペース→半角
@@ -52,38 +52,43 @@ function normalizeEmploymentType(raw: string): string {
 }
 
 /**
+ * 表記ゆれ・省略表記を吸収して、EMPLOYMENT_MAX_CUSTOMERS の正式キーに寄せる。
+ * どれにも当たらなければ null（例: 週数の無い「パート」は判定不可）。
+ *
+ * getMaxCustomers と同じ突き合わせ順（直接→正規化→エイリアス）を1箇所に集約したもの。
+ * 雇用形態でグルーピングする画面は、これを使って同じ雇用形態を1つにまとめる。
+ */
+export function canonicalEmploymentType(raw: string): string | null {
+  if (!raw) return null;
+
+  if (EMPLOYMENT_MAX_CUSTOMERS[raw] !== undefined) return raw;
+
+  const normalized = normalizeEmploymentType(raw);
+  for (const key of Object.keys(EMPLOYMENT_MAX_CUSTOMERS)) {
+    if (normalizeEmploymentType(key) === normalized) return key;
+  }
+
+  const aliasKey = EMPLOYMENT_ALIASES[normalized];
+  if (aliasKey) {
+    const aliasNorm = normalizeEmploymentType(aliasKey);
+    for (const key of Object.keys(EMPLOYMENT_MAX_CUSTOMERS)) {
+      if (normalizeEmploymentType(key) === aliasNorm) return key;
+    }
+  }
+
+  return null;
+}
+
+/**
  * 雇用形態から最大客数を取得する
  * @returns 最大客数。不明な雇用形態の場合は null
  */
 export function getMaxCustomers(employmentType: string): number | null {
-  if (!employmentType) return null;
-
-  // まず直接マッチ
-  const direct = EMPLOYMENT_MAX_CUSTOMERS[employmentType];
-  if (direct !== undefined) return direct;
-
-  // 正規化してマッチ
-  const normalized = normalizeEmploymentType(employmentType);
-  for (const [key, value] of Object.entries(EMPLOYMENT_MAX_CUSTOMERS)) {
-    if (normalizeEmploymentType(key) === normalized) {
-      return value;
-    }
-  }
-
-  // エイリアスマッチ（省略表記対応）
-  const aliasKey = EMPLOYMENT_ALIASES[normalized];
-  if (aliasKey) {
-    const aliasNorm = normalizeEmploymentType(aliasKey);
-    for (const [key, value] of Object.entries(EMPLOYMENT_MAX_CUSTOMERS)) {
-      if (normalizeEmploymentType(key) === aliasNorm) {
-        return value;
-      }
-    }
-  }
-
-  // 部分マッチ: 「パート」のみの場合は週数が不明のためnullを返す
-  // ただし「パート 週N前後」パターンは上でマッチ済み
-  return null;
+  // 突き合わせ（直接→正規化→エイリアス）は canonicalEmploymentType に集約。
+  // 週数の無い「パート」はここで null になる（週数が分からず最大客数を決められない）。
+  const canonical = canonicalEmploymentType(employmentType);
+  if (canonical === null) return null;
+  return EMPLOYMENT_MAX_CUSTOMERS[canonical];
 }
 
 /**

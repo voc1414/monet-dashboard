@@ -31,7 +31,7 @@ const COL = {
   NPS_COMMENT: 17,
   FANKURU_COMMENT: 18,
   // 列20 は 2026-08-29 に「写真」から「ニックネーム」へ差し替えられた（列19・20 はヘッダー空欄）。
-  // それ以前の行には写真URLが入っているので parseNickname で捨てる。
+  // それ以前の行には写真URLが入っているので parseReportNickname で捨てる。
   NICKNAME: 20,
 } as const;
 

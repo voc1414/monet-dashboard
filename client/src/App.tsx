@@ -17,6 +17,7 @@ import SurveyDetail from "./pages/SurveyDetail";
 import StaffDetail from "./pages/StaffDetail";
 import Counseling from "./pages/Counseling";
 import Ads from "./pages/Ads";
+import EmploymentRanking from "./pages/EmploymentRanking";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminAlerts from "./pages/admin/AdminAlerts";
 import AdminStores from "./pages/admin/AdminStores";
@@ -40,9 +41,10 @@ function Router() {
         <Route path="/store/:storeId/nps" component={NpsOverview} />
 
         {/*
-          広告と設定は管理者向けビルドにだけ登録する。
+          雇用形態別の売上・広告・設定は管理者向けビルドにだけ登録する。
           スタッフ向けビルドではルートが存在しないので、URL を直打ちしても 404 になる。
         */}
+        {IS_ADMIN_BUILD && <Route path="/employment" component={EmploymentRanking} />}
         {IS_ADMIN_BUILD && <Route path="/ads" component={Ads} />}
         {IS_ADMIN_BUILD && <Route path="/admin/login" component={AdminLogin} />}
         {IS_ADMIN_BUILD && <Route path="/admin" component={AdminAlerts} />}

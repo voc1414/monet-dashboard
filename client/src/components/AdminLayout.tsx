@@ -50,7 +50,7 @@ export default function AdminLayout({ children, breadcrumbs = [], title }: Admin
             {/* Mobile Menu Toggle */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground"
+              className="lg:hidden p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
@@ -76,17 +76,19 @@ export default function AdminLayout({ children, breadcrumbs = [], title }: Admin
           </div>
 
           {/* Desktop Nav（管理者は主タブ全部＋広告＋設定が並ぶ） */}
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden lg:flex items-center gap-1">
             {MAIN_TABS.map((tab) => (
               <Link key={tab.href} href={tab.href}>
-                <span className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-muted-foreground hover:text-foreground hover:bg-accent/50">
-                  <tab.icon className="w-4 h-4" />
-                  {tab.label}
+                {/* xl 未満は短いラベル（タブが増えると1行に収まらない・2026-09-01） */}
+                <span className="flex items-center gap-1.5 xl:gap-2 whitespace-nowrap px-2 xl:px-3 py-2 rounded-lg text-sm font-medium transition-colors text-muted-foreground hover:text-foreground hover:bg-accent/50">
+                  <tab.icon className="w-4 h-4 shrink-0" />
+                  <span className="xl:hidden">{tab.shortLabel}</span>
+                  <span className="hidden xl:inline">{tab.label}</span>
                 </span>
               </Link>
             ))}
-            <span className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-primary/10 text-primary">
-              <SETTINGS_TAB.icon className="w-4 h-4" />
+            <span className="flex items-center gap-1.5 xl:gap-2 whitespace-nowrap px-2 xl:px-3 py-2 rounded-lg text-sm font-medium bg-primary/10 text-primary">
+              <SETTINGS_TAB.icon className="w-4 h-4 shrink-0" />
               {SETTINGS_TAB.label}
             </span>
           </nav>
@@ -111,7 +113,7 @@ export default function AdminLayout({ children, breadcrumbs = [], title }: Admin
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="md:hidden border-b border-border/40 bg-white/95 backdrop-blur-md z-40"
+          className="lg:hidden border-b border-border/40 bg-white/95 backdrop-blur-md z-40"
         >
           <div className="container py-2 space-y-1">
             <p className="px-3 pt-1 pb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground/70">
