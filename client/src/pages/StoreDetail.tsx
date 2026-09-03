@@ -37,8 +37,7 @@ import type { CompositeScoreResult } from "@/lib/compositeScore";
 import type { FankuruPdf } from "@/hooks/useFankuruData";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { useSalonBoardData } from "@/hooks/useSalonBoardData";
-import { useSalonBoardStylistData } from "@/hooks/useSalonBoardStylistData";
-import type { StaffReport } from "@/hooks/useMonthlyReport";
+import { groupStaffReportsByStaff } from "@/lib/staffReportMetrics";
 import { validateStoreReport, getAlertSummary } from "@/lib/reportValidation";
 import type { ReportAlert } from "@/lib/reportValidation";
 import { normalizeStaffKey } from "@/lib/staffNameAlias";
@@ -224,7 +223,6 @@ export default function StoreDetail() {
   const { records, loading: npsLoading, error: npsError, lastUpdated, refresh } = useNpsData(npsAliasMap);
   const { rawData, loading: reportLoading, error: reportError, getStoreMonthlyStats, availableMonths: reportMonths } = useMonthlyReport();
   const { loading: sbLoading, error: sbError, getStoreMonth, getStoreMonthsAggregated, hasData: hasSbData } = useSalonBoardData();
-  const { getStylistMonth: getSbStylistMonth } = useSalonBoardStylistData();
   const loading = npsLoading || reportLoading || sbLoading;
   const error = npsError || reportError || sbError;
   const allNpsMonths = useMemo(() => getAvailableMonths(records), [records]);
@@ -335,6 +333,51 @@ export default function StoreDetail() {
       };
     }
   }, [getStoreMonthlyStats, storeId, selectedMonthsList]);
+
+  /**
+   * この店舗のスタッフ個人実績（月末報告書ベース・選択期間を合算・1人1行）
+   *
+   * 林さんの決定＝店舗売上はサロンボード／個人数値は月末報告書。
+   * 計算ルールの本体は lib/staffReportMetrics.ts。
+   *
+   * ここでまとめ直す理由（従来の不具合）:
+   *  ・月間表彰と総合点ランキングは「各スタッフの最新1月」しか見ておらず、
+   *    複数月・年間・全期間を選んでも単月の数字で順位を付けていた
+   *  ・reportStats.staffReports は報告書の生の行なので、全期間では同じ人が
+   *    提出月数ぶん重複して並び、スタッフ数も水増しされていた
+   *  ・スタッフ個人実績カードだけサロンボード優先になっていた（記録の無い変更）
+   *
+   * 売上の降順。並び替えの必要な箇所ではこの配列を作り直す。
+   */
+  const storeStaffMetrics = useMemo(() => {
+    const storeRows = rawData.filter(
+      r => r.storeNormalized === storeId && !isRetiredStaff(r.name, r.storeNormalized, r.reportMonth)
+    );
+    return groupStaffReportsByStaff(storeRows, activeFilterMonths).sort(
+      (a, b) => b.metrics.totalSales - a.metrics.totalSales
+    );
+  }, [rawData, storeId, activeFilterMonths]);
+
+  /**
+   * スタッフ1人ぶんのNPS。storeRecords はこの店舗ぶんに絞ってあるので
+   * 店舗内での名前一致で足りる（別店舗の同名スタッフは混ざらない）。
+   */
+  const npsOfStaff = useMemo(() => {
+    return (name: string): { npsScore: number | null; npsResponseCount: number } => {
+      const normName = normalizeStaffKey(name);
+      const hits = storeRecords.filter((r: any) => {
+        const s = r.staff?.trim();
+        return s && normalizeStaffKey(s) === normName;
+      });
+      if (hits.length === 0) return { npsScore: null, npsResponseCount: 0 };
+      const promoters = hits.filter((r: any) => r.npsScore >= 9).length;
+      const detractors = hits.filter((r: any) => r.npsScore <= 6).length;
+      return {
+        npsScore: Math.round(((promoters - detractors) / hits.length) * 100),
+        npsResponseCount: hits.length,
+      };
+    };
+  }, [storeRecords]);
 
   // 異常値検出
   const reportAlerts = useMemo(() => validateStoreReport(reportStats), [reportStats]);
@@ -457,65 +500,19 @@ export default function StoreDetail() {
 
       {/* 店舗内月間表彰セクション — 総合点ランキング */}
       {(() => {
-        // この店舗のスタッフのみフィルタ
-        const storeRawData = rawData.filter(r => r.storeNormalized === storeId);
-        if (storeRawData.length === 0 || loading) return null;
+        if (storeStaffMetrics.length === 0 || loading) return null;
 
-        let filtered: typeof storeRawData;
-        if (activeFilterMonths === "all") {
-          const map = new Map<string, typeof storeRawData[0]>();
-          for (const r of storeRawData) {
-            const existing = map.get(r.name);
-            if (!existing || r.reportMonth > existing.reportMonth) {
-              map.set(r.name, r);
-            }
-          }
-          filtered = Array.from(map.values());
-        } else if (activeFilterMonths.length === 1) {
-          filtered = storeRawData.filter(r => r.reportMonth === activeFilterMonths[0]);
-        } else {
-          const monthSet = new Set(activeFilterMonths);
-          const inRange = storeRawData.filter(r => monthSet.has(r.reportMonth));
-          const map = new Map<string, typeof storeRawData[0]>();
-          for (const r of inRange) {
-            const existing = map.get(r.name);
-            if (!existing || r.reportMonth > existing.reportMonth) {
-              map.set(r.name, r);
-            }
-          }
-          filtered = Array.from(map.values());
-        }
-
-        // スタッフごとに総合点を計算
-        const staffScores = filtered
-          .filter(r => !isRetiredStaff(r.name, r.storeNormalized, r.reportMonth))
-          .map(r => {
-            const utilRate = calculateUtilizationRate(r.totalCustomers, r.employmentType);
-            // NPS: storeRecordsからスタッフ名でフィルタ（スペース正規化して比較）
-            const normName = normalizeStaffKey(r.name);
-            const staffNpsRecords = storeRecords.filter((nr: any) => {
-              const nrStaff = nr.staff?.trim();
-              return nrStaff && normalizeStaffKey(nrStaff) === normName;
-            });
-            let npsScore: number | null = null;
-            let npsResponseCount = 0;
-            if (staffNpsRecords.length > 0) {
-              npsResponseCount = staffNpsRecords.length;
-              const promoters = staffNpsRecords.filter((nr: any) => nr.npsScore >= 9).length;
-              const detractors = staffNpsRecords.filter((nr: any) => nr.npsScore <= 6).length;
-              npsScore = Math.round(((promoters - detractors) / npsResponseCount) * 100);
-            }
-
+        // 総合点は期間合算の実績で計算する（次回予約率・稼働率とも合算ベース）
+        const staffScores = storeStaffMetrics
+          .map(({ rep, metrics }) => {
             const scoreResult = calculateCompositeScore({
-              npsScore,
-              npsResponseCount,
-              nextReservationRate: r.nextReservationRate,
-              utilizationRate: utilRate,
+              ...npsOfStaff(rep.name),
+              nextReservationRate: metrics.nextReservationRate,
+              utilizationRate: calculateUtilizationRate(metrics.avgMonthlyCustomers, metrics.employmentType),
             });
-
             return {
-              name: r.name,
-              store: r.storeNormalized,
+              name: rep.name,
+              store: rep.storeNormalized,
               score: scoreResult.total,
               rank: scoreResult.rank,
             };
@@ -563,33 +560,15 @@ export default function StoreDetail() {
       })()}
 
       {/* スタッフ総合点ランキング */}
-      {reportStats && reportStats.staffReports.length > 0 && (() => {
-        const rankings = reportStats.staffReports
-          .filter((sr: StaffReport) => !isRetiredStaff(sr.name, storeId, sr.reportMonth))
-          .map((sr: StaffReport) => {
-            const utilRate = calculateUtilizationRate(sr.totalCustomers, sr.employmentType);
-            // NPS: storeRecordsからスタッフ名でフィルタ（スペース正規化して比較）
-            const normSrName = normalizeStaffKey(sr.name);
-            const staffNpsRecords = storeRecords.filter((r: any) => {
-              const staffName = r.staff?.trim();
-              return staffName && normalizeStaffKey(staffName) === normSrName;
-            });
-            let npsScore: number | null = null;
-            let npsResponseCount = 0;
-            if (staffNpsRecords.length > 0) {
-              npsResponseCount = staffNpsRecords.length;
-              const promoters = staffNpsRecords.filter((r: any) => r.npsScore >= 9).length;
-              const detractors = staffNpsRecords.filter((r: any) => r.npsScore <= 6).length;
-              npsScore = Math.round(((promoters - detractors) / npsResponseCount) * 100);
-            }
-
+      {storeStaffMetrics.length > 0 && (() => {
+        const rankings = storeStaffMetrics
+          .map(({ rep, metrics }) => {
             const scoreResult = calculateCompositeScore({
-              npsScore,
-              npsResponseCount,
-              nextReservationRate: sr.nextReservationRate,
-              utilizationRate: utilRate,
+              ...npsOfStaff(rep.name),
+              nextReservationRate: metrics.nextReservationRate,
+              utilizationRate: calculateUtilizationRate(metrics.avgMonthlyCustomers, metrics.employmentType),
             });
-            return { staff: sr, scoreResult };
+            return { staff: rep, metrics, scoreResult };
           })
           .sort((a, b) => b.scoreResult.total - a.scoreResult.total);
 
@@ -602,8 +581,8 @@ export default function StoreDetail() {
               スタッフ総合点ランキング
             </h2>
             <div className="space-y-2">
-              {rankings.map(({ staff: sr, scoreResult }, i) => (
-                <motion.div key={sr.answerId || i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.05 * i }}>
+              {rankings.map(({ staff: sr, metrics, scoreResult }, i) => (
+                <motion.div key={`${sr.storeNormalized}-${sr.name}`} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.05 * i }}>
                   <Link href={`/staff/${encodeURIComponent(storeId)}/${encodeURIComponent(sr.name)}`}>
                     <Card className="border-border/50 shadow-sm hover:shadow-md hover:border-primary/30 transition-all cursor-pointer group">
                       <CardContent className="p-3 sm:p-4">
@@ -624,7 +603,7 @@ export default function StoreDetail() {
                           {/* 名前 */}
                           <div className="flex-1 min-w-0">
                             <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">{resolveStaffDisplayName(sr.name, storeId)}</span>
-                            <div className="text-[10px] text-muted-foreground">{sr.employmentType}</div>
+                            <div className="text-[10px] text-muted-foreground">{metrics.employmentType}</div>
                           </div>
                           {/* スコアバッジ */}
                           <div className="flex flex-col items-end gap-0.5 shrink-0">
@@ -668,27 +647,17 @@ export default function StoreDetail() {
         <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
           <Users className="w-5 h-5 text-primary" />
           スタッフ個人実績
-          {reportStats && (
-            <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2">{reportStats.staffCount}名</span>
+          {storeStaffMetrics.length > 0 && (
+            <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2">{storeStaffMetrics.length}名</span>
           )}
         </h2>
-        {reportStats && reportStats.staffReports.length > 0 ? (
+        {storeStaffMetrics.length > 0 ? (
           <div className="grid gap-3">
-            {reportStats.staffReports.map((sr: StaffReport, i: number) => {
-              // 実績はサロンボード優先（無ければ月末報告書）。新規はサロンボードのみ（無ければ0）。
-              const sb = getSbStylistMonth(sr.storeNormalized, sr.name, sr.reportMonth);
+            {storeStaffMetrics.map(({ rep: sr, metrics: m }, i: number) => {
               // 画面に出す呼び名。sr.name は照合キー・URLなので触らない
               const shownName = resolveStaffDisplayName(sr.name, sr.storeNormalized);
-              const m = {
-                totalSales: sb ? sb.sales : sr.totalSales,
-                totalCustomers: sb ? sb.customers : sr.totalCustomers,
-                unitPrice: sb ? sb.unitPrice : sr.unitPrice,
-                newCustomers: sb ? sb.newCustomers : 0,
-                returnCustomers: sb ? sb.returnCustomers : sr.returnCustomers,
-                retailSales: sb ? sb.retailSales : sr.retailSales,
-              };
               return (
-              <motion.div key={sr.answerId || i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.03 }}>
+              <motion.div key={`${sr.storeNormalized}-${sr.name}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.03 }}>
                 <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
                   <CardContent className="p-4">
                     <div className="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -703,7 +672,7 @@ export default function StoreDetail() {
                               <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none">NEW</span>
                             )}
                           </div>
-                          <div className="text-[10px] text-muted-foreground">{sr.employmentType}</div>
+                          <div className="text-[10px] text-muted-foreground">{m.employmentType}</div>
                         </div>
                       </div>
                       <div className="flex-1 grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -723,22 +692,22 @@ export default function StoreDetail() {
                         <div>
                           <div className="text-[10px] text-muted-foreground">次回予約率</div>
                           <div className="font-mono-data text-sm font-bold flex items-center gap-1">
-                            <span className={sr.nextReservationRate >= 85 ? "text-[#2D9C8F]" : sr.nextReservationRate >= 70 ? "text-[#E5B85C]" : "text-[#C75C5C]"}>
-                              {sr.nextReservationRate}%
+                            <span className={m.nextReservationRate >= 85 ? "text-[#2D9C8F]" : m.nextReservationRate >= 70 ? "text-[#E5B85C]" : "text-[#C75C5C]"}>
+                              {m.nextReservationRate}%
                             </span>
-                            {sr.nextReservationRate <= 69 && (
+                            {m.nextReservationRate <= 69 && (
                               <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1 py-0.5" title="要改善">
                                 <AlertTriangle className="w-2.5 h-2.5" />
                                 要改善
                               </span>
                             )}
-                            {sr.nextReservationRate >= 85 && (
+                            {m.nextReservationRate >= 85 && (
                               <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-1.5 py-0.5 shadow-sm">
                                 <Trophy className="w-2.5 h-2.5 text-amber-500" />
                                 <Sparkles className="w-2.5 h-2.5 text-amber-400" />
                               </span>
                             )}
-                            {sr.nextReservationRate >= 70 && sr.nextReservationRate <= 84 && (
+                            {m.nextReservationRate >= 70 && m.nextReservationRate <= 84 && (
                               <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-[#E5B85C] bg-amber-50/60 border border-amber-200/60 rounded-full px-1.5 py-0.5">
                                 <CircleCheck className="w-2.5 h-2.5 text-[#E5B85C]" />
                               </span>

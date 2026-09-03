@@ -20,7 +20,7 @@ import type { PeriodSelection } from "@/components/PeriodSelector";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { useNpsData, filterByMonth } from "@/hooks/useNpsData";
-import { useSalonBoardStylistData } from "@/hooks/useSalonBoardStylistData";
+import { groupStaffReportsByStaff } from "@/lib/staffReportMetrics";
 import type { StaffReport } from "@/hooks/useMonthlyReport";
 import { isNewStaff, isRetiredStaff } from "@/lib/newBadge";
 import { useStores } from "@/hooks/useStores";
@@ -111,37 +111,23 @@ export default function StaffList() {
   const { rawData, loading, error, availableMonths } = useMonthlyReport();
   const { npsAliasMap } = useStores();
   const { records: npsRecords, loading: npsLoading } = useNpsData(npsAliasMap);
-  const { getStylistMonth } = useSalonBoardStylistData();
   const [, navigate] = useLocation();
 
   /**
-   * 実績系（売上・客数・新規・再来）は【サロンボードのみ】。林さんの指示により、
-   * 売上データに月末報告書は使わない。サロンボードに該当月のデータが無い場合は
-   * 月末報告書へフォールバックせず 0（データ無し）を返す。
-   * ※雇用形態・次回予約率は別途 report 由来（売上ではないので従来どおり）。
+   * 個人の実績は【月末報告書】。林さんの決定は「店舗売上＝サロンボード／個人数値＝月末報告書」で、
+   * 2026-06〜09 のあいだ個人までサロンボード(stylist_flat)にしていたのは承認記録の無い変更だった
+   * （fd724ae / dc932af。どちらもコミットに指示の記録が無い）。2026-09-03 の林さん指示で報告書へ戻す。
+   * 数値は staffListUnsorted の時点で選択期間ぶんを合算済みなので、ここはその値を読むだけ。
    */
   const getMetrics = useMemo(() => {
-    return (staff: StaffReport) => {
-      const sb = getStylistMonth(staff.storeNormalized, staff.name, staff.reportMonth);
-      if (sb) {
-        return {
-          totalSales: sb.sales,
-          totalCustomers: sb.customers,
-          newCustomers: sb.newCustomers,
-          returnCustomers: sb.returnCustomers,
-          dataSource: "salonboard" as const,
-        };
-      }
-      // サロンボードにデータが無い → 月末報告書は使わず 0
-      return {
-        totalSales: 0,
-        totalCustomers: 0,
-        newCustomers: 0,
-        returnCustomers: 0,
-        dataSource: "none" as const,
-      };
-    };
-  }, [getStylistMonth]);
+    return (staff: StaffReport) => ({
+      totalSales: staff.totalSales,
+      totalCustomers: staff.totalCustomers,
+      newCustomers: staff.newCustomers,
+      returnCustomers: staff.returnCustomers,
+      dataSource: "report" as const,
+    });
+  }, []);
 
 
 
@@ -179,39 +165,31 @@ export default function StaffList() {
     [periodSelection, availableMonths]
   );
 
-  // 選択期間のスタッフデータ
+  /**
+   * 選択期間のスタッフ一覧。1人（店舗＋名前）を1行にまとめ、
+   * 数値は選択期間に入る月末報告書を【全部合算】する。
+   * 従来は全期間・年間・複数月を選んでも「各スタッフの最新1月」だけを見ていたため、
+   * 期間を広げても数字が単月のままだった（Manus実装時からの不具合）。
+   * 同じ対象月に複数回答があるときは回答日が新しい1行だけ採用する（実データに重複あり）。
+   */
   const staffListUnsorted = useMemo(() => {
     if (!rawData.length) return [];
-    let filtered: StaffReport[];
-    if (filterMonthsResult === "all") {
-      // 全期間: 各スタッフの最新月のデータを使用
-      const map = new Map<string, StaffReport>();
-      for (const r of rawData) {
-        const key = `${r.name}__${r.storeNormalized}`;
-        const existing = map.get(key);
-        if (!existing || r.reportMonth > existing.reportMonth) {
-          map.set(key, r);
-        }
-      }
-      filtered = Array.from(map.values());
-    } else if (filterMonthsResult.length === 1) {
-      // 単月
-      filtered = rawData.filter((r) => r.reportMonth === filterMonthsResult[0]);
-    } else {
-      // 複数月: 各スタッフの最新月のデータを使用
-      const monthSet = new Set(filterMonthsResult);
-      const inRange = rawData.filter((r) => monthSet.has(r.reportMonth));
-      const map = new Map<string, StaffReport>();
-      for (const r of inRange) {
-        const key = `${r.name}__${r.storeNormalized}`;
-        const existing = map.get(key);
-        if (!existing || r.reportMonth > existing.reportMonth) {
-          map.set(key, r);
-        }
-      }
-      filtered = Array.from(map.values());
-    }
-    return filtered;
+    // 表示・並び替えは合算値を使う。コメント等は期間内で最も新しい行のものを残す
+    return groupStaffReportsByStaff(rawData, filterMonthsResult).map(({ rep, metrics }) => ({
+      ...rep,
+      techSales: metrics.techSales,
+      retailSales: metrics.retailSales,
+      totalSales: metrics.totalSales,
+      newCustomers: metrics.newCustomers,
+      returnCustomers: metrics.returnCustomers,
+      totalCustomers: metrics.totalCustomers,
+      unitPrice: metrics.unitPrice,
+      nextReservation: metrics.nextReservation,
+      nextReservationRate: metrics.nextReservationRate,
+      // 稼働率は「1ヶ月に何人こなせるか」の枠で見る指標なので月平均客数を持たせる
+      avgMonthlyCustomers: metrics.avgMonthlyCustomers,
+      monthCount: metrics.monthCount,
+    }));
   }, [rawData, filterMonthsResult]);
 
   // 退社スタッフを除外
@@ -297,7 +275,7 @@ export default function StaffList() {
   const compositeScoreMap = useMemo(() => {
     const map = new Map<string, CompositeScoreResult>();
     for (const staff of staffFiltered) {
-      const utilRate = calculateUtilizationRate(getMetrics(staff).totalCustomers, staff.employmentType);
+      const utilRate = calculateUtilizationRate(staff.avgMonthlyCustomers, staff.employmentType);
       const npsInfo = staffNpsMap.get(npsKeyFor(staff));
 
 
@@ -312,9 +290,9 @@ export default function StaffList() {
       map.set(key, result);
     }
     return map;
-    // getMetrics はサロンボードCSVの到着で作り直される。依存に入れないと、
-    // 売上・稼働率の列（描画時に毎回計算）だけが更新され、総合点が
-    // 「稼働率0」で計算された古い値のまま残る（2026-08-19 修正）。
+    // getMetrics を依存に入れておく理由（2026-08-19 修正の経緯）:
+    // 売上・稼働率の列は描画時に毎回計算されるのに総合点だけ useMemo で固定されるため、
+    // 依存が漏れると同じ行の中で総合点だけ古い値が残る。
   }, [staffFiltered, staffNpsMap, getMetrics]);
 
   // ソート適用
@@ -331,8 +309,8 @@ export default function StaffList() {
         case "employmentType":
           return a.employmentType.localeCompare(b.employmentType, "ja") * dir;
         case "utilizationRate": {
-          const rateA = calculateUtilizationRate(getMetrics(a).totalCustomers, a.employmentType) ?? -1;
-          const rateB = calculateUtilizationRate(getMetrics(b).totalCustomers, b.employmentType) ?? -1;
+          const rateA = calculateUtilizationRate(a.avgMonthlyCustomers, a.employmentType) ?? -1;
+          const rateB = calculateUtilizationRate(b.avgMonthlyCustomers, b.employmentType) ?? -1;
           return (rateA - rateB) * dir;
         }
         case "nextReservationRate":
@@ -544,7 +522,7 @@ export default function StaffList() {
             {staffList.map((staff, i) => {
               const staffKey = `${staff.answerId}-${i}`;
               const metrics = getMetrics(staff);
-              const utilRate = calculateUtilizationRate(metrics.totalCustomers, staff.employmentType);
+              const utilRate = calculateUtilizationRate(staff.avgMonthlyCustomers, staff.employmentType);
               const npsInfo = staffNpsMap.get(npsKeyFor(staff));
               // 画面に出す呼び名。staff.name は照合キーなので触らない
               const shownName = resolveStaffDisplayName(staff.name, staff.storeNormalized);

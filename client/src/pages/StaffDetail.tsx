@@ -27,8 +27,8 @@ import { generateStoreAdvice } from "@/lib/npsAdvice";
 import type { NpsAdvice } from "@/lib/npsAdvice";
 import { useFankuruDataByStaff } from "@/hooks/useFankuruData";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
-import { useSalonBoardStylistData } from "@/hooks/useSalonBoardStylistData";
 import type { StaffReport } from "@/hooks/useMonthlyReport";
+import { aggregateStaffReportMetrics, pickLatestPerMonth } from "@/lib/staffReportMetrics";
 import { isNewStaff } from "@/lib/newBadge";
 import { useStores } from "@/hooks/useStores";
 import { calculateUtilizationRate, getUtilizationColor } from "@/lib/utilizationRate";
@@ -313,52 +313,34 @@ export default function StaffDetail() {
     return months.length === 1 ? months[0] : undefined;
   }, [filterM, isAllPeriod]);
 
-  // 月末報告書データ（スタッフ個人）
-  const staffReport = useMemo(() => {
+  /**
+   * 個人の実績（総売上・技術・店販・客単価・総客数・新規・再来・次回予約率）は【月末報告書のみ】。
+   * 林さんの決定は一貫して「店舗売上＝サロンボード／個人数値＝月末報告書」。
+   * 2026-06〜09 のあいだ個人までサロンボード(stylist_flat)にしていたのは承認記録の無い変更
+   * （fd724ae で優先化、dc932af で報告書フォールバックを削除。どちらもコミットに指示の記録が無い）。
+   * 2026-09-03 の林さん指示で報告書へ戻す。
+   *
+   * 選択期間に入る報告書の行はすべて合算する。従来は最新1行だけを見ており、
+   * 全期間・年間を選んでも単月のままだった（Manus実装時からの不具合。出どころとは別の問題）。
+   * 同じ対象月に複数回答があるときは回答日が新しい1行だけ採用する（二重計上を防ぐ）。
+   * 報告書に総売上・客単価の列は無いので
+   * 総売上＝技術売上＋店販売上／客単価＝総売上÷(新規＋再来) で算出する（林さん承認 2026-09-03）。
+   */
+  const reportRowsInPeriod = useMemo(() => {
     const staffRows = rawData.filter(r => r.name === staffName && (!staffStore || r.storeNormalized === staffStore));
-    if (isAllPeriod) {
-      // 全期間: 最新月のデータを返す
-      const sorted = [...staffRows].sort((a, b) => b.reportMonth.localeCompare(a.reportMonth));
-      return sorted[0] || null;
-    }
-    const months = filterM as string[];
-    const matching = staffRows.filter(r => months.includes(r.reportMonth)).sort((a, b) => b.reportMonth.localeCompare(a.reportMonth));
-    return matching[0] || null;
+    const inPeriod = isAllPeriod
+      ? staffRows
+      : staffRows.filter(r => (filterM as string[]).includes(r.reportMonth));
+    return pickLatestPerMonth(inPeriod);
   }, [rawData, staffName, staffStore, filterM, isAllPeriod]);
 
-  // 実績系（売上・技術・店販・客数・新規・再来・客単価）は【サロンボードのみ】。
-  // 林さんの指示により売上データに月末報告書は使わない。該当月のサロンボードデータが無ければ 0（データ無し）。
-  // ※雇用形態は report 由来（売上ではない）なので保持。次回予約率は別ロジック。
-  const { getStylistMonth } = useSalonBoardStylistData();
-  const metrics = useMemo(() => {
-    if (!staffReport) return null;
-    const sb = getStylistMonth(staffReport.storeNormalized, staffReport.name, staffReport.reportMonth);
-    if (sb) {
-      return {
-        totalSales: sb.sales,
-        techSales: sb.techSales,
-        retailSales: sb.retailSales,
-        unitPrice: sb.unitPrice,
-        totalCustomers: sb.customers,
-        newCustomers: sb.newCustomers,
-        returnCustomers: sb.returnCustomers,
-        employmentType: staffReport.employmentType,
-        dataSource: "salonboard" as const,
-      };
-    }
-    // サロンボードにデータが無い → 月末報告書は使わず 0（雇用形態のみ report から保持）
-    return {
-      totalSales: 0,
-      techSales: 0,
-      retailSales: 0,
-      unitPrice: 0,
-      totalCustomers: 0,
-      newCustomers: 0,
-      returnCustomers: 0,
-      employmentType: staffReport.employmentType,
-      dataSource: "none" as const,
-    };
-  }, [staffReport, getStylistMonth]);
+  // コメント・行動チェック等は期間内で最も新しい1件を出す
+  const staffReport = useMemo(() => reportRowsInPeriod[0] || null, [reportRowsInPeriod]);
+
+  const metrics = useMemo(() => aggregateStaffReportMetrics(reportRowsInPeriod), [reportRowsInPeriod]);
+
+  // 次回予約率も期間合算（Σ次回予約数 ÷ Σ客数）
+  const nextResRate = metrics?.nextReservationRate ?? 0;
 
   // NPS: スタッフ名でフィルタ（スペース正規化して比較）
   const staffNpsRecords = useMemo(() => {
@@ -472,11 +454,11 @@ export default function StaffDetail() {
   const compositeScore = useMemo((): CompositeScoreResult | null => {
     // データが何もない場合はnull
     if (!staffNpsStats && !staffReport && !hasFankuruData) return null;
-    const utilRate = metrics ? calculateUtilizationRate(metrics.totalCustomers, metrics.employmentType) : null;
+    const utilRate = metrics ? calculateUtilizationRate(metrics.avgMonthlyCustomers, metrics.employmentType) : null;
     return calculateCompositeScore({
       npsScore: staffNpsStats?.npsScore ?? null,
       npsResponseCount: staffNpsStats?.totalResponses ?? 0,
-      nextReservationRate: staffReport?.nextReservationRate ?? null,
+      nextReservationRate: metrics?.nextReservationRate ?? null,
       utilizationRate: utilRate,
     });
   }, [staffNpsStats, staffReport, hasFankuruData]);
@@ -484,15 +466,15 @@ export default function StaffDetail() {
   // アドバイス生成
   const staffAdvice = useMemo((): StaffAdvice | null => {
     if (!compositeScore) return null;
-    const utilRate = metrics ? calculateUtilizationRate(metrics.totalCustomers, metrics.employmentType) : null;
+    const utilRate = metrics ? calculateUtilizationRate(metrics.avgMonthlyCustomers, metrics.employmentType) : null;
     return generateStaffAdvice({
       totalScore: compositeScore.total,
       rankLabel: compositeScore.rank.label,
-      nextReservationRate: staffReport?.nextReservationRate ?? null,
+      nextReservationRate: metrics?.nextReservationRate ?? null,
       utilizationRate: utilRate,
       npsScore: staffNpsStats?.npsScore ?? null,
       totalCustomers: metrics?.totalCustomers ?? 0,
-      nextReservationCount: staffReport?.nextReservation ?? 0,
+      nextReservationCount: metrics?.nextReservation ?? 0,
     });
   }, [compositeScore, staffReport, staffNpsStats]);
 
@@ -768,15 +750,15 @@ export default function StaffDetail() {
 
       {/* ===== 0. 次回予約率・稼働率 ===== */}
       {staffReport && (() => {
-        const utilRate = calculateUtilizationRate(metrics?.totalCustomers ?? staffReport.totalCustomers, staffReport.employmentType);
+        const utilRate = calculateUtilizationRate(metrics?.avgMonthlyCustomers ?? 0, staffReport.employmentType);
         return (
           <section className="mb-6 pt-6 border-t-2 border-primary/20">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* 次回予約率 */}
               <div className={`rounded-xl px-4 sm:px-5 py-4 border ${
-                staffReport.nextReservationRate >= 85
+                nextResRate >= 85
                   ? "bg-gradient-to-r from-amber-50/60 to-yellow-50/40 border-amber-200/60"
-                  : staffReport.nextReservationRate >= 70
+                  : nextResRate >= 70
                     ? "bg-amber-50/30 border-amber-200/40"
                     : "bg-red-50/40 border-red-200/50"
               }`}>
@@ -786,26 +768,26 @@ export default function StaffDetail() {
                 </div>
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <span className={`font-mono-data text-2xl sm:text-3xl font-bold ${
-                    staffReport.nextReservationRate >= 85 ? "text-[#2D9C8F]" :
-                    staffReport.nextReservationRate >= 70 ? "text-[#E5B85C]" :
+                    nextResRate >= 85 ? "text-[#2D9C8F]" :
+                    nextResRate >= 70 ? "text-[#E5B85C]" :
                     "text-[#C75C5C]"
                   }`}>
-                    {staffReport.nextReservationRate}%
+                    {nextResRate}%
                   </span>
                   <div className="shrink-0">
-                    {staffReport.nextReservationRate >= 85 && (
+                    {nextResRate >= 85 && (
                       <span className="inline-flex items-center gap-0.5 text-[10px] sm:text-[11px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-2 py-1 shadow-sm">
                         <Trophy className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-500" />
                         エクセレント！
                       </span>
                     )}
-                    {staffReport.nextReservationRate >= 70 && staffReport.nextReservationRate <= 84 && (
+                    {nextResRate >= 70 && nextResRate <= 84 && (
                       <span className="inline-flex items-center gap-0.5 text-[10px] sm:text-[11px] font-bold text-[#E5B85C] bg-amber-50/60 border border-amber-200/60 rounded-full px-2 py-1">
                         <CircleCheck className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#E5B85C]" />
                         適正
                       </span>
                     )}
-                    {staffReport.nextReservationRate <= 69 && (
+                    {nextResRate <= 69 && (
                       <span className="inline-flex items-center gap-0.5 text-[10px] sm:text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1">
                         <AlertTriangle className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                         要改善
@@ -878,9 +860,11 @@ export default function StaffDetail() {
         {staffReport ? (
           <Card className="border-border/50 shadow-sm">
             <CardContent className="p-5">
-              {metrics?.dataSource === "salonboard" && (
+              {metrics && (
                 <div className="mb-3">
-                  <span className="text-[10px] font-medium text-primary/70 bg-primary/5 border border-primary/20 rounded px-1.5 py-0.5">SalonBoard</span>
+                  <span className="text-[10px] font-medium text-primary/70 bg-primary/5 border border-primary/20 rounded px-1.5 py-0.5">
+                    月末報告書{metrics.monthCount > 1 ? `（${metrics.monthCount}ヶ月分を合算）` : ""}
+                  </span>
                 </div>
               )}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -907,7 +891,7 @@ export default function StaffDetail() {
                 </div>
                 <div>
                   <div className="text-[10px] text-muted-foreground mb-1">次回予約率</div>
-                  <div className="font-mono-data text-lg font-bold text-foreground">{staffReport.nextReservationRate}%</div>
+                  <div className="font-mono-data text-lg font-bold text-foreground">{nextResRate}%</div>
                 </div>
               </div>
 

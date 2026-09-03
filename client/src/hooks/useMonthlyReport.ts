@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { registerNewStoresFromReports, isRetiredStaff } from "@/lib/newBadge";
 import { canonicalizeStaffName, useStaffAliasVersion } from "@/lib/staffNameAlias";
 import { isTestReportRow } from "@/lib/testDataFilter";
+import { setReportNicknames, parseReportNickname } from "@/lib/staffDisplayName";
 
 // 新モネ月末報告書 スプレッドシート
 const SPREADSHEET_ID = "1DXAaFk0aLDZwXq28krOcrDSiTOwd6BeTzV-xFXbLuKI";
@@ -29,6 +30,9 @@ const COL = {
   REVIEW_COMMENT: 16,
   NPS_COMMENT: 17,
   FANKURU_COMMENT: 18,
+  // 列20 は 2026-08-29 に「写真」から「ニックネーム」へ差し替えられた（列19・20 はヘッダー空欄）。
+  // それ以前の行には写真URLが入っているので parseNickname で捨てる。
+  NICKNAME: 20,
 } as const;
 
 // テストデータ除外(1): 2026-04-01以前の回答を除外
@@ -165,6 +169,8 @@ export interface StaffReport {
   reportMonthLabel: string; // "2月" 形式
   lineUserId: string;
   name: string;
+  /** 列20 のニックネーム（L Message の必須入力）。写真URL・空欄のときは "" */
+  nickname: string;
   store: string;
   storeNormalized: string;
   employmentType: string;
@@ -322,7 +328,23 @@ export function useMonthlyReport() {
       const c = canonicalizeStaffName(r.name);
       return c === r.name ? r : { ...r, name: c };
     });
-    return deduplicateReports(canonicalized);
+    const deduped = deduplicateReports(canonicalized);
+
+    // 呼び名の解決層へ列20 のニックネームを注入する（解決順②）。
+    // useEffect ではなく useMemo の中で行う: resolveStaffDisplayName は render 中に
+    // 呼ばれるので、render 後に走る useEffect で注入しても初回描画が氏名のまま残り、
+    // 再描画の契機も無いので画面が更新されない。
+    // 正準化・重複排除の後に渡すことで、名寄せ済みの name で引けるようにする。
+    setReportNicknames(
+      deduped.map((r) => ({
+        name: r.name,
+        store: r.storeNormalized,
+        nickname: r.nickname,
+        answerDate: r.answerDate,
+      }))
+    );
+
+    return deduped;
   }, [parsedReports, aliasVersion]);
 
   useEffect(() => {
@@ -368,6 +390,7 @@ export function useMonthlyReport() {
             reportMonthLabel: monthNum > 0 ? `${monthNum}月` : "",
             lineUserId: r[COL.LINE_USER_ID] || "",
             name: r[COL.NAME] || "",
+            nickname: parseReportNickname(r[COL.NICKNAME]),
             store: r[COL.STORE]?.trim() || "",
             storeNormalized: normalizeStoreName(r[COL.STORE] || ""),
             employmentType: r[COL.EMPLOYMENT_TYPE] || "",
