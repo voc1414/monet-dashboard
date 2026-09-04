@@ -23,8 +23,7 @@
  */
 import { STAFF_MASTER } from "@/data/staffMaster";
 import { normalizeStaffKey } from "@/lib/staffNameAlias";
-
-const normStore = (s: string) => (s || "").replace(/[\s　]/g, "").toLowerCase();
+import { normalizeStoreKey as normStore } from "@/lib/storeKey";
 
 /** 月末報告書 列20 由来のニックネーム。useMonthlyReport が実行時に注入する */
 export interface ReportNicknameEntry {
@@ -80,8 +79,18 @@ export function reportNicknameCount(): number {
  *
  * name は氏名（「小池明子」）で来ることもサロンボード表示名（「Akiko」）で来ることも
  * あるため、マスタ側は name / displayName の両方を照合対象にする。
- * どちらに転んでも誤爆しないよう、候補が2件以上に割れたときは null を返す
- * （＝氏名表示のまま。別人のニックネームを出すより安全）。
+ *
+ * **店舗が分かるときは「その店舗に居る同名者がちょうど1人」のときだけ返す。**
+ * 空振り（店舗表記が揺れている・その店舗に居ない）は氏名に落とす。
+ * 下の findReportNickname と同じ規律で、理由も同じ：
+ * 「マスタ全体でこの名前は1人だけ」は「画面に出ているこの人がその1人」ではない。
+ *
+ * 2026-09-04 の独立監査で、ここに全社フォールバックが残っているのを実測された
+ * （`resolveStaffDisplayName("Akiko","堀江院2nd")` が 堀江院 小池明子の呼び名を返す。
+ *  SurveyList.tsx は NPS の (staff, storeShort) から行を作るので、実データで到達する）。
+ * さらに①のこの誤ヒットは②の正しい直接ヒットを上書きするため、②だけ締めても無意味だった。
+ * 現在マスタ36人の nickname が全て null で画面が壊れていないのは偶然であり、
+ * Notion のニックネーム列に1件でも値が入れば発火する。
  */
 function findNickname(name: string, store?: string): string | null {
   if (!name) return null;
@@ -95,10 +104,7 @@ function findNickname(name: string, store?: string): string | null {
   if (store) {
     const st = normStore(store);
     const inStore = matches.filter((s) => normStore(s.store) === st);
-    if (inStore.length === 1) return inStore[0].nickname;
-    // 同一店舗に同名が2人 = 判別不能。店舗表記が揺れている（土橋院/広島土橋院）
-    // 場合は inStore が空になるので、下の全社一意判定に落とす。
-    if (inStore.length > 1) return null;
+    return inStore.length === 1 ? inStore[0].nickname : null;
   }
 
   return matches.length === 1 ? matches[0].nickname : null;
@@ -107,8 +113,28 @@ function findNickname(name: string, store?: string): string | null {
 /**
  * 月末報告書 列20 のニックネームを探す。見つからなければ null。
  *
- * 店舗が渡れば「店舗＋人」で引く。店舗が渡らない／店舗表記が揺れて空振りしたときは
- * 全社で呼び名が一意に決まる場合だけ返す（2件以上に割れたら null＝別人の呼び名を出さない）。
+ * **店舗が分かるときは「店舗＋名前」の直接ヒットだけを採る。** 空振りしたら氏名に落とす。
+ * 列20 は本人が答えたときだけ埋まるので、「報告書にこの名前は1件しか無い」は
+ * 「その1件がこの人のもの」を意味しない。証拠の不在を証拠として扱わない。
+ *
+ * 段階的に締めた経緯（消さない。同じ穴を2回開けたため）:
+ *   - 第1版「2人以上と証明できたときだけ止める」→ Mika（複数店舗に別人が実在）は止まるが、
+ *     Yu（そのときマスタ上は1人だけだった表示名）は、ある店舗の回答が別店舗の画面に
+ *     「ゆうちゃん」として出た。名簿外の退職者（藤田・AKI。CLAUDE.md §3 で名簿外が正常）も
+ *     素通りしていた。
+ *   - 第2版「マスタでちょうど1人＋その人の所属店舗と一致」→ 別店舗の回答が、
+ *     マスタ上ただ1人のその人の画面に出た。「マスタに1人しか居ない」は
+ *     「回答者がその1人」ではない（名簿外の同名者が答えていれば別人の呼び名になる）。
+ *     ※所属店舗は異動で変わる（例: 2026-10-01 に Yu が福島院→堀江院）。所属を判定材料に
+ *       すること自体が時点依存で危うい、というのがこの版を捨てた理由でもある。
+ *
+ * 店舗が渡らない経路だけ全社フォールバックを残す（`/staff/:storeId/:staffId` からは常に
+ * 店舗が入るので通らない防御的な経路）。そこでも「報告書側の候補が1つ」かつ
+ * 「マスタ側もその名前でちょうど1人」を要求する。
+ *
+ * この締め付けで、店舗ラベルが未マップの店（例 岡山下伊福院）の人は氏名表示に落ちる。
+ * それは安全側の劣化であり、直す場所はここではなく
+ * `useMonthlyReport.ts` の `STORE_NAME_MAP_FALLBACK`／Notion 店舗マスタ側（CLAUDE.md §0）。
  */
 function findReportNickname(name: string, store?: string): string | null {
   if (!name) return null;
@@ -116,8 +142,7 @@ function findReportNickname(name: string, store?: string): string | null {
   if (!key) return null;
 
   if (store) {
-    const hit = reportNicknames.get(`${normStore(store)}__${key}`);
-    if (hit) return hit.nickname;
+    return reportNicknames.get(`${normStore(store)}__${key}`)?.nickname ?? null;
   }
 
   const suffix = `__${key}`;
@@ -125,7 +150,14 @@ function findReportNickname(name: string, store?: string): string | null {
   for (const [k, v] of reportNicknames) {
     if (k.endsWith(suffix)) candidates.add(v.nickname);
   }
-  return candidates.size === 1 ? Array.from(candidates)[0] : null;
+  if (candidates.size !== 1) return null;
+
+  const samePeople = STAFF_MASTER.filter(
+    (s) => normalizeStaffKey(s.name) === key || normalizeStaffKey(s.displayName) === key
+  );
+  if (samePeople.length !== 1) return null;
+
+  return Array.from(candidates)[0];
 }
 
 /**

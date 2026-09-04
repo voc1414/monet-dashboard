@@ -78,21 +78,81 @@ describe("報告書のニックネームで画面の呼び名が変わる", () =
     expect(resolveStaffDisplayName("西本 美華")).toBe("みかりん");
   });
 
-  it("店舗表記が揺れて空振りしても、全社で一意なら解決する（土橋院/広島土橋院）", () => {
+  it("店舗表記の空白ゆれ（末尾スペース）は吸収して直接ヒットする", () => {
+    // 報告書側は「堀江院 」のように末尾に空白が入ることがある。照合キーで空白を落とす
     setReportNicknames([
-      { name: "西本 美華", store: "堀江院", nickname: "みかりん", answerDate: "2026-08-29 10:00:00" },
+      { name: "西本 美華", store: "堀江院 ", nickname: "みかりん", answerDate: "2026-08-29 10:00:00" },
     ]);
-    expect(resolveStaffDisplayName("西本 美華", "存在しない院")).toBe("みかりん");
+    expect(resolveStaffDisplayName("西本 美華", "堀江院")).toBe("みかりん");
   });
 
-  it("同姓同名が別店舗に居て呼び名が割れるときは氏名のまま（別人の呼び名を出さない）", () => {
+  it("報告書側と画面側で店舗ラベルの表記が違うと呼び名が消える（未マップ店の劣化。安全側へ倒す）", () => {
+    // normalizeStoreName は未マップ名を素通しする（useMonthlyReport.ts:82）。新店（例 下伊福院）が
+    // STORE_NAME_MAP_FALLBACK に無いと、報告書側は生ラベル「岡山下伊福院」のまま注入され、
+    // 画面側は Notion 店舗マスタの短縮名「下伊福院」で引くため、両側が食い違って直接ヒットしない。
     setReportNicknames([
-      { name: "山田 花子", store: "堀江院", nickname: "はなちゃん", answerDate: "2026-08-29 10:00:00" },
-      { name: "山田 花子", store: "福島院", nickname: "やまちゃん", answerDate: "2026-08-29 10:00:00" },
+      { name: "小田りえ", store: "岡山下伊福院", nickname: "りえちゃん", answerDate: "2026-08-29 10:00:00" },
     ]);
-    expect(resolveStaffDisplayName("山田 花子")).toBe("山田 花子");
-    // 店舗が分かれば正しく引ける
-    expect(resolveStaffDisplayName("山田 花子", "堀江院")).toBe("はなちゃん");
+    expect(resolveStaffDisplayName("小田りえ", "下伊福院")).toBe("小田りえ");
+    // 消えているのはデータではなくラベルの対応。生ラベルで引けば当たる
+    expect(resolveStaffDisplayName("小田りえ", "岡山下伊福院")).toBe("りえちゃん");
+    // ここで救う（全社フォールバック）と別人の呼び名が出る経路そのものなので救わない。
+    // 直す場所は STORE_NAME_MAP_FALLBACK／Notion 店舗マスタ側（CLAUDE.md §0）
+  });
+
+  it("同じ表示名の別人が居るとき、答えた片方の呼び名を他方に出さない（Mika＝堀江院 西本美華／福島院 松野美香）", () => {
+    // 報告書の氏名列にはローマ字の表示名が入ることがある（実データに「yuko（←Yuko）」等）。
+    // 列20 は本人が答えたときだけ埋まるので、福島院の Mika だけが答えている状態が普通に起きる。
+    setReportNicknames([
+      { name: "Mika", store: "福島院", nickname: "みかっぺ", answerDate: "2026-08-29 10:00:00" },
+    ]);
+    // 答えた本人には出る
+    expect(resolveStaffDisplayName("Mika", "福島院")).toBe("みかっぺ");
+    // 堀江院の Mika は別人。呼び名が無いので表示名のまま（他人の呼び名を出さない）
+    expect(resolveStaffDisplayName("Mika", "堀江院")).toBe("Mika");
+    // 店舗が分からないときも同じ
+    expect(resolveStaffDisplayName("Mika")).toBe("Mika");
+    expect(resolveStaffInitial("Mika", "堀江院")).toBe("M");
+  });
+
+  it("店舗が渡ったら「店舗＋名前」の直接ヒット以外は出さない（Yu は複数店舗に現れる表示名）", () => {
+    // 2026-09-04 監査で実測した漏れ。「2人以上と証明できたときだけ止める」では素通りしていた。
+    // 「マスタでちょうど1人＋その1人の所属店舗と一致」でも足りない:
+    // 「マスタに1人しか居ない」は「回答者がその1人」ではない（名簿外の同名者が答えていれば別人の呼び名）。
+    // 所属店舗は異動で変わる（例 2026-10-01 に Yu が福島院→堀江院）ため、
+    // 所属を判定材料にする設計自体が時点依存で危うい。だから報告書側の組だけを見る。
+    setReportNicknames([
+      { name: "Yu", store: "堀江院", nickname: "ゆうちゃん", answerDate: "2026-08-29 10:00:00" },
+    ]);
+    // 回答が無い店舗の Yu には出さない（ここが漏れていた）
+    expect(resolveStaffDisplayName("Yu", "姪浜院")).toBe("Yu");
+    expect(resolveStaffDisplayName("Yu", "福島院")).toBe("Yu");
+    // 「堀江院の Yu」は報告書に実在する組なので直接ヒットで出る（店舗＋名前が一致している）
+    expect(resolveStaffDisplayName("Yu", "堀江院")).toBe("ゆうちゃん");
+  });
+
+  it("マスタに居ない名前は全社フォールバックしない（退職者 藤田・AKI は名簿外が正常＝CLAUDE.md §3）", () => {
+    setReportNicknames([
+      { name: "藤田", store: "堀江院", nickname: "ふじさん", answerDate: "2026-08-29 10:00:00" },
+    ]);
+    expect(resolveStaffDisplayName("藤田", "姪浜院")).toBe("藤田");
+    expect(resolveStaffDisplayName("藤田")).toBe("藤田");
+    // 本人の店舗で引けば直接ヒットするので、名簿外でも呼び名は出る
+    expect(resolveStaffDisplayName("藤田", "堀江院")).toBe("ふじさん");
+  });
+
+  it("回答が複数店舗に割れているときは、店舗なしでは呼び名を出さない（異動の直後に起きる）", () => {
+    // 異動すると前の店舗と新しい店舗の両方に回答が残る。マスタ上は1人（西本 美華）でも、
+    // 店舗が渡らない経路ではどちらの回答を採るべきか決められないので氏名に落とす。
+    // ＝「候補が割れたら出さない」分岐だけを見るケース（マスタ不在の分岐とは別物）
+    setReportNicknames([
+      { name: "西本 美華", store: "堀江院", nickname: "みかりん", answerDate: "2026-08-29 10:00:00" },
+      { name: "西本 美華", store: "福島院", nickname: "みかみか", answerDate: "2026-09-30 10:00:00" },
+    ]);
+    expect(resolveStaffDisplayName("西本 美華")).toBe("西本 美華");
+    // 店舗が分かればそれぞれ正しく引ける
+    expect(resolveStaffDisplayName("西本 美華", "堀江院")).toBe("みかりん");
+    expect(resolveStaffDisplayName("西本 美華", "福島院")).toBe("みかみか");
   });
 
   it("同じ人が複数月ぶん答えていたら回答日が新しい呼び名を採る", () => {
@@ -137,9 +197,9 @@ describe("解決順（①Notion → ②報告書 → ③氏名）", () => {
 
   it("Notion が空なら報告書が使われる", () => {
     setReportNicknames([
-      { name: "坂手芳", store: "堀江院2nd", nickname: "よしちゃん", answerDate: "2026-08-29 10:00:00" },
+      { name: "坂手芳", store: "堀江院2nd", nickname: "かおるん", answerDate: "2026-08-29 10:00:00" },
     ]);
-    expect(resolveStaffDisplayName("坂手芳", "堀江院2nd")).toBe("よしちゃん");
+    expect(resolveStaffDisplayName("坂手芳", "堀江院2nd")).toBe("かおるん");
   });
 
   it("両方無ければ氏名のまま（導入前と同じ見た目）", () => {
@@ -179,7 +239,15 @@ describe("壊れた入力で落ちない", () => {
   });
 });
 
-describe("配線（useMonthlyReport 側）", () => {
+/**
+ * ここから下は**挙動テストではない**。useMonthlyReport は React hook で、vitest は
+ * environment: node（DOMなし）・server/**.test.ts しか拾わない。import 自体は通っても
+ * hook を呼ぶ／描画することができないので、実挙動は検証できない。
+ * よってソースの文字列を見張っているだけ＝**スプレッドシート側の列がズレても緑のまま通る**
+ * （ソースの列番号が変われば落ちる。守れるのはコード側の書き換えだけ）。
+ * 「配線が検証されている」と読まないこと（呼び名の実挙動は上の describe が検証する）。
+ */
+describe("ソース文字列の見張り（useMonthlyReport 側・挙動は見ていない）", () => {
   const src = (relative: string) =>
     readFileSync(path.resolve(import.meta.dirname, "../client/src", relative), "utf8");
 
@@ -211,7 +279,7 @@ describe("配線（useMonthlyReport 側）", () => {
     expect(injectAt).toBeLessThan(memoEnd);
   });
 
-  it("呼び名の解決順が3段でコメントに残っている", () => {
+  it("呼び名の解決順が3段のまま（式そのものを見張る。コメントではない）", () => {
     const s = src("lib/staffDisplayName.ts");
     expect(s).toContain("findNickname(name, store) || findReportNickname(name, store) || name");
   });

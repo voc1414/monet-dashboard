@@ -18,7 +18,8 @@ vi.mock("@/data/staffMaster", async () => {
   };
 });
 
-const { resolveStaffDisplayName, resolveStaffInitial } = await import("@/lib/staffDisplayName");
+const { resolveStaffDisplayName, resolveStaffInitial, setReportNicknames } =
+  await import("@/lib/staffDisplayName");
 const { STAFF_MASTER } = await import("@/data/staffMaster");
 
 describe("resolveStaffDisplayName", () => {
@@ -58,8 +59,29 @@ describe("resolveStaffDisplayName", () => {
     expect(resolveStaffDisplayName("")).toBe("");
   });
 
-  it("店舗表記が揺れていても氏名が全社で一意なら解決する（土橋院/広島土橋院）", () => {
-    expect(resolveStaffDisplayName("西本 美華", "存在しない院")).toBe("みかりん");
+  it("店舗が合わなければ氏名に落とす（全社フォールバックしない＝別人の呼び名を出さない）", () => {
+    // 2026-09-04 の独立監査で実測された穴。以前はここが
+    // 「マスタ全体でこの名前が1人なら店舗が合わなくても返す」だった。
+    // 実データの発火点：NPS に「堀江院2nd / Akiko」の行が実在し、SurveyList.tsx が
+    // NPS の (staff, storeShort) からスタッフ行を作るため、堀江院 小池明子の呼び名が
+    // 堀江院2nd の画面に出ていた。
+    expect(resolveStaffDisplayName("Akiko", "堀江院2nd")).toBe("Akiko");
+    expect(resolveStaffDisplayName("小池明子", "堀江院2nd")).toBe("小池明子");
+    // 店舗表記が揺れて空振りした場合も同じ扱い（救うと上と同じ穴になる）。
+    // 直す場所はここではなく useMonthlyReport.ts の STORE_NAME_MAP_FALLBACK／Notion 店舗マスタ側
+    expect(resolveStaffDisplayName("西本 美華", "存在しない院")).toBe("西本 美華");
+  });
+
+  it("①（Notion）の店舗違いヒットが②（報告書）の正しい直接ヒットを潰さない", () => {
+    // ①が店舗違いでも返していた頃は、②に正しい「堀江院2nd / Akiko」があっても
+    // ①の「堀江院 小池明子＝あっこ」が先に勝って上書きしていた（監査で実測）
+    setReportNicknames([
+      { name: "Akiko", store: "堀江院2nd", nickname: "あきこ2nd", answerDate: "2026-08-29 10:00:00" },
+    ]);
+    expect(resolveStaffDisplayName("Akiko", "堀江院2nd")).toBe("あきこ2nd");
+    // 本人（堀江院 小池明子）には①の Notion 値が出続ける（優先順位は変えていない）
+    expect(resolveStaffDisplayName("Akiko", "堀江院")).toBe("あっこ");
+    setReportNicknames([]);
   });
 
   it("マスタ全員が nickname または氏名のどちらかに解決される", () => {

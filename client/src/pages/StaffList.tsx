@@ -28,7 +28,7 @@ import { calculateUtilizationRate, getUtilizationColor, getUtilizationLabel } fr
 import { getNpsClass } from "@/lib/npsClass";
 import { calculateCompositeScore, getCompositeRank } from "@/lib/compositeScore";
 import type { CompositeScoreResult } from "@/lib/compositeScore";
-import { normalizeStaffKey } from "@/lib/staffNameAlias";
+import { npsStaffKey } from "@/lib/npsStaffMatch";
 import { resolveStaffDisplayName } from "@/lib/staffDisplayName";
 
 
@@ -225,7 +225,7 @@ export default function StaffList() {
 
   // NPSの引き当ては「店舗＋名前」で行う（表示名は店舗をまたいで重複するため）
   const npsKeyFor = (s: { name: string; storeNormalized: string }) =>
-    `${normalizeStaffKey(s.name)}__${s.storeNormalized}`;
+    npsStaffKey(s.name, s.storeNormalized);
 
   // スタッフごとのNPS情報を計算
   const staffNpsMap = useMemo(() => {
@@ -249,12 +249,13 @@ export default function StaffList() {
     // スペース正規化＋小文字化してグルーピング（NPSシートは"Yoshie"、月末報告書は"yoshie"等の大小違いがある）。
     // キーには必ず店舗を含める。表示名は店舗をまたいで重複するため（例: Mika は堀江院=西本美華 と
     // 福島院=松野美香 の別人）、名前だけで束ねると別人の口コミが混ざる（2026-08-19 修正）。
-    const npsKey = (name: string, store: string) => `${normalizeStaffKey(name)}__${store}`;
+    // キーの作り方の正本は `@/lib/npsStaffMatch`。詳細画面（StaffDetail）の絞り込みも同じ関数を通す
+    // ＝ここだけ直して詳細が取り残される、という事故を止めるため（2026-09-04）。
     const grouped = new Map<string, number[]>();
     for (const r of filteredNps) {
       const staffName = r.staff?.trim();
       if (!staffName) continue;
-      const k = npsKey(staffName, r.storeShort);
+      const k = npsStaffKey(staffName, r.storeShort);
       if (!grouped.has(k)) grouped.set(k, []);
       grouped.get(k)!.push(r.npsScore);
     }
