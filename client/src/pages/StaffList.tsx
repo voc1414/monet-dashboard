@@ -1,7 +1,8 @@
 /**
  * Design: monet Brand Identity — 水彩ブルー × コンクリートモダン
  * Page: スタッフ一覧（全店舗横断・ソート機能付き）
- * Columns: 氏名、総売上、配属店舗、雇用形態、稼働率、次回予約率、NPS
+ * Columns: 氏名、配属店舗、雇用形態、稼働率、次回予約率、NPS
+ *          （＋管理者ビルドのみ 総合点・総売上。2026-09-06 GF-MDASH-M9）
  * Feature: カード全体クリックでスタッフ個人ページへ遷移
  */
 import { useState, useMemo, useEffect } from "react";
@@ -30,6 +31,7 @@ import { calculateCompositeScore, getCompositeRank } from "@/lib/compositeScore"
 import type { CompositeScoreResult } from "@/lib/compositeScore";
 import { npsStaffKey } from "@/lib/npsStaffMatch";
 import { resolveStaffDisplayName } from "@/lib/staffDisplayName";
+import { IS_ADMIN_BUILD } from "@/lib/appRole";
 
 
 const formatCurrency = (n: number) => {
@@ -68,6 +70,28 @@ const SORT_LABELS: Record<SortField, string> = {
   nextReservationRate: "次回予約率",
   npsScore: "NPS",
 };
+
+/*
+ * 個人間の売上比較（総売上・総合点）は管理者ビルドだけに出す（2026-09-06 GF-MDASH-M9）。
+ * 林さんの指示は「ランキング系はスタッフのやる気がなくなる」。スタッフ一覧は
+ * 全店舗の全員が1つの表に並ぶため、総売上ヘッダを1回押せば売上順位表になっていた。
+ * NPS・次回予約率・稼働率は他人と比べる数字ではなく本人の改善指標なので残す。
+ * 雇用形態別の売上(/employment)は 2026-09-01 に同じ理由で管理者限定化済み。
+ */
+const SHOW_RANKING_COLUMNS = IS_ADMIN_BUILD;
+
+/** 並び替えボタンに出す順序。スタッフ向けでは順位付けの2項目を落とす */
+const SORT_FIELDS_SHOWN: SortField[] = SHOW_RANKING_COLUMNS
+  ? ["compositeScore", "nextReservationRate", "utilizationRate", "npsScore", "totalSales", "storeNormalized", "employmentType"]
+  : ["nextReservationRate", "utilizationRate", "npsScore", "storeNormalized", "employmentType"];
+
+/*
+ * デスクトップ表の列幅。ヘッダ行と各行で必ず同じ定義を使う（片方だけ直すとズレる）。
+ * Tailwind は完全なクラス名を静的に拾うため、両方の文字列をそのまま書いておく。
+ */
+const DESKTOP_GRID_COLS = SHOW_RANKING_COLUMNS
+  ? "grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.5fr)]"
+  : "grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.5fr)]";
 
 /** Compact NPS badge for staff list */
 function StaffNpsBadge({ npsInfo }: { npsInfo: StaffNpsInfo | undefined }) {
@@ -413,7 +437,7 @@ export default function StaffList() {
       {/* Mobile Sort Controls */}
       <div className="md:hidden mb-4">
         <div className="flex items-center gap-1.5 flex-wrap">
-          {(["compositeScore", "nextReservationRate", "utilizationRate", "npsScore", "totalSales", "storeNormalized", "employmentType"] as SortField[]).map((field) => (
+          {SORT_FIELDS_SHOWN.map((field) => (
             <button
               key={field}
               onClick={() => handleSort(field)}
@@ -472,20 +496,24 @@ export default function StaffList() {
       {!loading && staffList.length > 0 && (
         <>
           {/* Table Header (desktop) - sticky */}
-          <div className="hidden md:grid grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.5fr)] gap-3 items-center px-5 py-2 text-[10px] text-muted-foreground font-medium uppercase tracking-wider border-b border-border/40 mb-2 sticky top-[4rem] bg-[#FAF8F5] z-20 backdrop-blur-sm shadow-sm">
+          <div className={`hidden md:grid ${DESKTOP_GRID_COLS} gap-3 items-center px-5 py-2 text-[10px] text-muted-foreground font-medium uppercase tracking-wider border-b border-border/40 mb-2 sticky top-[4rem] bg-[#FAF8F5] z-20 backdrop-blur-sm shadow-sm`}>
             <span>氏名</span>
-            <span
-              className="flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors select-none justify-center"
-              onClick={() => handleSort("compositeScore")}
-            >
-              総合点 {getSortIcon("compositeScore")}
-            </span>
-            <span
-              className="flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors select-none"
-              onClick={() => handleSort("totalSales")}
-            >
-              総売上 {getSortIcon("totalSales")}
-            </span>
+            {SHOW_RANKING_COLUMNS && (
+              <span
+                className="flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors select-none justify-center"
+                onClick={() => handleSort("compositeScore")}
+              >
+                総合点 {getSortIcon("compositeScore")}
+              </span>
+            )}
+            {SHOW_RANKING_COLUMNS && (
+              <span
+                className="flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors select-none"
+                onClick={() => handleSort("totalSales")}
+              >
+                総売上 {getSortIcon("totalSales")}
+              </span>
+            )}
             <span
               className="flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors select-none"
               onClick={() => handleSort("storeNormalized")}
@@ -541,7 +569,7 @@ export default function StaffList() {
                   >
                     <CardContent className="p-0">
                       {/* Desktop Layout */}
-                      <div className="hidden md:grid grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.5fr)] gap-3 items-center px-5 py-3">
+                      <div className={`hidden md:grid ${DESKTOP_GRID_COLS} gap-3 items-center px-5 py-3`}>
                         {/* 氏名 */}
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -556,8 +584,8 @@ export default function StaffList() {
                             </div>
                           </div>
                         </div>
-                        {/* 総合点 */}
-                        {(() => {
+                        {/* 総合点（管理者ビルドのみ） */}
+                        {SHOW_RANKING_COLUMNS && (() => {
                           const scoreKey = `${staff.name}__${staff.storeNormalized}`;
                           const scoreResult = compositeScoreMap.get(scoreKey);
                           if (!scoreResult) return <div className="text-center"><span className="text-xs text-muted-foreground">—</span></div>;
@@ -575,10 +603,12 @@ export default function StaffList() {
                             </div>
                           );
                         })()}
-                        {/* 総売上 */}
-                        <div>
-                          <span className="font-mono-data text-sm font-bold text-foreground">{formatCurrency(metrics.totalSales)}</span>
-                        </div>
+                        {/* 総売上（管理者ビルドのみ） */}
+                        {SHOW_RANKING_COLUMNS && (
+                          <div>
+                            <span className="font-mono-data text-sm font-bold text-foreground">{formatCurrency(metrics.totalSales)}</span>
+                          </div>
+                        )}
                         {/* 店舗 */}
                         <div>
                           <span className="text-xs text-muted-foreground truncate">{staff.storeNormalized}</span>
@@ -666,14 +696,14 @@ export default function StaffList() {
                             <span className="text-primary font-bold text-xs">{shownName.charAt(0)}</span>
                           </div>
                           <div className="flex-1 min-w-0">
-                            {/* 1行目: 名前 + 総合点 + 売上 */}
+                            {/* 1行目: 名前（＋管理者ビルドのみ 総合点・売上） */}
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors truncate">{shownName}</span>
                                 {isNewStaff(staff.name, staff.storeNormalized) && (
                                   <span className="text-[9px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none shrink-0">NEW</span>
                                 )}
-                                {(() => {
+                                {SHOW_RANKING_COLUMNS && (() => {
                                   const scoreKey = `${staff.name}__${staff.storeNormalized}`;
                                   const scoreResult = compositeScoreMap.get(scoreKey);
                                   if (!scoreResult) return null;
@@ -688,8 +718,12 @@ export default function StaffList() {
                                 })()}
                               </div>
                               <div className="flex items-center gap-1 shrink-0 ml-2">
-                                <span className="text-[9px] text-muted-foreground">売上</span>
-                                <span className="font-mono-data text-base font-bold text-foreground">{formatCurrency(metrics.totalSales)}</span>
+                                {SHOW_RANKING_COLUMNS && (
+                                  <>
+                                    <span className="text-[9px] text-muted-foreground">売上</span>
+                                    <span className="font-mono-data text-base font-bold text-foreground">{formatCurrency(metrics.totalSales)}</span>
+                                  </>
+                                )}
                                 <ChevronRight className="w-4 h-4 text-muted-foreground" />
                               </div>
                             </div>
