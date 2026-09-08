@@ -235,6 +235,53 @@ export function buildStaffFirstAppearanceMap(
   return map;
 }
 
+/**
+ * 初登場月マップのキーを外から作るための公開版（純関数）。
+ * 正規化ルール（スペース除去・小文字化・"名前|店舗"）を必ずここ経由でそろえる。
+ */
+export function staffFirstAppearanceKey(staffName: string, storeName: string): string {
+  return normalizeStaffKey(staffName, storeName);
+}
+
+/**
+ * 指定した月が、そのスタッフの「入社◯ヶ月以内」に当たるかを判定する（純関数）。
+ *
+ * isNewStaff() が「今この人は新人か」（現在月で判定・バッジ用）なのに対し、
+ * こちらは「その月はその人の入社◯ヶ月以内だったか」を月ごとに判定する。
+ * 期間を選んで過去も集計する画面（雇用形態別の売上）では、人単位で丸ごと落とすと
+ * 去年の立ち上がり月が平均に残ってしまうため、レコード（人×月）単位で判定する。
+ *
+ * 「入社日」はダッシュボードのデータに存在しない（Notion から同期するのは
+ * 名前・表示名・店舗・在籍状態・退職月 の5項目のみ）。よって NEW バッジと同じ
+ * 「月末報告書での初登場月」を入社月の代わりに使う。
+ * buildStaffFirstAppearanceMap がデータ最古月＝初登場月の人（データ開始前から在籍）を
+ * あらかじめ落としているので、古株が新人扱いになることはない。
+ *
+ * @param firstAppearanceMap buildStaffFirstAppearanceMap の戻り値
+ * @param staffName スタッフ名
+ * @param storeName 店舗名（表示名は店舗をまたいで重複するので必須）
+ * @param targetMonth 判定したい月 "YYYY-MM"
+ * @param windowMonths 何ヶ月以内を対象にするか（既定 3＝初登場月を含めて3ヶ月間）
+ */
+export function isWithinFirstMonthsOfJoining(
+  firstAppearanceMap: Map<string, string> | null | undefined,
+  staffName: string,
+  storeName: string,
+  targetMonth: string,
+  windowMonths: number = 3,
+): boolean {
+  if (!firstAppearanceMap || firstAppearanceMap.size === 0) return false;
+  if (!targetMonth) return false;
+
+  const firstMonth = firstAppearanceMap.get(normalizeStaffKey(staffName, storeName));
+  if (!firstMonth) return false;
+
+  // 初登場月より前の月は判定対象にしない（そもそもデータが無い）
+  if (targetMonth < firstMonth) return false;
+  // 初登場月を含めて windowMonths ヶ月間（既定なら 0,1,2 の3ヶ月）
+  return targetMonth <= addMonths(firstMonth, windowMonths - 1);
+}
+
 // ============================================================
 // 店舗NEW判定（レガシー互換 — useStores.isNewStore に移行済みだが一部で参照あり）
 // ============================================================

@@ -20,6 +20,10 @@ import {
   employmentGroupOf,
 } from "../client/src/lib/employmentRanking";
 import type { EmploymentRankingInput } from "../client/src/lib/employmentRanking";
+import {
+  buildStaffFirstAppearanceMap,
+  isWithinFirstMonthsOfJoining,
+} from "../client/src/lib/newBadge";
 
 function row(
   name: string,
@@ -309,6 +313,115 @@ describe("除外と並び順", () => {
   });
 });
 
+describe("「入社3ヶ月以内込み」トグル（2026-09-08 GF-MDASH-M10）", () => {
+  /*
+   * 判定はスタブではなく本番と同じ関数（buildStaffFirstAppearanceMap +
+   * isWithinFirstMonthsOfJoining）をそのまま通す。predicate を自作すると
+   * 「NEW バッジと同じ基準」という達成条件を検証したことにならないため。
+   *
+   * 古株さん … 2026-05（＝データ最古月）から在籍。初登場月マップから除外されるので
+   *            トグルを OFF にしても絶対に落ちない。
+   * 新人さん … 2026-06 が初登場月。窓は 2026-06〜2026-08。
+   */
+  const rows = [
+    row("古株さん", "堀江院", "2026-05", "フルタイム社員"),
+    row("古株さん", "堀江院", "2026-06", "フルタイム社員"),
+    row("古株さん", "堀江院", "2026-07", "フルタイム社員"),
+    row("新人さん", "堀江院", "2026-06", "フルタイム社員"),
+    row("新人さん", "堀江院", "2026-07", "フルタイム社員"),
+  ];
+  const sales = salesFrom({
+    "堀江院__古株さん__2026-05": 1_000_000,
+    "堀江院__古株さん__2026-06": 1_000_000,
+    "堀江院__古株さん__2026-07": 1_000_000,
+    "堀江院__新人さん__2026-06": 400_000,
+    "堀江院__新人さん__2026-07": 400_000,
+  });
+  const firstAppearance = buildStaffFirstAppearanceMap(rows);
+  const withinFirstMonths = (name: string, store: string, month: string) =>
+    isWithinFirstMonthsOfJoining(firstAppearance, name, store, month);
+
+  it("ON（未指定）は1行も落とさず、トグルを付ける前と同じ数字になる", () => {
+    const result = buildEmploymentRanking(rows, { months: "all", getSales: sales });
+    const g = groupOf(result, "フルタイム社員");
+    expect(g.people).toBe(2);
+    expect(g.records).toBe(5);
+    expect(g.totalSales).toBe(3_800_000);
+    expect(g.avgMonthlySales).toBe(760_000);
+    expect(result.totals.excludedRecords).toBe(0);
+    expect(result.totals.excludedPeople).toBe(0);
+  });
+
+  it("OFF にすると入社3ヶ月以内の売上が合計・平均・人数から消える", () => {
+    const result = buildEmploymentRanking(rows, {
+      months: "all",
+      getSales: sales,
+      isWithinFirstMonths: withinFirstMonths,
+    });
+    const g = groupOf(result, "フルタイム社員");
+    expect(g.members.map((m) => m.name)).toEqual(["古株さん"]);
+    expect(g.people).toBe(1);
+    expect(g.records).toBe(3);
+    expect(g.totalSales).toBe(3_000_000);
+    // 新人さんの 400,000 が混ざらないので平均が 760,000 → 1,000,000 に戻る
+    expect(g.avgMonthlySales).toBe(1_000_000);
+    expect(result.totals.people).toBe(1);
+    expect(result.totals.excludedRecords).toBe(2);
+    expect(result.totals.excludedPeople).toBe(1);
+  });
+
+  it("データ開始前から在籍している人は OFF でも落とさない", () => {
+    // 初登場月＝データ最古月の人は buildStaffFirstAppearanceMap がマップから外している
+    expect(withinFirstMonths("古株さん", "堀江院", "2026-05")).toBe(false);
+    expect(withinFirstMonths("古株さん", "堀江院", "2026-07")).toBe(false);
+  });
+
+  it("判定は人単位ではなく月単位（4ヶ月目以降は残る）", () => {
+    const longRows = [
+      ...rows,
+      row("古株さん", "堀江院", "2026-08", "フルタイム社員"),
+      row("古株さん", "堀江院", "2026-09", "フルタイム社員"),
+      row("新人さん", "堀江院", "2026-08", "フルタイム社員"),
+      row("新人さん", "堀江院", "2026-09", "フルタイム社員"),
+    ];
+    const longFirst = buildStaffFirstAppearanceMap(longRows);
+    // 新人さんの窓は初登場月 2026-06 を含めて3ヶ月＝2026-08 まで
+    expect(isWithinFirstMonthsOfJoining(longFirst, "新人さん", "堀江院", "2026-08")).toBe(true);
+    expect(isWithinFirstMonthsOfJoining(longFirst, "新人さん", "堀江院", "2026-09")).toBe(false);
+
+    const result = buildEmploymentRanking(longRows, {
+      months: "all",
+      getSales: salesFrom({
+        "堀江院__新人さん__2026-06": 400_000,
+        "堀江院__新人さん__2026-07": 400_000,
+        "堀江院__新人さん__2026-08": 500_000,
+        "堀江院__新人さん__2026-09": 900_000,
+      }),
+      isWithinFirstMonths: (name, store, month) =>
+        isWithinFirstMonthsOfJoining(longFirst, name, store, month),
+    });
+    const g = groupOf(result, "フルタイム社員");
+    const newcomer = g.members.find((m) => m.name === "新人さん");
+    // 立ち上がりの3ヶ月は落ち、4ヶ月目だけが残る（人ごと消さない）
+    expect(newcomer?.months).toEqual(["2026-09"]);
+    expect(newcomer?.totalSales).toBe(900_000);
+    expect(result.totals.excludedRecords).toBe(3);
+  });
+
+  it("店舗が違えば別人として判定する（表示名は店舗をまたいで重複する）", () => {
+    const twoStores = [
+      row("Mika", "堀江院", "2026-05", "フルタイム社員"),
+      row("Mika", "堀江院", "2026-06", "フルタイム社員"),
+      row("Mika", "福島院", "2026-06", "フルタイム社員"),
+    ];
+    const map = buildStaffFirstAppearanceMap(twoStores);
+    // 堀江院の Mika はデータ最古月から居るので新人ではない
+    expect(isWithinFirstMonthsOfJoining(map, "Mika", "堀江院", "2026-06")).toBe(false);
+    // 福島院の Mika は 2026-06 が初登場
+    expect(isWithinFirstMonthsOfJoining(map, "Mika", "福島院", "2026-06")).toBe(true);
+  });
+});
+
 describe("画面側の配線", () => {
   function readClientSource(relative: string): string {
     return readFileSync(path.resolve(import.meta.dirname, "../client/src", relative), "utf8");
@@ -352,5 +465,18 @@ describe("画面側の配線", () => {
     const page = readClientSource("pages/EmploymentRanking.tsx");
     expect(page).toContain("validRecords");
     expect(page).toContain("missingRecords");
+  });
+
+  it("「入社3ヶ月以内込み」は独自ルールを作らず NEW バッジと同じ関数を使う", () => {
+    const page = readClientSource("pages/EmploymentRanking.tsx");
+    expect(page).toContain("入社3ヶ月以内込み");
+    expect(page).toContain("buildStaffFirstAppearanceMap");
+    expect(page).toContain("isWithinFirstMonthsOfJoining");
+  });
+
+  it("除外した件数を画面に出す（黙って数字を減らさない）", () => {
+    const page = readClientSource("pages/EmploymentRanking.tsx");
+    expect(page).toContain("excludedRecords");
+    expect(page).toContain("excludedPeople");
   });
 });

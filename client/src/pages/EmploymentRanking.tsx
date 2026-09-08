@@ -5,6 +5,10 @@
  * 上段 = 雇用形態同士の比較（1人あたり月間平均売上）
  * 下段 = 各雇用形態の中での個人ランキング（期間合計＋月平均）
  *
+ * 「入社3ヶ月以内込み」トグル（2026-09-08 GF-MDASH-M10・林さん指示）:
+ *   既定 ON＝従来と完全に同じ数字。OFF で入社3ヶ月以内のレコードを集計から外す。
+ *   入社日のデータは持っていないので、NEW バッジと同じ「月末報告書での初登場月」を使う。
+ *
  * データソース:
  *   雇用形態 … 月末報告書スプシ 列8（useMonthlyReport）
  *   売上     … 月末報告書の 技術売上 + 店販売上（reportRowSales）
@@ -16,6 +20,8 @@ import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { BarChart3, Loader2, AlertTriangle, Info, Trophy } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import DashboardLayout from "@/components/DashboardLayout";
 import {
   PeriodSelector,
@@ -27,7 +33,11 @@ import type { PeriodSelection } from "@/components/PeriodSelector";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { buildEmploymentRanking } from "@/lib/employmentRanking";
 import type { EmploymentGroup } from "@/lib/employmentRanking";
-import { isRetiredStaff } from "@/lib/newBadge";
+import {
+  buildStaffFirstAppearanceMap,
+  isRetiredStaff,
+  isWithinFirstMonthsOfJoining,
+} from "@/lib/newBadge";
 import { reportRowSales } from "@/lib/staffReportMetrics";
 import { resolveStaffDisplayName } from "@/lib/staffDisplayName";
 
@@ -45,6 +55,23 @@ export default function EmploymentRanking() {
 
   const [periodSelection, setPeriodSelection] = useState<PeriodSelection>(
     getDefaultPeriodSelection(),
+  );
+
+  /**
+   * 「入社3ヶ月以内込み」（2026-09-08 GF-MDASH-M10・林さん指示）。
+   * 既定は ON ＝ これまでと同じ数字。OFF にすると入社3ヶ月以内の売上を集計から外す。
+   */
+  const [includeNewStaff, setIncludeNewStaff] = useState(true);
+
+  /**
+   * 初登場月マップ。ダッシュボードに「入社日」は無いので、NEW バッジと同じ
+   * 「月末報告書での初登場月」を入社月の代わりに使う（newBadge.ts 参照）。
+   * StoreDataProvider が注入するモジュール変数に頼らず、この画面が見ている
+   * rawData から直接組み立てる（読み込み順に左右されないため）。
+   */
+  const firstAppearanceMap = useMemo(
+    () => buildStaffFirstAppearanceMap(rawData),
+    [rawData],
   );
 
   const filterMonths = useMemo(
@@ -77,8 +104,13 @@ export default function EmploymentRanking() {
       getSales: (store, name, month) =>
         salesByStaffMonth.get(`${store}__${name}__${month}`)?.sales ?? null,
       isRetired: (name, store, month) => isRetiredStaff(name, store, month),
+      // ON のときは渡さない＝1行も落とさない（トグルを付ける前と完全に同じ数字）
+      isWithinFirstMonths: includeNewStaff
+        ? undefined
+        : (name, store, month) =>
+            isWithinFirstMonthsOfJoining(firstAppearanceMap, name, store, month),
     });
-  }, [rawData, filterMonths, salesByStaffMonth]);
+  }, [rawData, filterMonths, salesByStaffMonth, includeNewStaff, firstAppearanceMap]);
 
   const busy = loading;
 
@@ -106,11 +138,28 @@ export default function EmploymentRanking() {
               )}
             </p>
           </div>
-          <PeriodSelector
-            allMonths={availableMonths}
-            selection={periodSelection}
-            onChange={setPeriodSelection}
-          />
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            {/* 入社3ヶ月以内込み（OFF で入社3ヶ月以内の売上を集計から外す） */}
+            <div className="flex items-center gap-2">
+              <Switch
+                id="include-new-staff"
+                checked={includeNewStaff}
+                onCheckedChange={setIncludeNewStaff}
+                data-testid="switch-include-new-staff"
+              />
+              <Label
+                htmlFor="include-new-staff"
+                className="cursor-pointer text-xs font-medium text-foreground"
+              >
+                入社3ヶ月以内込み
+              </Label>
+            </div>
+            <PeriodSelector
+              allMonths={availableMonths}
+              selection={periodSelection}
+              onChange={setPeriodSelection}
+            />
+          </div>
         </div>
 
         {error && (
@@ -133,6 +182,12 @@ export default function EmploymentRanking() {
           <Card>
             <CardContent className="py-10 text-center text-sm text-muted-foreground">
               この期間に対象の報告がありません。
+              {!includeNewStaff && (
+                <span className="mt-1 block text-xs">
+                  「入社3ヶ月以内込み」が OFF です。この期間の対象者が全員
+                  入社3ヶ月以内だと、ここは空になります。
+                </span>
+              )}
             </CardContent>
           </Card>
         )}
@@ -161,6 +216,32 @@ export default function EmploymentRanking() {
                   雇用形態は<strong className="text-foreground">その月の報告どおり</strong>
                   で分類しています。期間中に雇用形態が変わった人は、変わる前と後の両方のグループに
                   その月のぶんだけ入ります。
+                </p>
+                <p>
+                  <strong className="text-foreground">「入社3ヶ月以内込み」</strong>
+                  {includeNewStaff ? (
+                    <>
+                      は<strong className="text-foreground">ON</strong>
+                      です。入社して間もない人の月も、そのまま平均とランキングに入っています。
+                      OFF にすると外せます。
+                    </>
+                  ) : (
+                    <>
+                      を<strong className="text-foreground">OFF</strong>
+                      にしています。
+                      <strong className="text-foreground">
+                        {result.totals.excludedPeople}人・
+                        {result.totals.excludedRecords}レコード（人×月）
+                      </strong>
+                      を集計から外しました。
+                    </>
+                  )}
+                  「入社◯ヶ月目か」は
+                  <strong className="text-foreground">月末報告書に初めて出てきた月</strong>
+                  から数えています（スタッフ一覧の NEW バッジと同じ基準）。
+                  入社日そのもののデータはダッシュボードに持っていません。
+                  判定は人単位ではなく<strong className="text-foreground">月ごと</strong>
+                  なので、いま在籍が長い人でも、その人の最初の3ヶ月ぶんだけが外れます。
                 </p>
                 <p>
                   対象期間の合計：{result.totals.people}人 ／ {result.totals.records}レコード（

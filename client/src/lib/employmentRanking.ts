@@ -17,6 +17,9 @@
  *      それでも getSales が null を返す余地は残す（分母から除外し、件数を必ず出す）。
  *   4. 雇用形態の比較指標は「1人あたり月間平均売上」＝ 売上合計 ÷ 有効レコード数（人×月）。
  *      期間が1ヶ月でも12ヶ月でも意味が変わらず、在籍月数の違いにも歪まない。
+ *   5.（2026-09-08 GF-MDASH-M10）画面の「入社3ヶ月以内込み」トグル。
+ *      OFF のときだけ isWithinFirstMonths を渡し、入社3ヶ月以内のレコードを落とす。
+ *      ON（未指定）のときは1行も落とさないので、従来の数字と完全に一致する。
  */
 import { canonicalEmploymentType, getMaxCustomers, normalizeEmploymentType } from "./utilizationRate";
 
@@ -83,6 +86,13 @@ export interface EmploymentRankingResult {
     missingRecords: number;
     totalSales: number;
     avgMonthlySales: number | null;
+    /**
+     * 「入社3ヶ月以内込み」を OFF にして落としたレコード数（人×月）。
+     * トグル ON（isWithinFirstMonths 未指定）のときは必ず 0。
+     */
+    excludedRecords: number;
+    /** 落としたレコードに出てくる実人数（延べではない）。ON のときは必ず 0 */
+    excludedPeople: number;
   };
 }
 
@@ -139,21 +149,40 @@ export interface BuildEmploymentRankingOptions {
   getSales: (store: string, name: string, month: string) => number | null;
   /** 退社・集計対象外の判定。true の行は落とす */
   isRetired?: (name: string, store: string, month: string) => boolean;
+  /**
+   * 「入社3ヶ月以内込み」トグルが OFF のときだけ渡す。true の行を集計から落とす。
+   * 未指定なら1行も落とさないので、トグル ON の数字は従来と完全に一致する。
+   * 判定は newBadge.isWithinFirstMonthsOfJoining（＝NEW バッジと同じ初登場月ルール）を使うこと。
+   */
+  isWithinFirstMonths?: (name: string, store: string, month: string) => boolean;
 }
 
 export function buildEmploymentRanking(
   rows: EmploymentRankingInput[],
-  { months, getSales, isRetired }: BuildEmploymentRankingOptions,
+  { months, getSales, isRetired, isWithinFirstMonths }: BuildEmploymentRankingOptions,
 ): EmploymentRankingResult {
   const monthSet = months === "all" ? null : new Set(months);
 
-  const target = dedupeByStaffMonth(
+  const eligible = dedupeByStaffMonth(
     rows.filter((r) => {
       if (!r.name || !r.storeNormalized || !r.reportMonth) return false;
       if (monthSet && !monthSet.has(r.reportMonth)) return false;
       if (isRetired?.(r.name, r.storeNormalized, r.reportMonth)) return false;
       return true;
     }),
+  );
+
+  // 「入社3ヶ月以内込み」OFF。二重提出をつぶした後に落とすので、
+  // 除外件数がそのまま「画面から消えた人×月」の数になる。
+  const excluded = new Set<EmploymentRankingInput>();
+  if (isWithinFirstMonths) {
+    for (const r of eligible) {
+      if (isWithinFirstMonths(r.name, r.storeNormalized, r.reportMonth)) excluded.add(r);
+    }
+  }
+  const target = excluded.size > 0 ? eligible.filter((r) => !excluded.has(r)) : eligible;
+  const excludedPeople = new Set(
+    Array.from(excluded).map((r) => `${r.storeNormalized}__${r.name}`),
   );
 
   // グループ → 人 → その人の月ごとの売上
@@ -256,6 +285,8 @@ export function buildEmploymentRanking(
       missingRecords: records - validRecords,
       totalSales,
       avgMonthlySales: validRecords > 0 ? Math.round(totalSales / validRecords) : null,
+      excludedRecords: excluded.size,
+      excludedPeople: excludedPeople.size,
     },
   };
 }
