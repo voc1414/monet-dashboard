@@ -8,6 +8,7 @@ import { Router, Request, Response } from "express";
 import { ENV } from "../_core/env";
 import { notifyOwner } from "../_core/notification";
 import { getAllStores, insertStore, storeExists, updateStoreSalonBoardSheet } from "../db";
+import { cellOf, resolveReportColumns } from "@/lib/reportColumns";
 
 // ─── 月末報告書スプレッドシート ───
 const SPREADSHEET_ID = "1DXAaFk0aLDZwXq28krOcrDSiTOwd6BeTzV-xFXbLuKI";
@@ -70,18 +71,10 @@ function parseCSVLine(line: string): string[] {
   return result;
 }
 
-// カラムインデックス
-const COL = {
-  ANSWER_DATE: 2,
-  NAME: 6,
-  STORE: 7,
-  EMPLOYMENT_TYPE: 8,
-  TECH_SALES: 11,
-  RETAIL_SALES: 12,
-  NEW_CUSTOMERS: 13,
-  RETURN_CUSTOMERS: 14,
-  NEXT_RESERVATION: 15,
-};
+// 列は設問名から実行時に解決する（@/lib/reportColumns）。
+// 2026-09-12 までここに 2 / 6 / 7 / … と列番号を直書きしていた。設問が1つ増えて列が
+// 1つズレると、店舗名のつもりで別の設問の自由記述を読み、実在しない店舗を
+// insertStore() で店舗マスタへ自動登録してしまう（書き込み事故）。
 
 interface NewStoreData {
   storeName: string;
@@ -147,7 +140,20 @@ async function detectNewStores(): Promise<NewStoreData[]> {
   if (!res.ok) throw new Error(`スプレッドシート取得失敗: HTTP ${res.status}`);
   const text = await res.text();
   const lines = text.split("\n").filter(l => l.trim());
-  const dataLines = lines.slice(1);
+  const rows = lines.map(parseCSVLine);
+  const header = rows[0] ?? [];
+  const dataRows = rows.slice(1);
+
+  // 必須列が1つでも決まらないときは検出そのものを止める。
+  // ここは店舗マスタへ書き込む経路なので、読み違えたまま進む方が害が大きい。
+  const col = resolveReportColumns(header, dataRows);
+  if (!col.ok) {
+    const detail = col.issues
+      .filter(i => i.severity === "error")
+      .map(i => i.message)
+      .join(" / ");
+    throw new Error(`月末報告書の列を特定できないため新店舗の検出を中止しました: ${detail}`);
+  }
 
   const storeAgg: Record<string, {
     rawNames: Set<string>;
@@ -161,9 +167,8 @@ async function detectNewStores(): Promise<NewStoreData[]> {
     latestDate: string;
   }> = {};
 
-  for (const line of dataLines) {
-    const cols = parseCSVLine(line);
-    const rawStore = (cols[COL.STORE] || "").trim();
+  for (const cols of dataRows) {
+    const rawStore = cellOf(cols, col.index, "store").trim();
     if (!rawStore) continue;
 
     const normalized = normalizeStoreName(rawStore);
@@ -185,19 +190,19 @@ async function detectNewStores(): Promise<NewStoreData[]> {
 
     const agg = storeAgg[normalized];
     agg.rawNames.add(rawStore);
-    const staffName = (cols[COL.NAME] || "").trim();
+    const staffName = cellOf(cols, col.index, "name").trim();
     if (staffName) agg.staffNames.add(staffName);
-    agg.techSales += parseInt((cols[COL.TECH_SALES] || "0").replace(/[^0-9]/g, "")) || 0;
-    agg.retailSales += parseInt((cols[COL.RETAIL_SALES] || "0").replace(/[^0-9]/g, "")) || 0;
-    agg.newCustomers += parseInt((cols[COL.NEW_CUSTOMERS] || "0").replace(/[^0-9]/g, "")) || 0;
-    agg.returnCustomers += parseInt((cols[COL.RETURN_CUSTOMERS] || "0").replace(/[^0-9]/g, "")) || 0;
+    agg.techSales += parseInt(cellOf(cols, col.index, "techSales").replace(/[^0-9]/g, "")) || 0;
+    agg.retailSales += parseInt(cellOf(cols, col.index, "retailSales").replace(/[^0-9]/g, "")) || 0;
+    agg.newCustomers += parseInt(cellOf(cols, col.index, "newCustomers").replace(/[^0-9]/g, "")) || 0;
+    agg.returnCustomers += parseInt(cellOf(cols, col.index, "returnCustomers").replace(/[^0-9]/g, "")) || 0;
     agg.dataCount++;
 
-    const nextRes = (cols[COL.NEXT_RESERVATION] || "").trim();
+    const nextRes = cellOf(cols, col.index, "nextReservation").trim();
     const pctMatch = nextRes.match(/(\d+\.?\d*)/);
     if (pctMatch) agg.nextReservationValues.push(parseFloat(pctMatch[1]));
 
-    const answerDate = (cols[COL.ANSWER_DATE] || "").trim().split(" ")[0] || "";
+    const answerDate = cellOf(cols, col.index, "answerDate").trim().split(" ")[0] || "";
     if (answerDate > agg.latestDate) agg.latestDate = answerDate;
   }
 

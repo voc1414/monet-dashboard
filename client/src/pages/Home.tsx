@@ -11,7 +11,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PeriodSelector, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
 import type { PeriodSelection } from "@/components/PeriodSelector";
 import DashboardLayout from "@/components/DashboardLayout";
-import DataHealthPanel from "@/components/DataHealthPanel";
 import { useNpsData, calculateStoreStats, getAvailableMonths } from "@/hooks/useNpsData";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { useSalonBoardData } from "@/hooks/useSalonBoardData";
@@ -218,11 +217,10 @@ export default function Home() {
     });
   };
 
+  // データ点検（「今日直すことがあるか」を先に一言）は DashboardLayout が描画する。
+  // トップだけは問題が無いときも「問題ありません」と出す。
   return (
-    <DashboardLayout lastUpdated={lastUpdated} onRefresh={refresh} loading={loading}>
-      {/* データ点検（「今日直すことがあるか」を先に一言） */}
-      <DataHealthPanel />
-
+    <DashboardLayout lastUpdated={lastUpdated} onRefresh={refresh} loading={loading} healthPanel="always">
       {/* Hero Section */}
       <div className="relative rounded-2xl overflow-hidden mb-8">
         <div className="absolute inset-0">

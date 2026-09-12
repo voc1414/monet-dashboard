@@ -9,6 +9,7 @@ import { ChevronRight, RefreshCw } from "lucide-react";
 import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 
+import DataHealthPanel from "@/components/DataHealthPanel";
 import { SETTINGS_TAB, visibleMainTabs } from "@/lib/navItems";
 import { IS_ADMIN_BUILD } from "@/lib/appRole";
 import monetLogo from "@/assets/monet-logo.png";
@@ -26,6 +27,15 @@ interface DashboardLayoutProps {
   lastUpdated?: Date | null;
   onRefresh?: () => void;
   loading?: boolean;
+  /**
+   * データ点検パネルの出し方。
+   * "issuesOnly"（既定）… 確認したいことがあるときだけ出す。
+   * "always"           … 問題が無くても「問題ありません」の1行を出す（トップ用）。
+   * "off"              … 出さない。
+   * 2026-09-12 まではトップ（Home）だけがこのパネルを自前で置いていたため、
+   * 他のページを見ている人には数字がおかしくなっていても気づけなかった。
+   */
+  healthPanel?: "always" | "issuesOnly" | "off";
 }
 
 export default function DashboardLayout({
@@ -34,6 +44,7 @@ export default function DashboardLayout({
   lastUpdated,
   onRefresh,
   loading,
+  healthPanel = "issuesOnly",
 }: DashboardLayoutProps) {
   const [location] = useLocation();
   // 広告・設定タブは管理者向けビルドにしか無い（スタッフ向けバンドルには存在しない）
@@ -156,6 +167,7 @@ export default function DashboardLayout({
         transition={{ duration: 0.3, ease: "easeOut" }}
         className={`container py-6 lg:pb-16 ${compactBottomNav ? "pb-32" : "pb-24"}`}
       >
+        {healthPanel !== "off" && <DataHealthPanel hideWhenOk={healthPanel !== "always"} />}
         {children}
       </motion.main>
 

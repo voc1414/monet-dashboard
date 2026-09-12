@@ -35,7 +35,16 @@ function monthsAgo(ym: string, base: string): number {
   return (y2 - y1) * 12 + (m2 - m1);
 }
 
-export default function DataHealthPanel() {
+interface DataHealthPanelProps {
+  /**
+   * 問題が1件も無いときはパネルごと消す。
+   * トップ（Home）では「点検して問題なし」と分かること自体に意味があるので false（既定）。
+   * 他のページでは常時1行出ると邪魔なので true を渡す。
+   */
+  hideWhenOk?: boolean;
+}
+
+export default function DataHealthPanel({ hideWhenOk = false }: DataHealthPanelProps = {}) {
   const [open, setOpen] = useState(false);
   const { rawData: reports, loading: l1, columnIssues } = useMonthlyReport();
   const { data: stylistRows, loading: l2 } = useSalonBoardStylistData();
@@ -147,6 +156,9 @@ export default function DataHealthPanel() {
     return a;
   }, {});
   const ok = issues.length === 0;
+
+  // フックは上で必ず呼び終えているので、ここで早期 return してもフックの順序は崩れない。
+  if (ok && hideWhenOk) return null;
 
   return (
     <div className={`rounded-2xl border shadow-sm mb-6 ${ok ? "border-emerald-200 bg-emerald-50/50" : "border-amber-300 bg-amber-50/60"}`}>
