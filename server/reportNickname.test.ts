@@ -251,10 +251,12 @@ describe("ソース文字列の見張り（useMonthlyReport 側・挙動は見�
   const src = (relative: string) =>
     readFileSync(path.resolve(import.meta.dirname, "../client/src", relative), "utf8");
 
-  it("列20 を NICKNAME として読む", () => {
+  it("ニックネーム列を解決層へ流している（列番号の直書きは廃止・M3）", () => {
     const s = src("hooks/useMonthlyReport.ts");
-    expect(s).toContain("NICKNAME: 20");
-    expect(s).toContain("parseReportNickname(r[COL.NICKNAME])");
+    // 列番号はもうソースに無い。どの列を読むかの正しさは
+    // server/reportColumns.test.ts が実ヘッダを食わせて挙動で検証している。
+    expect(s).not.toContain("NICKNAME: 20");
+    expect(s).toContain('parseReportNickname(cell(r, "nickname"))');
   });
 
   it("StaffReport に nickname を持つ", () => {

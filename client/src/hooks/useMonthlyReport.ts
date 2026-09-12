@@ -3,37 +3,17 @@ import { registerNewStoresFromReports, isRetiredStaff } from "@/lib/newBadge";
 import { canonicalizeStaffName, useStaffAliasVersion } from "@/lib/staffNameAlias";
 import { isTestReportRow } from "@/lib/testDataFilter";
 import { setReportNicknames, parseReportNickname } from "@/lib/staffDisplayName";
+import { resolveReportColumns, cellOf, type ReportColumnIssue, type ReportColumnKey } from "@/lib/reportColumns";
 
 // 新モネ月末報告書 スプレッドシート
 const SPREADSHEET_ID = "1DXAaFk0aLDZwXq28krOcrDSiTOwd6BeTzV-xFXbLuKI";
 const GID = "505478524";
 const CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&gid=${GID}`;
 
-// カラムインデックス
-const COL = {
-  LINE_USER_ID: 0,
-  ANSWER_ID: 1,
-  ANSWER_DATE: 2,
-  ANSWERER_ID: 3,
-  LINE_NAME: 4,
-  SYSTEM_NAME: 5,
-  NAME: 6,
-  STORE: 7,
-  EMPLOYMENT_TYPE: 8,
-  BEHAVIOR_CHECK: 9,
-  RULE_CHECK: 10,
-  TECH_SALES: 11,
-  RETAIL_SALES: 12,
-  NEW_CUSTOMERS: 13,
-  RETURN_CUSTOMERS: 14,
-  NEXT_RESERVATION: 15,
-  REVIEW_COMMENT: 16,
-  NPS_COMMENT: 17,
-  FANKURU_COMMENT: 18,
-  // 列20 は 2026-08-29 に「写真」から「ニックネーム」へ差し替えられた（列19・20 はヘッダー空欄）。
-  // それ以前の行には写真URLが入っているので parseReportNickname で捨てる。
-  NICKNAME: 20,
-} as const;
+// 列インデックスはヘッダ行の設問名から実行時に解決する（@/lib/reportColumns）。
+// 2026-09-12 まではここに COL = { TECH_SALES: 11, ... } と番号を直書きしていたが、
+// フォームの設問を1つ増減すると以降の列が全部ズレ、型も見た目も壊れないまま
+// 数字だけが静かに間違うので廃止した（台帳 GF-MDASH-M3）。
 
 // テストデータ除外(1): 2026-04-01以前の回答を除外
 // テストデータ除外(2): 名前が「テスト」の回答を除外 → @/lib/testDataFilter
@@ -318,6 +298,8 @@ export function useMonthlyReport() {
   const [parsedReports, setParsedReports] = useState<StaffReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // ヘッダ行から列を解決できなかったときの警告。データ点検パネルがそのまま表示する。
+  const [columnIssues, setColumnIssues] = useState<ReportColumnIssue[]>([]);
 
   // スタッフ名の表示名を正準化（本人入力ゆれ「坂手」→「坂手芳」等）してから重複排除する。
   // 名前マッピング（DB）は非同期に届くため、aliasVersion の変化で名寄せをやり直す。
@@ -359,43 +341,68 @@ export function useMonthlyReport() {
         const rows = parseCSV(text);
 
         if (rows.length < 2) {
-          setParsedReports([]);
+          if (!cancelled) {
+            setParsedReports([]);
+            setColumnIssues([]);
+          }
           return;
         }
 
-        // ヘッダー行をスキップ
-        const dataRows = rows.slice(1).filter((r) => r.length >= 16 && r[COL.STORE]?.trim());
+        // ヘッダ行の設問名から列を解決する。ニックネーム列だけはヘッダが空欄なので
+        // 本文の中身から特定される（reportColumns.ts のコメント参照）。
+        const header = rows[0];
+        const body = rows.slice(1);
+        const columns = resolveReportColumns(header, body);
+        if (!cancelled) setColumnIssues(columns.issues);
+
+        if (!columns.ok) {
+          // 必須列が見つからない。欠けた値を 0 として集計すると売上・客数が静かに壊れるので、
+          // ここで集計を止めてデータ点検パネルに出す（M3 達成条件②）。
+          if (!cancelled) {
+            setParsedReports([]);
+            setError(null);
+          }
+          return;
+        }
+
+        const col = columns.index;
+        const cell = (r: string[], key: ReportColumnKey) => cellOf(r, col, key);
+
+        const dataRows = body.filter(
+          (r) => r.length > columns.maxRequiredIndex && cell(r, "store").trim()
+        );
 
         const reports: StaffReport[] = dataRows
-          .filter((r) => isAfterStartDate(r[COL.ANSWER_DATE] || ""))
+          .filter((r) => isAfterStartDate(cell(r, "answerDate")))
           // テスト回答を除外（スプシから行を消せないため・ルールは testDataFilter.ts）
-          .filter((r) => !isTestReportRow(r))
+          // 判定する列も解決済みの index から渡す（列番号を直書きすると設問増減でズレる）
+          .filter((r) => !isTestReportRow(r, col))
           .map((r) => {
-          const techSales = parseNumber(r[COL.TECH_SALES] || "");
-          const retailSales = parseNumber(r[COL.RETAIL_SALES] || "");
+          const techSales = parseNumber(cell(r, "techSales"));
+          const retailSales = parseNumber(cell(r, "retailSales"));
           const totalSales = techSales + retailSales;
-          const newCustomers = parseNumber(r[COL.NEW_CUSTOMERS] || "");
-          const returnCustomers = parseNumber(r[COL.RETURN_CUSTOMERS] || "");
+          const newCustomers = parseNumber(cell(r, "newCustomers"));
+          const returnCustomers = parseNumber(cell(r, "returnCustomers"));
           const totalCustomers = newCustomers + returnCustomers;
           const unitPrice = totalCustomers > 0 ? Math.round(totalSales / totalCustomers) : 0;
-          const nextReservation = parseNumber(r[COL.NEXT_RESERVATION] || "");
+          const nextReservation = parseNumber(cell(r, "nextReservation"));
           const nextReservationRate = totalCustomers > 0 ? Math.round((nextReservation / totalCustomers) * 1000) / 10 : 0;
-          const reportMonth = getReportMonth(r[COL.ANSWER_DATE] || "");
+          const reportMonth = getReportMonth(cell(r, "answerDate"));
           const monthNum = reportMonth ? parseInt(reportMonth.split("-")[1]) : 0;
 
           return {
-            answerId: r[COL.ANSWER_ID] || "",
-            answerDate: r[COL.ANSWER_DATE] || "",
+            answerId: cell(r, "answerId"),
+            answerDate: cell(r, "answerDate"),
             reportMonth,
             reportMonthLabel: monthNum > 0 ? `${monthNum}月` : "",
-            lineUserId: r[COL.LINE_USER_ID] || "",
-            name: r[COL.NAME] || "",
-            nickname: parseReportNickname(r[COL.NICKNAME]),
-            store: r[COL.STORE]?.trim() || "",
-            storeNormalized: normalizeStoreName(r[COL.STORE] || ""),
-            employmentType: r[COL.EMPLOYMENT_TYPE] || "",
-            behaviorCheck: r[COL.BEHAVIOR_CHECK] || "",
-            ruleCheck: r[COL.RULE_CHECK] || "",
+            lineUserId: cell(r, "lineUserId"),
+            name: cell(r, "name"),
+            nickname: parseReportNickname(cell(r, "nickname")),
+            store: cell(r, "store").trim(),
+            storeNormalized: normalizeStoreName(cell(r, "store")),
+            employmentType: cell(r, "employmentType"),
+            behaviorCheck: cell(r, "behaviorCheck"),
+            ruleCheck: cell(r, "ruleCheck"),
             techSales,
             retailSales,
             totalSales,
@@ -405,9 +412,9 @@ export function useMonthlyReport() {
             unitPrice,
             nextReservation,
             nextReservationRate,
-            reviewComment: r[COL.REVIEW_COMMENT] || "",
-            npsComment: r[COL.NPS_COMMENT] || "",
-            fankuruComment: r[COL.FANKURU_COMMENT] || "",
+            reviewComment: cell(r, "reviewComment"),
+            npsComment: cell(r, "npsComment"),
+            fankuruComment: cell(r, "fankuruComment"),
           };
         });
 
@@ -546,6 +553,7 @@ export function useMonthlyReport() {
     rawData,
     loading,
     error,
+    columnIssues,
     availableMonths,
     getStoreMonthlyStats,
     getAllStoresStats,

@@ -6,11 +6,13 @@
  * 削除できない。今後もテスト送信は行われる。
  * よって「テスト」と回答された人物はダッシュボードに表示しない。
  *
- * 判定対象の列（月末報告書）:
- *   - 5 システム表示名
- *   - 6 氏名
- *   - 20 ニックネーム（設問差し替え後・ヘッダー空欄）
- * LINE名（列4）は本人の実アカウント名であり誤爆するため判定に使わない。
+ * 判定対象の列（月末報告書）: システム表示名 / 氏名 / ニックネーム。
+ * LINE名は本人の実アカウント名であり誤爆するため判定に使わない。
+ *
+ * 2026-09-12 まではここに 5 / 6 / 20 と列番号を直書きしていた。設問が1つ増えて
+ * 列が1つズレると「テスト」と書かれた行を検出できなくなり、テスト送信の売上が
+ * 店舗集計に混入する。列は呼び出し側（@/lib/reportColumns で解決した結果）から
+ * 受け取る。
  */
 
 /** テスト回答と見なす名前（完全一致・大小文字とスペースは無視） */
@@ -31,9 +33,20 @@ export function isTestName(value: string | undefined | null): boolean {
 }
 
 /**
+ * 判定に使う列の位置。解決できていない列は -1。
+ * `resolveReportColumns()` が返す index をそのまま渡せる形にしてある。
+ */
+export interface TestRowColumns {
+  systemName: number;
+  name: number;
+  nickname: number;
+}
+
+/**
  * 月末報告書の1行がテスト回答かどうか。
  * システム表示名・氏名・ニックネームのいずれかが「テスト」ならテスト扱い。
  */
-export function isTestReportRow(row: string[]): boolean {
-  return isTestName(row[5]) || isTestName(row[6]) || isTestName(row[20]);
+export function isTestReportRow(row: string[], cols: TestRowColumns): boolean {
+  const at = (c: number) => (c < 0 ? "" : row[c]);
+  return isTestName(at(cols.systemName)) || isTestName(at(cols.name)) || isTestName(at(cols.nickname));
 }

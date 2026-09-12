@@ -37,17 +37,32 @@ function monthsAgo(ym: string, base: string): number {
 
 export default function DataHealthPanel() {
   const [open, setOpen] = useState(false);
-  const { rawData: reports, loading: l1 } = useMonthlyReport();
+  const { rawData: reports, loading: l1, columnIssues } = useMonthlyReport();
   const { data: stylistRows, loading: l2 } = useSalonBoardStylistData();
   const { records: npsRecords, loading: l3 } = useNpsData();
   const loading = l1 || l2 || l3;
 
-  const { freshness, issues, notes } = useMemo(() => {
+  const { freshness, issues, notes, columnNotes } = useMemo(() => {
     const today = new Date();
     const todayYm = ymOf(today);
     const fresh: { name: string; latest: string; ok: boolean; note: string }[] = [];
     const found: Issue[] = []; // 直すもの
     const notes: string[] = []; // 直すものではないが知っておく情報
+    const columnNotes: string[] = []; // 月末報告書の列解決の参考情報
+
+    // ---- 月末報告書の列が読めているか（M3）----
+    // 設問を1つ増減すると以降の列が全部ズレる。ズレたまま 0 で集計すると
+    // 画面上は普通に見えるので、ここで必ず出す。
+    for (const ci of columnIssues) {
+      if (ci.severity === "info") {
+        columnNotes.push(ci.message);
+      } else {
+        found.push({
+          kind: ci.severity === "error" ? "月末報告書の列が見つからない（集計を止めています）" : "月末報告書の列が読めない",
+          detail: ci.message,
+        });
+      }
+    }
 
     // ---- 鮮度 ----
     const sbLatest = stylistRows.map((r) => r.yearMonth).sort().pop() || "";
@@ -122,8 +137,8 @@ export default function DataHealthPanel() {
       found.push({ kind: "NPSが誰にも紐づかない", detail: `${r.storeShort} / ${staff}` });
     }
 
-    return { freshness: fresh, issues: found, notes };
-  }, [reports, stylistRows, npsRecords]);
+    return { freshness: fresh, issues: found, notes, columnNotes };
+  }, [reports, stylistRows, npsRecords, columnIssues]);
 
   if (loading) return null;
 
@@ -176,6 +191,19 @@ export default function DataHealthPanel() {
               </p>
               <ul className="space-y-0.5 text-muted-foreground">
                 {notes.map((n, i) => (
+                  <li key={i}>・{n}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {columnNotes.length > 0 && (
+            <div>
+              <div className="font-semibold text-foreground mb-1">
+                参考：月末報告書の列の読み取り（{columnNotes.length}件）
+              </div>
+              <ul className="space-y-0.5 text-muted-foreground">
+                {columnNotes.map((n, i) => (
                   <li key={i}>・{n}</li>
                 ))}
               </ul>
