@@ -117,3 +117,30 @@ export const SETTINGS_PAGES: SettingsPage[] = [
 export function visibleMainTabs(isAdmin: boolean): NavItem[] {
   return MAIN_TABS.filter((tab) => isAdmin || !tab.adminOnly);
 }
+
+/**
+ * 「設定」タブを画面に出すか（2026-09-13 から false）。
+ *
+ * 設定の4枚（SETTINGS_PAGES）は AdminLayout がサーバAPI（/api/trpc の admin.me）で
+ * ログイン状態を確かめる作りだが、本番は GitHub Pages の静的配信でそのAPIが無い
+ * （本番実測: /monet-dashboard/api/trpc/admin.me → 404）。
+ * 結果、押すとログイン画面へ飛ばされ、ID/パスワードを入れても照合する相手がいないので
+ * 設定画面には入れない（ログイン画面から「ダッシュボードに戻る」で戻ることはできる）。
+ *
+ * 中身の管理はすべて Notion へ移っており、この画面から設定できることは本番では効かない。
+ *   - 店舗マスタ・スタッフの在籍/退職 … Notion が正本（isRetiredStaff は DB優先・マスタfallback で、
+ *     本番は DB が無いため常に Notion 由来の staffMaster.ts が効く）
+ *   - 名前マッピング … 本番で効くのはコード側の2層だけ。staffNameAlias.ts の内蔵表と、
+ *     stylistAlias.ts が Notion の「かな」から機械生成する別名（DBの stylist_aliases は注入されない）
+ *   - 店舗情報ページ … 編集UIはあるが保存は未実装（AdminStores の saveEdit は「準備中です」を出すだけ）
+ *
+ * サーバを立て直して設定画面を復活させるときは true に戻す。ページ本体とルートは残してある。
+ * そのとき server/navItems.test.ts の「管理者向けビルドでも出さない」も同時に直すこと
+ * （直さないと CI が赤くなる）。
+ */
+export const SETTINGS_TAB_ENABLED = false;
+
+/** 設定タブを出してよいか。管理者向けビルドで、かつ設定画面が実際に使えるときだけ */
+export function shouldShowSettingsTab(isAdmin: boolean): boolean {
+  return SETTINGS_TAB_ENABLED && isAdmin;
+}

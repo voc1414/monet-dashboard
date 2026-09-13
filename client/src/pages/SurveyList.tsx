@@ -428,10 +428,8 @@ export default function SurveyList() {
                 </div>
                 <p className="text-[11px] text-amber-700 mt-1">
                   ファンくるPDFのスタイリスト名がどのスタッフにも紐づいていません。
-                  <Link href="/admin/surveys">
-                    <span className="underline font-medium cursor-pointer hover:text-amber-900">管理者ページの「名前マッピング」</span>
-                  </Link>
-                  からマッピングを追加してください。
+                  Notion「全スタッフ一覧」でその方の<span className="font-medium">「かな」</span>を入れると、
+                  ひらがな・カタカナ・ローマ字の表記ゆれが自動で紐づきます。
                 </p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {unmatchedStylists.slice(0, 5).map((u, i) => (
@@ -472,10 +470,7 @@ export default function SurveyList() {
                 </div>
                 <p className="text-[11px] text-amber-700 mt-1">
                   NPSの「スタッフ選択」の名前が月末報告書のどのスタッフにも名寄せできていません。
-                  <Link href="/admin/surveys">
-                    <span className="underline font-medium cursor-pointer hover:text-amber-900">管理者ページの「名前マッピング」</span>
-                  </Link>
-                  で「この表記 → 正式名」を追加すると自動で紐付きます。
+                  Notion「全スタッフ一覧」でその方の<span className="font-medium">「かな」</span>を入れると自動で紐付きます。
                 </p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {unmatchedNpsStaff.slice(0, 5).map((u, i) => (

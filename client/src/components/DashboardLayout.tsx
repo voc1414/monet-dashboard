@@ -10,7 +10,7 @@ import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 
 import DataHealthPanel from "@/components/DataHealthPanel";
-import { SETTINGS_TAB, visibleMainTabs } from "@/lib/navItems";
+import { SETTINGS_TAB, shouldShowSettingsTab, visibleMainTabs } from "@/lib/navItems";
 import { IS_ADMIN_BUILD } from "@/lib/appRole";
 import monetLogo from "@/assets/monet-logo.png";
 
@@ -50,10 +50,12 @@ export default function DashboardLayout({
   // 広告・設定タブは管理者向けビルドにしか無い（スタッフ向けバンドルには存在しない）
   const isAdmin = IS_ADMIN_BUILD;
   const tabs = visibleMainTabs(isAdmin);
+  // 設定タブは押しても入れないので出さない（2026-09-13）。判定は navItems.ts に集約。
+  const showSettings = shouldShowSettingsTab(isAdmin);
   // モバイル下部ナビは1行あたり5個までしか横に並ばない（375px幅・和文ラベル）。
   // それを超えたら2行グリッドに切り替える。1行に詰めると「カウンセリング」等が
   // 3行に折り返して56pxのバーからはみ出し、末尾の1文字が切れる（2026-09-01 実測）。
-  const compactBottomNav = tabs.length + (isAdmin ? 1 : 0) > 5;
+  const compactBottomNav = tabs.length + (showSettings ? 1 : 0) > 5;
 
   return (
     <div className="min-h-screen bg-background">
@@ -98,7 +100,7 @@ export default function DashboardLayout({
                 </span>
               </Link>
             ))}
-            {isAdmin && (
+            {showSettings && (
               <>
                 <div className="w-px h-5 bg-border/60" />
                 <Link href={SETTINGS_TAB.href}>
@@ -195,7 +197,7 @@ export default function DashboardLayout({
               </div>
             </Link>
           ))}
-          {isAdmin && (
+          {showSettings && (
             <Link href={SETTINGS_TAB.href}>
               <div
                 className={`flex flex-col items-center gap-0.5 py-1.5 rounded-lg transition-colors text-muted-foreground/60 ${

@@ -19,7 +19,11 @@ FC共有前提でログイン不要の公開閲覧（管理ページ `/admin` �
 - スタッフ向け（既存URL・スタッフに配る）: https://voc1414.github.io/monet-dashboard/
   … 店舗一覧／スタッフ一覧／アンケート／カウンセリングの4タブ。**広告と設定はビルドに含まれない**（URL直打ちでも 404）
 - 管理者向け（林さん専用）: https://voc1414.github.io/monet-dashboard/admin-view/
-  … 上の4タブ＋広告（Meta）＋設定（従来の `/admin` 4枚）
+  … 上の4タブ＋雇用形態別の売上＋広告（Meta）
+- **「設定」タブは 2026-09-13 から出していない**（`client/src/lib/navItems.ts` の `SETTINGS_TAB_ENABLED = false`）。
+  設定4枚は AdminLayout が `/api/trpc` の `admin.me` で認証を確かめるが、GitHub Pages にそのAPIは無い（本番実測 404）。
+  押すとログイン画面へ飛ばされ、照合するサーバが無いので入れない。中身の管理は Notion（店舗マスタ／全スタッフ一覧）へ移行済み。
+  **タブが無いのは不具合ではない。復活させるならサーバを立て直したうえでフラグを true に戻し、`server/navItems.test.ts` も同時に直す**
 - 判定は `client/src/lib/appRole.ts`（`VITE_ROLE=admin` のときだけ管理者ビルド。既定は staff＝安全側）。
   タブ定義の正本は `client/src/lib/navItems.ts`。2回ビルドとスタッフ側の広告コード混入検査は `.github/workflows/pages.yml`
 - URLを隠すことが目的ではない（repoは public）。**目的はスタッフの画面に広告費・CPAを出さないこと**
