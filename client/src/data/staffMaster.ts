@@ -41,6 +41,9 @@ export type StaffMasterEntry = {
 };
 
 export const STAFF_MASTER: StaffMasterEntry[] = [
+  { name: "岡野彩純", store: "下伊福院", displayName: "岡野 彩純", nickname: null, kana: "", status: "active", retiredMonth: null },
+  { name: "坂本あさみ", store: "下伊福院", displayName: "坂本 亜佐美", nickname: null, kana: "", status: "active", retiredMonth: null },
+  { name: "田窪莉央", store: "下伊福院", displayName: "田窪 莉央", nickname: null, kana: "", status: "active", retiredMonth: null },
   { name: "井上恵子", store: "楽々園院", displayName: "井上 恵子", nickname: null, kana: "いのうえ けいこ", status: "active", retiredMonth: null },
   { name: "石原ようこ", store: "楽々園院", displayName: "石原 ようこ", nickname: null, kana: "いしはら ようこ", status: "active", retiredMonth: null },
   { name: "千葉祐子", store: "楽々園院", displayName: "千葉 祐子", nickname: null, kana: "ちば ゆうこ", status: "active", retiredMonth: null },
@@ -69,7 +72,7 @@ export const STAFF_MASTER: StaffMasterEntry[] = [
   { name: "三宅 和美", store: "堀江院2nd", displayName: "Kazumi", nickname: null, kana: "みやけ かずみ", status: "retired", retiredMonth: "2026-03" },
   { name: "池内 亜希子", store: "堀江院2nd", displayName: "Aki", nickname: null, kana: "いけうち あきこ", status: "retired", retiredMonth: "2026-04" },
   { name: "天野美奈穂", store: "堀江院2nd", displayName: "Minaho", nickname: null, kana: "あまの みなほ", status: "active", retiredMonth: null },
-  { name: "徳永 さゆり", store: "堀江院2nd", displayName: "Sayuri", nickname: null, kana: "とくなが さゆり", status: "active", retiredMonth: null },
+  { name: "徳永 さゆり", store: "堀江院2nd", displayName: "Sayuri", nickname: null, kana: "とくなが さゆり", status: "retired", retiredMonth: null },
   { name: "本吉真優", store: "堀江院2nd", displayName: "Mayu", nickname: null, kana: "もとよし まゆ", status: "active", retiredMonth: null },
   { name: "満川宏美", store: "堀江院2nd", displayName: "Hiromi", nickname: null, kana: "みつかわ ひろみ", status: "retired", retiredMonth: "2026-07" },
   { name: "金田あゆみ", store: "姪浜院", displayName: "金田 あゆみ", nickname: null, kana: "かねだ あゆみ", status: "active", retiredMonth: null },

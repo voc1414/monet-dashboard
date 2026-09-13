@@ -43,6 +43,8 @@ const STORE_NAME_MAP_FALLBACK: Record<string, string> = {
   "楽々園院": "楽々園院",
   "広島土橋院": "土橋院",
   "土橋院": "土橋院",
+  "岡山下伊福院": "下伊福院",
+  "下伊福院": "下伊福院",
 };
 
 // Module-level alias map that can be updated from DB
@@ -52,7 +54,8 @@ export function setReportAliasMap(map: Record<string, string> | undefined) {
   _reportAliasMap = map;
 }
 
-function normalizeStoreName(raw: string): string {
+/** 月末報告書の所属店舗（例「岡山下伊福院」）を短縮名へ畳む。export はテスト用。 */
+export function normalizeStoreName(raw: string): string {
   const trimmed = raw.trim();
   // DB-based map takes priority
   if (_reportAliasMap && Object.keys(_reportAliasMap).length > 0) {

@@ -89,7 +89,7 @@ export function reportNicknameCount(): number {
  * （`resolveStaffDisplayName("Akiko","堀江院2nd")` が 堀江院 小池明子の呼び名を返す。
  *  SurveyList.tsx は NPS の (staff, storeShort) から行を作るので、実データで到達する）。
  * さらに①のこの誤ヒットは②の正しい直接ヒットを上書きするため、②だけ締めても無意味だった。
- * 現在マスタ36人の nickname が全て null で画面が壊れていないのは偶然であり、
+ * 現在マスタ39人（2026-09-13 時点）の nickname が全て null で画面が壊れていないのは偶然であり、
  * Notion のニックネーム列に1件でも値が入れば発火する。
  */
 function findNickname(name: string, store?: string): string | null {

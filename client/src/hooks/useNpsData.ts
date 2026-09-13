@@ -36,7 +36,8 @@ export interface StoreStats {
  * Parse store name from NPS spreadsheet full name.
  * Uses npsAliasMap from DB if available, otherwise falls back to keyword matching.
  */
-function parseStoreName(fullName: string, npsAliasMap?: Record<string, string>): string {
+/** NPSシートのサロン名（例「monet 岡山下伊福院」）を短縮名へ畳む。export はテスト用。 */
+export function parseStoreName(fullName: string, npsAliasMap?: Record<string, string>): string {
   // If we have a DB-based alias map, try to match.
   // 長いエイリアスから照合（「堀江院 2nd」が「堀江院」に先取りされ2nd分が堀江院へ誤計上されるのを防ぐ）。
   // シート側は「堀江院 2nd」とスペース入りのため、空白を除去して比較する。
@@ -58,6 +59,9 @@ function parseStoreName(fullName: string, npsAliasMap?: Record<string, string>):
   if (fullName.includes("姪浜院")) return "姪浜院";
   if (fullName.includes("楽々園院")) return "楽々園院";
   if (fullName.includes("土橋院")) return "土橋院";
+  // 岡山エリア。シートの実値は「monet 岡山下伊福院」。下の汎用正規表現は
+  // 「岡山下伊福院」を丸ごと拾ってしまい短縮名に落ちないため、明示的に判定する。
+  if (fullName.includes("下伊福院")) return "下伊福院";
 
   // Generic: extract 「〇〇院」pattern
   const m = fullName.match(/([一-龥ぁ-ゖァ-ヶA-Za-z0-9]+院(?:2nd)?)/);

@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { STORE_MASTER, openedAreaStores } from "@/data/storeMaster";
 
-describe("店舗マスタ（Notion「DB_monet店舗一覧」由来・2026-08-20 追加）", () => {
-  it("9店すべてが入っている", () => {
-    expect(STORE_MASTER).toHaveLength(9);
+describe("店舗マスタ（Notion「DB_monet店舗一覧」由来・2026-08-20 追加 / 2026-09-13 更新）", () => {
+  it("11店すべてが入っている", () => {
+    expect(STORE_MASTER).toHaveLength(11);
     expect(STORE_MASTER.map((s) => s.name)).toContain("下伊福院");
     expect(STORE_MASTER.map((s) => s.name)).toContain("岡本院");
   });
@@ -12,8 +12,16 @@ describe("店舗マスタ（Notion「DB_monet店舗一覧」由来・2026-08-20 
     const areas = openedAreaStores("2026-08-20");
     const names = areas.flatMap((a) => a.stores);
     expect(names).toHaveLength(7);
-    expect(names).not.toContain("下伊福院"); // 開店日未定
+    expect(names).not.toContain("下伊福院"); // この時点ではまだ開店前（開店 2026-09-10）
     expect(names).not.toContain("岡本院");   // 開店日未定
+  });
+
+  // 下伊福院は 2026-09-10 開店（林さん確認 2026-09-13）。
+  it("下伊福院は開店日 2026-09-10 から岡山エリアとして並ぶ", () => {
+    expect(openedAreaStores("2026-09-09").flatMap((a) => a.stores)).not.toContain("下伊福院");
+    const areas = openedAreaStores("2026-09-10");
+    expect(areas.flatMap((a) => a.stores)).toContain("下伊福院");
+    expect(areas.find((a) => a.area === "岡山エリア")?.stores).toEqual(["下伊福院"]);
   });
 
   it("開店日を過ぎた店は自動で並ぶ（コード修正が要らない）", () => {

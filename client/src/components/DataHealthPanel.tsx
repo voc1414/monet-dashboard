@@ -14,6 +14,7 @@ import { useSalonBoardStylistData, stylistKey } from "@/hooks/useSalonBoardStyli
 import { useNpsData } from "@/hooks/useNpsData";
 import { canonicalizeStaffName, normalizeStaffKey } from "@/lib/staffNameAlias";
 import { isRetiredStaff } from "@/lib/newBadge";
+import { STAFF_MASTER } from "@/data/staffMaster";
 
 /** 日次で入るデータの許容遅れ（日）。これを超えたら赤。 */
 const STALE_DAYS = 14;
@@ -46,18 +47,22 @@ interface DataHealthPanelProps {
 
 export default function DataHealthPanel({ hideWhenOk = false }: DataHealthPanelProps = {}) {
   const [open, setOpen] = useState(false);
+  // 参考情報は「異常ではないもの」しか入らない。既定では畳んでおく
+  // （毎日10件近く並ぶと、本当に直すものが出たときに埋もれる）。
+  const [notesOpen, setNotesOpen] = useState(false);
   const { rawData: reports, loading: l1, columnIssues } = useMonthlyReport();
   const { data: stylistRows, loading: l2 } = useSalonBoardStylistData();
   const { records: npsRecords, loading: l3 } = useNpsData();
   const loading = l1 || l2 || l3;
 
-  const { freshness, issues, notes, columnNotes } = useMemo(() => {
+  const { freshness, issues, notes, columnNotes, npsNotes } = useMemo(() => {
     const today = new Date();
     const todayYm = ymOf(today);
     const fresh: { name: string; latest: string; ok: boolean; note: string }[] = [];
     const found: Issue[] = []; // 直すもの
     const notes: string[] = []; // 直すものではないが知っておく情報
     const columnNotes: string[] = []; // 月末報告書の列解決の参考情報
+    const npsNotes: string[] = []; // NPSの担当名が名簿に無い（＝個人ページに出ない）参考情報
 
     // ---- 月末報告書の列が読めているか（M3）----
     // 設問を1つ増減すると以降の列が全部ズレる。ズレたまま 0 で集計すると
@@ -133,7 +138,16 @@ export default function DataHealthPanel({ hideWhenOk = false }: DataHealthPanelP
     }
 
     // ---- 整合: NPSの担当名が名簿に着地するか ----
+    // 照合先は2つ。月末報告書に出てくる名前と、スタッフ名簿（Notion「全スタッフ一覧」）。
+    // 報告書だけを見ていると、新店のように「名簿には居るが最初の月末報告書がまだ無い」人の
+    // 口コミが全員「紐づかない」と出る（2026-09-13 下伊福院の3名で発生）。名簿も見る。
     const roster = new Set(reports.map((r) => normalizeStaffKey(canonicalizeStaffName(r.name))));
+    for (const s of STAFF_MASTER) {
+      if (s.status !== "active") continue;
+      // 氏名と表示名の両方。NPSフォームはどちらの表記でも入ってくる。
+      if (s.name) roster.add(normalizeStaffKey(s.name));
+      if (s.displayName) roster.add(normalizeStaffKey(s.displayName));
+    }
     const npsSeen = new Set<string>();
     for (const r of npsRecords) {
       const staff = (r.staff || "").trim();
@@ -143,10 +157,12 @@ export default function DataHealthPanel({ hideWhenOk = false }: DataHealthPanelP
       const id = `${k}__${r.storeShort}`;
       if (npsSeen.has(id)) continue;
       npsSeen.add(id);
-      found.push({ kind: "NPSが誰にも紐づかない", detail: `${r.storeShort} / ${staff}` });
+      // 直すものには入れない。店舗のNPSスコアにはこの口コミも入っており、
+      // 効いてくるのは「担当者の個人ページに出ない」ことだけ。毎日警告を出す実害ではない。
+      npsNotes.push(`${r.storeShort} / ${staff}`);
     }
 
-    return { freshness: fresh, issues: found, notes, columnNotes };
+    return { freshness: fresh, issues: found, notes, columnNotes, npsNotes };
   }, [reports, stylistRows, npsRecords, columnIssues]);
 
   if (loading) return null;
@@ -156,6 +172,7 @@ export default function DataHealthPanel({ hideWhenOk = false }: DataHealthPanelP
     return a;
   }, {});
   const ok = issues.length === 0;
+  const referenceCount = npsNotes.length + notes.length + columnNotes.length;
 
   // フックは上で必ず呼び終えているので、ここで早期 return してもフックの順序は崩れない。
   if (ok && hideWhenOk) return null;
@@ -193,32 +210,58 @@ export default function DataHealthPanel({ hideWhenOk = false }: DataHealthPanelP
             </div>
           ))}
 
-          {notes.length > 0 && (
+          {referenceCount > 0 && (
             <div>
-              <div className="font-semibold text-foreground mb-1">
-                参考：同じ表示名が複数店舗にいます（{notes.length}件）
-              </div>
-              <p className="text-xs text-muted-foreground mb-1">
-                別人なので、突合は必ず「店舗＋表示名」の組で行う必要があります。異常ではありません。
-              </p>
-              <ul className="space-y-0.5 text-muted-foreground">
-                {notes.map((n, i) => (
-                  <li key={i}>・{n}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+              <button
+                onClick={() => setNotesOpen((v) => !v)}
+                className="w-full flex items-center gap-2 text-left font-semibold text-foreground"
+              >
+                参考（{referenceCount}件・異常ではありません）
+                <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${notesOpen ? "rotate-180" : ""}`} />
+              </button>
 
-          {columnNotes.length > 0 && (
-            <div>
-              <div className="font-semibold text-foreground mb-1">
-                参考：月末報告書の列の読み取り（{columnNotes.length}件）
-              </div>
-              <ul className="space-y-0.5 text-muted-foreground">
-                {columnNotes.map((n, i) => (
-                  <li key={i}>・{n}</li>
-                ))}
-              </ul>
+              {notesOpen && (
+                <div className="mt-2 space-y-3">
+                  {npsNotes.length > 0 && (
+                    <div>
+                      <div className="text-foreground mb-1">口コミの担当名が名簿に無い（{npsNotes.length}件）</div>
+                      <p className="text-xs text-muted-foreground mb-1">
+                        店舗のNPSスコアには入っています。担当者の個人ページに出ないだけです。
+                      </p>
+                      <ul className="space-y-0.5 text-muted-foreground">
+                        {npsNotes.map((n, i) => (
+                          <li key={i}>・{n}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {notes.length > 0 && (
+                    <div>
+                      <div className="text-foreground mb-1">同じ表示名が複数店舗にいます（{notes.length}件）</div>
+                      <p className="text-xs text-muted-foreground mb-1">
+                        別人なので、突合は必ず「店舗＋表示名」の組で行う必要があります。
+                      </p>
+                      <ul className="space-y-0.5 text-muted-foreground">
+                        {notes.map((n, i) => (
+                          <li key={i}>・{n}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {columnNotes.length > 0 && (
+                    <div>
+                      <div className="text-foreground mb-1">月末報告書の列の読み取り（{columnNotes.length}件）</div>
+                      <ul className="space-y-0.5 text-muted-foreground">
+                        {columnNotes.map((n, i) => (
+                          <li key={i}>・{n}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

@@ -2,16 +2,27 @@
 /**
  * Notion「DB_monet店舗一覧」→ client/src/data/storeMaster.ts を再生成する。
  *
+ * 入力経路は2つある。どちらでも同じ storeMaster.ts が出る（sync-staff-master.mjs と同じ作り）。
+ *
+ * ①インテグレーション・トークン経路（自動・CIから回せる）
  *   NOTION_TOKEN=ntn_xxx node scripts/sync-store-master.mjs
  *   （npm run sync:stores）
+ *   前提: 対象DBが Notion 側でインテグレーションに接続されていること。
+ *   未接続だと 404「Make sure the relevant pages ... are shared」が返る。
+ *   2026-09-13時点、手元の2トークン（hayashin-guard / gf-crm）はどちらも未接続で404。
+ *   注意: Notion の「Claudeコネクタ」(OAuth) を接続してもこの経路は通らない。別物。
  *
- * 前提: 対象DBが Notion 側でインテグレーションに接続されていること。
- *       未接続だと 404「Make sure the relevant pages ... are shared」が返る。
+ * ②スナップショット経路（Claudeコネクタ／MCPで読めている場合。トークン不要）
+ *   node scripts/sync-store-master.mjs --from-json <path.json>
+ *   JSON は Notion の列名そのままの配列。取得日を添える（鮮度が分かるように）:
+ *     { "取得日": "2026-09-13",
+ *       "rows": [ { "名前": "下伊福院", "エリア": "岡山", "開店日": "2026-09-10" } ] }
+ *   「開店日」は "YYYY-MM-DD" か null。
  *
  * 取り込むのは 名前・エリア・開店日 の3つだけ。住所・電話・LP URL などは
  * ダッシュボードで使っていないので取得しない。
  */
-import { writeFileSync } from "node:fs";
+import { writeFileSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
@@ -19,9 +30,18 @@ const DATABASE_ID = "354ab44d3cb98068ad2ac3a3aa2e2af2";
 const NOTION_VERSION = "2022-06-28";
 const OUT = resolve(dirname(fileURLToPath(import.meta.url)), "../client/src/data/storeMaster.ts");
 
+const jsonArgIndex = process.argv.indexOf("--from-json");
+const jsonPath = jsonArgIndex >= 0 ? process.argv[jsonArgIndex + 1] : null;
 const token = process.env.NOTION_TOKEN;
-if (!token) {
-  console.error("NOTION_TOKEN が未設定です。NOTION_TOKEN=... node scripts/sync-store-master.mjs");
+
+if (jsonArgIndex >= 0 && !jsonPath) {
+  console.error("--from-json の後にJSONのパスを渡してください。");
+  process.exit(1);
+}
+if (!jsonPath && !token) {
+  console.error("入力がありません。次のどちらかで実行してください:");
+  console.error("  ① NOTION_TOKEN=... node scripts/sync-store-master.mjs");
+  console.error("  ② node scripts/sync-store-master.mjs --from-json <path.json>");
   process.exit(1);
 }
 
@@ -48,18 +68,46 @@ async function fetchAll() {
   return out;
 }
 
-const stores = (await fetchAll())
-  .map((p) => {
+/**
+ * 入力を「Notionの列名そのままのオブジェクト」の配列に揃える。
+ * ①API経路は properties を剥がし、②JSON経路はそのまま使う。
+ */
+async function readRows() {
+  if (jsonPath) {
+    const raw = JSON.parse(readFileSync(jsonPath, "utf-8"));
+    const rows = Array.isArray(raw) ? raw : raw.rows;
+    if (!Array.isArray(rows)) {
+      console.error(`${jsonPath} の形式が違います。配列か { "rows": [...] } を渡してください。`);
+      process.exit(1);
+    }
+    const asOf = Array.isArray(raw) ? null : raw["取得日"];
+    console.log(`スナップショットから読み込み: ${rows.length}件${asOf ? `（取得日 ${asOf}）` : ""}`);
+    return rows;
+  }
+  return (await fetchAll()).map((p) => {
     const props = p.properties;
-    const area = props["エリア"]?.select?.name ?? "";
     return {
-      name: plain(props["名前"]),
+      名前: plain(props["名前"]),
+      エリア: props["エリア"]?.select?.name ?? "",
+      開店日: props["開店日"]?.date?.start ?? null,
+    };
+  });
+}
+
+const stores = (await readRows())
+  .map((r) => {
+    const area = (r["エリア"] ?? "").trim();
+    return {
+      name: (r["名前"] ?? "").trim(),
       area: area ? `${area}エリア` : "",
-      openedOn: props["開店日"]?.date?.start ?? null,
+      openedOn: r["開店日"] || null,
     };
   })
   .filter((s) => s.name && s.area)
-  .sort((a, b) => (a.openedOn || "9999").localeCompare(b.openedOn || "9999") || a.name.localeCompare(b.name, "ja"));
+  // 開店日順のみ。同じ開店日のときは Notion の行順をそのまま残す（Array#sort は安定）。
+  // 第2キーに名前の五十音を入れていたが、同日開店の福島院・高槻院の並びが再生成のたびに
+  // 画面上で入れ替わるため外した（2026-09-13）。並びを変えたいときは Notion 側で並べ替える。
+  .sort((a, b) => (a.openedOn || "9999").localeCompare(b.openedOn || "9999"));
 
 if (!stores.length) {
   console.error("0件でした。書き出しを中止します（誤って全店を消さないため）。");

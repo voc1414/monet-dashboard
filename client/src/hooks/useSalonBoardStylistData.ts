@@ -63,6 +63,8 @@ const STORE_KEYWORDS: { keyword: string; storeName: string }[] = [
   { keyword: "土橋院", storeName: "土橋院" },
   { keyword: "広島楽々園院", storeName: "楽々園院" },
   { keyword: "楽々園院", storeName: "楽々園院" },
+  { keyword: "岡山下伊福院", storeName: "下伊福院" },
+  { keyword: "下伊福院", storeName: "下伊福院" },
 ];
 
 export function normalizeSalonBoardStore(raw: string): string {
