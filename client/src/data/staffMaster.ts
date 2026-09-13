@@ -41,9 +41,9 @@ export type StaffMasterEntry = {
 };
 
 export const STAFF_MASTER: StaffMasterEntry[] = [
-  { name: "岡野彩純", store: "下伊福院", displayName: "岡野 彩純", nickname: null, kana: "", status: "active", retiredMonth: null },
-  { name: "坂本あさみ", store: "下伊福院", displayName: "坂本 亜佐美", nickname: null, kana: "", status: "active", retiredMonth: null },
-  { name: "田窪莉央", store: "下伊福院", displayName: "田窪 莉央", nickname: null, kana: "", status: "active", retiredMonth: null },
+  { name: "岡野彩純", store: "下伊福院", displayName: "岡野 彩純", nickname: null, kana: "おかの あすみ", status: "active", retiredMonth: null },
+  { name: "坂本あさみ", store: "下伊福院", displayName: "坂本 亜佐美", nickname: null, kana: "さかもと あさみ", status: "active", retiredMonth: null },
+  { name: "田窪莉央", store: "下伊福院", displayName: "田窪 莉央", nickname: null, kana: "たくぼ りお", status: "active", retiredMonth: null },
   { name: "井上恵子", store: "楽々園院", displayName: "井上 恵子", nickname: null, kana: "いのうえ けいこ", status: "active", retiredMonth: null },
   { name: "石原ようこ", store: "楽々園院", displayName: "石原 ようこ", nickname: null, kana: "いしはら ようこ", status: "active", retiredMonth: null },
   { name: "千葉祐子", store: "楽々園院", displayName: "千葉 祐子", nickname: null, kana: "ちば ゆうこ", status: "active", retiredMonth: null },
