@@ -1091,6 +1091,10 @@ export default function StoreDetail() {
         // 次回予約率は常に月末報告書から（サロンボードにはない）
         const nextReservationRate = reportStats?.nextReservationRate || 0;
         const nextReservation = reportStats?.totalNextReservation || 0;
+        // 率の分母も月末報告書の客数を使う。サロンボードの storeTotalCustomers を出すと
+        // 画面の「予約 / 総客」を割り算しても表示中の率にならない（e77e585 で総客数カードと
+        // 変数を共有した際の取りこぼし。同コミットは「次回予約率は月末報告書から取得を維持」が意図）。
+        const nextReservationCustomers = reportStats?.totalCustomers || 0;
 
         const hasAnyData = hasSb || !!reportStats;
         const monthLabel = reportStats?.monthLabel || (activeMonth ? `${parseInt(activeMonth.split("-")[1])}月` : "");
@@ -1113,7 +1117,7 @@ export default function StoreDetail() {
                   { label: "総売上", value: formatCurrency(storeTotalSales), sub: `技術: ${formatCurrency(storeTechSales)} / 店販: ${formatCurrency(storeRetailSales)}`, icon: DollarSign },
                   { label: "客単価", value: formatCurrency(storeUnitPrice), sub: `総売上 ÷ 総客数`, icon: Scissors },
                   { label: "総客数", value: `${storeTotalCustomers}名`, sub: `新規: ${storeNewCustomers} / 再来: ${storeReturnCustomers}`, icon: Users },
-                  { label: "次回予約率", value: `${nextReservationRate}%`, sub: `予約: ${nextReservation} / 総客: ${storeTotalCustomers}`, icon: TrendingUp, warn: nextReservationRate <= 69, excellent: nextReservationRate >= 85, adequate: nextReservationRate >= 70 && nextReservationRate <= 84 },
+                  { label: "次回予約率", value: `${nextReservationRate}%`, sub: `予約: ${nextReservation} / 総客: ${nextReservationCustomers}`, icon: TrendingUp, warn: nextReservationRate <= 69, excellent: nextReservationRate >= 85, adequate: nextReservationRate >= 70 && nextReservationRate <= 84 },
                 ].map((item, i) => (
                   <motion.div key={item.label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.04 }}>
                     <Card className="border-border/50 shadow-sm">
