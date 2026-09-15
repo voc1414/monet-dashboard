@@ -70,6 +70,14 @@ export interface SalonBoardMonthlyData {
   totalCustomers: number;
   newCustomers: number;
   returnCustomers: number;
+  /**
+   * オプション売上・割引額。store_official（公式の店舗別月次集計）にだけ存在する。
+   * stylist_flat からの集計（store_official が取れないときのフォールバック）には無いので optional。
+   * discount は CSV では負値で入っているが、ここでは常に正の大きさに正規化して持つ。
+   * 関係式: 技術 + 店販 + オプション − 割引 = 純売上（= totalSales・カードの見出しの数字）
+   */
+  optionSales?: number;
+  discount?: number;
 }
 
 // CSVパーサー（ダブルクォート対応）
@@ -152,6 +160,9 @@ export function parseStoreOfficialCsv(csvText: string): SalonBoardMonthlyData[] 
       totalCustomers,
       newCustomers: parseNum(c[10]),
       returnCustomers: parseNum(c[11]),
+      optionSales: parseNum(c[5]),
+      // 割引は CSV では負値。表示側で「− 割引 ¥x」と書くので正の大きさに寄せる
+      discount: Math.abs(parseNum(c[7])),
     });
   }
   return out;

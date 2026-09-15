@@ -65,8 +65,25 @@ export function normalizeStoreName(raw: string): string {
   return STORE_NAME_MAP_FALLBACK[trimmed] || trimmed;
 }
 
-// 回答日時から報告月を算出（-1ヶ月）
-function getReportMonth(answerDateStr: string): string {
+/**
+ * 「その日が属する月の前月」を "YYYY-MM" で返す（純関数・日付を持ち回らない）。
+ *
+ * Date#setMonth(-1) を直に使うと、提出日が月末のときに前月へ行き損ねる。
+ * 例: 3/31 に setMonth(-1) すると「2/31」＝3/3 に溢れ、報告月が 2月ではなく3月になる。
+ * 報告月に必要なのは年と月だけなので、日を一切通さず年月だけで計算する。
+ */
+function prevYearMonth(year: number, month1to12: number): string {
+  const m = month1to12 - 1; // 0-based
+  const d = new Date(year, m - 1, 1); // 日は必ず1日。溢れようがない
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/**
+ * 回答日時から報告月を算出（-1ヶ月）。
+ * 月末（3/31・5/31・7/31・10/31・12/31 など）に提出された回答が、
+ * 前月ではなく当月に積まれてしまう取りこぼしを防ぐため、日は使わずに年月だけで引く。
+ */
+export function getReportMonth(answerDateStr: string): string {
   try {
     // "2026-03-31 11:41:04 pm" → Date
     const cleaned = answerDateStr.trim().replace(/\s+(am|pm)/i, (_, p) => ` ${p.toUpperCase()}`);
@@ -75,17 +92,10 @@ function getReportMonth(answerDateStr: string): string {
       // フォールバック: 手動パース
       const parts = answerDateStr.trim().match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2}):(\d{2})\s*(am|pm)?/i);
       if (!parts) return "";
-      let [, year, month, day, hour, min, sec, ampm] = parts;
-      let h = parseInt(hour);
-      if (ampm?.toLowerCase() === "pm" && h < 12) h += 12;
-      if (ampm?.toLowerCase() === "am" && h === 12) h = 0;
-      const d = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), h, parseInt(min), parseInt(sec));
-      // -1ヶ月
-      d.setMonth(d.getMonth() - 1);
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const [, year, month] = parts;
+      return prevYearMonth(parseInt(year), parseInt(month));
     }
-    date.setMonth(date.getMonth() - 1);
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    return prevYearMonth(date.getFullYear(), date.getMonth() + 1);
   } catch {
     return "";
   }

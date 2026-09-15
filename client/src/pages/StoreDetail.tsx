@@ -1088,6 +1088,12 @@ export default function StoreDetail() {
         const storeTotalCustomers = hasSb ? (sbData?.totalCustomers || 0) : 0;
         const storeNewCustomers = hasSb ? (sbData?.newCustomers || 0) : 0;
         const storeReturnCustomers = hasSb ? (sbData?.returnCustomers || 0) : 0;
+        // オプションと割引は store_official にだけある（stylist_flat 集計のときは undefined）。
+        // 技術 + 店販 + オプション − 割引 = 総売上（カードの見出し）。
+        // 内訳を技術と店販だけにすると足し算が見出しに合わないので、あるときは4項目すべて出す。
+        const storeOptionSales = hasSb ? sbData?.optionSales : undefined;
+        const storeDiscount = hasSb ? sbData?.discount : undefined;
+        const hasSalesBreakdown = storeOptionSales !== undefined && storeDiscount !== undefined;
         // 次回予約率は常に月末報告書から（サロンボードにはない）
         const nextReservationRate = reportStats?.nextReservationRate || 0;
         const nextReservation = reportStats?.totalNextReservation || 0;
@@ -1114,7 +1120,11 @@ export default function StoreDetail() {
             {hasAnyData ? (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
-                  { label: "総売上", value: formatCurrency(storeTotalSales), sub: `技術: ${formatCurrency(storeTechSales)} / 店販: ${formatCurrency(storeRetailSales)}`, icon: DollarSign },
+                  { label: "総売上", value: formatCurrency(storeTotalSales), sub: hasSalesBreakdown
+                  // 項目名と金額の間は改行しない空白（ ）。スマホ幅だと「割引」と
+                  // 「¥107,800」が行を跨いで読めなくなるため
+                  ? `技術 ${formatCurrency(storeTechSales)} + 店販 ${formatCurrency(storeRetailSales)} + オプション ${formatCurrency(storeOptionSales!)} − 割引 ${formatCurrency(storeDiscount!)}`
+                  : `技術: ${formatCurrency(storeTechSales)} / 店販: ${formatCurrency(storeRetailSales)}`, icon: DollarSign },
                   { label: "客単価", value: formatCurrency(storeUnitPrice), sub: `総売上 ÷ 総客数`, icon: Scissors },
                   { label: "総客数", value: `${storeTotalCustomers}名`, sub: `新規: ${storeNewCustomers} / 再来: ${storeReturnCustomers}`, icon: Users },
                   { label: "次回予約率", value: `${nextReservationRate}%`, sub: `予約: ${nextReservation} / 総客: ${nextReservationCustomers}`, icon: TrendingUp, warn: nextReservationRate <= 69, excellent: nextReservationRate >= 85, adequate: nextReservationRate >= 70 && nextReservationRate <= 84 },
@@ -1125,7 +1135,8 @@ export default function StoreDetail() {
                         <item.icon className="w-4 h-4 text-primary mb-2" />
                         <div className="font-mono-data text-lg md:text-xl font-bold">{item.value}</div>
                         <div className="text-[10px] text-muted-foreground mt-1">{item.label}</div>
-                        <div className="text-[9px] text-muted-foreground/70 mt-0.5">{item.sub}</div>
+                        {/* break-keep: 和文が語の途中（「割/引」）で折り返されるのを防ぐ */}
+                        <div className="text-[9px] text-muted-foreground/70 mt-0.5 break-keep">{item.sub}</div>
                         {('warn' in item) && item.warn && (
                           <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 mt-1.5" title="要改善">
                             <AlertTriangle className="w-2.5 h-2.5" />

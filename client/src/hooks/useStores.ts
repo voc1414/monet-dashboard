@@ -113,7 +113,10 @@ export function useStores() {
       if (!storeList) return false;
       const store = storeList.find(s => s.name === storeName);
       if (!store || !store.knownSince) return false;
+      // 日を先に1日へ寄せてから月を引く。今日が月末（3/31 等）だと
+      // setMonth(-3) が「12/31」→ 溢れて 1/1 のように1日ずれるため。
       const threeMonthsAgo = new Date();
+      threeMonthsAgo.setDate(1);
       threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
       const knownDate = new Date(store.knownSince);
       return knownDate > threeMonthsAgo;
