@@ -6,6 +6,7 @@
  * スプレッドシートCSVカラム: 店舗名,年月,日付,ファイル名,表示名,driveFileId,previewUrl,viewUrl
  */
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { storeNameFromMaster } from "@/lib/storeNameFromMaster";
 import {
   aliasKey,
   aliasesForStaff,
@@ -85,7 +86,7 @@ export function normalizeStoreName(raw: string): string {
   if (_fankuruAliasMap && Object.keys(_fankuruAliasMap).length > 0) {
     if (_fankuruAliasMap[raw]) return _fankuruAliasMap[raw];
   }
-  return STORE_NAME_NORMALIZE_FALLBACK[raw] || raw;
+  return STORE_NAME_NORMALIZE_FALLBACK[raw] || storeNameFromMaster(raw) || raw;
 }
 
 // CSVパーサー（ダブルクォート対応）

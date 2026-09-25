@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { storeNameFromMaster } from "@/lib/storeNameFromMaster";
 import { registerNewStoresFromReports, isRetiredStaff } from "@/lib/newBadge";
 import { canonicalizeStaffName, useStaffAliasVersion } from "@/lib/staffNameAlias";
 import { isTestReportRow } from "@/lib/testDataFilter";
@@ -62,7 +63,7 @@ export function normalizeStoreName(raw: string): string {
     if (_reportAliasMap[trimmed]) return _reportAliasMap[trimmed];
   }
   // Fallback to hardcoded
-  return STORE_NAME_MAP_FALLBACK[trimmed] || trimmed;
+  return STORE_NAME_MAP_FALLBACK[trimmed] || storeNameFromMaster(trimmed) || trimmed;
 }
 
 /**

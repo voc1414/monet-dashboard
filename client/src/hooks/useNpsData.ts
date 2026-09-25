@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { storeNameFromMaster } from "@/lib/storeNameFromMaster";
 
 const SPREADSHEET_ID = "1xSm2poTIeRPFviVmINdWNWmLT5d9pXXL2XzWEQsxiRU";
 const SHEET_NAME = "全店舗";
@@ -64,6 +65,10 @@ export function parseStoreName(fullName: string, npsAliasMap?: Record<string, st
   if (fullName.includes("下伊福院")) return "下伊福院";
   // 兵庫エリア。シートの実値は「monet 岡本」で「院」が付かず、下の汎用正規表現に掛からない。
   if (fullName.includes("岡本")) return "岡本院";
+
+  // 表に無い新店は、Notion の店舗一覧から畳む（「monet 岡本」のように院が無くても拾う）
+  const fromMaster = storeNameFromMaster(fullName);
+  if (fromMaster) return fromMaster;
 
   // Generic: extract 「〇〇院」pattern
   const m = fullName.match(/([一-龥ぁ-ゖァ-ヶA-Za-z0-9]+院(?:2nd)?)/);

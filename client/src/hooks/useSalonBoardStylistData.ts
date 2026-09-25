@@ -18,6 +18,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { normalizeStylistName } from "@/hooks/useFankuruData";
 import { canonicalizeStaffName } from "@/lib/staffNameAlias";
+import { storeNameFromMaster } from "@/lib/storeNameFromMaster";
 
 // 正本「サロンボード売上」スプレッドシートID（林さん作成・毎朝7:30自動更新の stylist_flat タブ）。
 // DB/設定から差し込みたい場合は setSalonBoardStylistSpreadsheetId() で上書き可能。
@@ -73,7 +74,8 @@ export function normalizeSalonBoardStore(raw: string): string {
   for (const { keyword, storeName } of STORE_KEYWORDS) {
     if (s.indexOf(keyword) >= 0) return storeName;
   }
-  return s;
+  // 表に無い新店は、Notion の店舗一覧から畳む（新店のたびにここへ書き足さなくてよい）
+  return storeNameFromMaster(s) || s;
 }
 
 /**

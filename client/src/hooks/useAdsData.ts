@@ -11,6 +11,7 @@
  * gviz CSV を匿名読み(credentials:'omit' 相当の素のfetch)する。集計値のみでPIIなし。
  */
 import { useEffect, useState } from "react";
+import { singleStoreAreas, masterRegionBases } from "@/lib/storeNameFromMaster";
 
 const SPREADSHEET_ID = "1z5JU-Onf6wiqydFUeYYoQ0czXByyZbqH4JODWkYh6Ts";
 
@@ -263,9 +264,8 @@ function getCampaignType(name: string): "集客" | "求人" | "" {
   return "";
 }
 // 「大阪」のようにエリア接尾辞なしで来た場合に補うための既知エリア。
-// 新エリアを開いたらここにも足す（データ側が「岡山エリア」と接尾辞つきで来ていれば
-// 下の /エリア$/ で拾えるが、接尾辞なしだと落ちるため）。
-const KNOWN_REGIONS = ["大阪", "広島", "福岡", "岡山", "兵庫"];
+// Notion の店舗一覧にあるエリアは自動で加わる（新エリアを開いても書き足さなくてよい）。
+const KNOWN_REGIONS = Array.from(new Set(["大阪", "広島", "福岡", "岡山", "兵庫", ...masterRegionBases()]));
 export function normalizeRegion(r: string): string | null {
   if (!r) return null;
   for (const base of KNOWN_REGIONS) {
@@ -535,11 +535,8 @@ export function regionFromCampaign(camp: string): string | null {
 
 // 1エリア＝1店舗のエリアだけ、地域から店舗を特定できる。
 // 大阪(4店)・広島(2店)のように複数店舗のエリアは特定できないので補完しない。
-// 新店がこのエリアに増えたら、ここから外して店舗欄をデータ側で埋めること。
-const SINGLE_STORE_AREA: Record<string, string> = {
-  "岡山エリア": "下伊福院",
-  "兵庫エリア": "岡本院",
-};
+// Notion の店舗一覧から自動で決まる（そのエリアに新店を登録すれば自動で補完対象から外れる）。
+const SINGLE_STORE_AREA: Record<string, string> = singleStoreAreas();
 
 /** 空の地域・店舗をキャンペーン名から補う。値が入っていれば必ずそちらを優先する。 */
 export function fillRegionAndStore(
