@@ -21,7 +21,7 @@ import {
 import DashboardLayout from "@/components/DashboardLayout";
 import { useAdsData, getDashboardData, normalizeRegion } from "@/hooks/useAdsData";
 import type { Bucket, StoreRow, RegionRow, NamedRow } from "@/hooks/useAdsData";
-import { useSalonBoardStylistData } from "@/hooks/useSalonBoardStylistData";
+import { useSalonBoardStylistData, normalizeSalonBoardStore } from "@/hooks/useSalonBoardStylistData";
 import { useSalonBoardDailyNew } from "@/hooks/useSalonBoardDailyNew";
 import { useStoreNewSales } from "@/hooks/useStoreNewSales";
 
@@ -70,7 +70,10 @@ function lookupRegionLine(name: string, byRegion: Record<string, number>): numbe
 
 // 新規来店数（サロンボード）店舗名の名寄せ：/ads「堀江2nd院」とサロンボード「堀江院2nd」を
 // "院"・空白を除いた共通キーで一致させる（福島院→福島 / 堀江2nd院→堀江2nd 等）。
-const canonicalStore = (name: string) => (name || "").replace(/院/g, "").replace(/[\s　]/g, "");
+// サロンボードは店によって正式名称（例「モネ-monet- 白髪染めと髪質改善のサロン　岡山下伊福院」）で来るので、
+// 先に短縮名へ畳んでから照合する。
+const canonicalStore = (name: string) =>
+  normalizeSalonBoardStore(name || "").replace(/院/g, "").replace(/[\s　]/g, "");
 
 // HPB（ホットペッパービューティー）掲載費: 全店一律の月額。CPA/ROASの分母に集客広告費と合算する（林 確定仕様 2026-07-05）
 const HPB_MONTHLY_FEE = 55000;

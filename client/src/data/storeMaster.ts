@@ -31,7 +31,7 @@ export const STORE_MASTER: StoreMasterEntry[] = [
   { name: "高槻院", area: "大阪エリア", openedOn: "2026-02-18" },
   { name: "土橋院", area: "広島エリア", openedOn: "2026-04-25" },
   { name: "下伊福院", area: "岡山エリア", openedOn: "2026-09-10" },
-  { name: "岡本院", area: "兵庫エリア", openedOn: null },
+  { name: "岡本院", area: "兵庫エリア", openedOn: "2026-09-17" },
   { name: "本通院", area: "広島エリア", openedOn: null },
   { name: "春日院", area: "福岡エリア", openedOn: null },
 ];

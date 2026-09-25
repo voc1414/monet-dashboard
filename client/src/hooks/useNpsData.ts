@@ -62,6 +62,8 @@ export function parseStoreName(fullName: string, npsAliasMap?: Record<string, st
   // 岡山エリア。シートの実値は「monet 岡山下伊福院」。下の汎用正規表現は
   // 「岡山下伊福院」を丸ごと拾ってしまい短縮名に落ちないため、明示的に判定する。
   if (fullName.includes("下伊福院")) return "下伊福院";
+  // 兵庫エリア。シートの実値は「monet 岡本」で「院」が付かず、下の汎用正規表現に掛からない。
+  if (fullName.includes("岡本")) return "岡本院";
 
   // Generic: extract 「〇〇院」pattern
   const m = fullName.match(/([一-龥ぁ-ゖァ-ヶA-Za-z0-9]+院(?:2nd)?)/);
