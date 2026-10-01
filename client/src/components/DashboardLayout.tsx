@@ -169,7 +169,8 @@ export default function DashboardLayout({
         transition={{ duration: 0.3, ease: "easeOut" }}
         className={`container py-6 lg:pb-16 ${compactBottomNav ? "pb-32" : "pb-24"}`}
       >
-        {healthPanel !== "off" && <DataHealthPanel hideWhenOk={healthPanel !== "always"} />}
+        {/* データ点検はスタッフが直せる内容ではなく不安を招くだけなので、管理者向けビルドだけに出す */}
+        {isAdmin && healthPanel !== "off" && <DataHealthPanel hideWhenOk={healthPanel !== "always"} />}
         {children}
       </motion.main>
 
