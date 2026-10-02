@@ -8,7 +8,7 @@
  * - 詳しい改善方法はNotionマニュアルへ誘導
  */
 
-const RESERVATION_MANUAL_URL =
+export const RESERVATION_MANUAL_URL =
   "https://therapeutic-cadet-009.notion.site/18-323ab44d3cb980949927d85ab04c02bf?pvs=74";
 
 const RESERVATION_TARGET = 85; // 次回予約率の目標（%）

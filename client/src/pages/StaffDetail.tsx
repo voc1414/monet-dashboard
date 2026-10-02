@@ -1,7 +1,8 @@
 /*
  * Design: monet Brand Identity — 水彩ブルー × コンクリートモダン
  * Page: スタッフ個別ページ
- * セクション順: 個人売上 → 個別アドバイス → ファンくるデータ → NPS結果
+ * セクション順（管理者）: 総合点 → アドバイス → 次回予約率・稼働率 → 個人売上 → 個別アドバイス → ファンくる → NPS結果
+ * セクション順（スタッフ）: 3指標＋よかった点・改善点 → ファンくる → NPS結果 → 個人売上（2026-10-02 林さん指示）
  */
 import { useParams } from "wouter";
 import { useState, useMemo } from "react";
@@ -35,6 +36,8 @@ import { calculateUtilizationRate, getUtilizationColor } from "@/lib/utilization
 import { calculateCompositeScore } from "@/lib/compositeScore";
 import type { CompositeScoreResult } from "@/lib/compositeScore";
 import { generateStaffAdvice } from "@/lib/staffAdvice";
+import { IS_ADMIN_BUILD } from "@/lib/appRole";
+import StaffSimpleSummary from "@/components/StaffSimpleSummary";
 import type { StaffAdvice } from "@/lib/staffAdvice";
 import { filterNpsRecordsForStaff } from "@/lib/npsStaffMatch";
 import { resolveStaffDisplayName } from "@/lib/staffDisplayName";
@@ -490,6 +493,139 @@ export default function StaffDetail() {
     { label: shownName },
   ];
 
+  const salesSection = (
+    <>
+        {/* ===== 1. 個人売上 ===== */}
+        <section className="mb-8 pt-6 border-t-2 border-primary/20">
+          <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+            <DollarSign className="w-5 h-5 text-primary" />
+            個人売上
+            {!isAllPeriod && (
+              <span className="text-xs font-normal text-muted-foreground">— {getPeriodLabel(periodSelection)}</span>
+            )}
+          </h2>
+
+          {staffReport ? (
+            <Card className="border-border/50 shadow-sm">
+              <CardContent className="p-5">
+                {metrics && (
+                  <div className="mb-3">
+                    <span className="text-[10px] font-medium text-primary/70 bg-primary/5 border border-primary/20 rounded px-1.5 py-0.5">
+                      月末報告書{metrics.monthCount > 1 ? `（${metrics.monthCount}ヶ月分を合算）` : ""}
+                    </span>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+                  <div>
+                    <div className="text-[10px] text-muted-foreground mb-1">総売上</div>
+                    <div className="font-mono-data text-lg font-bold text-foreground">{formatCurrency(metrics?.totalSales ?? staffReport.totalSales)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-muted-foreground mb-1">技術売上</div>
+                    <div className="font-mono-data text-lg font-bold text-foreground">{formatCurrency(metrics?.techSales ?? staffReport.techSales)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-muted-foreground mb-1">店販売上</div>
+                    <div className="font-mono-data text-lg font-bold text-foreground">{formatCurrency(metrics?.retailSales ?? staffReport.retailSales)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-muted-foreground mb-1">客単価</div>
+                    <div className="font-mono-data text-lg font-bold text-foreground">{formatCurrency(metrics?.unitPrice ?? staffReport.unitPrice)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-muted-foreground mb-1">総客数</div>
+                    <div className="font-mono-data text-lg font-bold text-foreground">{metrics?.totalCustomers ?? staffReport.totalCustomers}名</div>
+                    <div className="text-[9px] text-muted-foreground/70">新規{metrics?.newCustomers ?? 0} / 再来{metrics?.returnCustomers ?? staffReport.returnCustomers}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-muted-foreground mb-1">次回予約率</div>
+                    <div className="font-mono-data text-lg font-bold text-foreground">{nextResRate}%</div>
+                  </div>
+                </div>
+
+                {/* 行動チェック・ルールチェック */}
+                {(staffReport.behaviorCheck || staffReport.ruleCheck) && (
+                  <div className="mt-4 pt-4 border-t border-border/40 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {staffReport.behaviorCheck && (
+                      <div>
+                        <div className="text-[10px] text-muted-foreground mb-1">行動チェック</div>
+                        <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{staffReport.behaviorCheck}</p>
+                      </div>
+                    )}
+                    {staffReport.ruleCheck && (
+                      <div>
+                        <div className="text-[10px] text-muted-foreground mb-1">ルールチェック</div>
+                        <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{staffReport.ruleCheck}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* コメント */}
+                {(staffReport.reviewComment || staffReport.npsComment) && (
+                  <div className="mt-4 pt-4 border-t border-border/40 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {staffReport.reviewComment && (
+                      <div>
+                        <div className="text-[10px] text-muted-foreground mb-1">口コミ振り返り</div>
+                        <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{staffReport.reviewComment}</p>
+                      </div>
+                    )}
+                    {staffReport.npsComment && (
+                      <div>
+                        <div className="text-[10px] text-muted-foreground mb-1">NPS振り返り</div>
+                        <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{staffReport.npsComment}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-border/50 border-dashed">
+              <CardContent className="p-6 text-center text-muted-foreground">
+                <DollarSign className="w-6 h-6 mx-auto mb-2 opacity-40" />
+                <p className="text-sm">この期間の売上データはありません</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 口コミ・NPS・ファンくるの件数（月末報告書の有無に関わらず出す） */}
+          <Card className="border-border/50 shadow-sm mt-4">
+            <CardContent className="p-5">
+              <div className="mb-3">
+                <span className="text-[10px] font-medium text-sage/80 bg-sage/5 border border-sage/20 rounded px-1.5 py-0.5">
+                  NPSシート・ファンくる{!isAllPeriod ? `（${getPeriodLabel(periodSelection)}）` : ""}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <div className="text-[10px] text-muted-foreground mb-1 flex items-center gap-1">
+                    <MessageSquare className="w-3 h-3" />口コミ
+                  </div>
+                  <div className="font-mono-data text-lg font-bold text-foreground">{feedbackCounts.reviewCount}件</div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-muted-foreground mb-1 flex items-center gap-1">
+                    <Gauge className="w-3 h-3" />NPS
+                  </div>
+                  <div className="font-mono-data text-lg font-bold text-foreground">{feedbackCounts.npsCount}件</div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-muted-foreground mb-1 flex items-center gap-1">
+                    <FolderOpen className="w-3 h-3" />ファンくる
+                  </div>
+                  <div className="font-mono-data text-lg font-bold text-foreground">{feedbackCounts.fankuruCount}件</div>
+                </div>
+              </div>
+              <p className="text-[10px] text-muted-foreground/70 mt-3 leading-relaxed">
+                口コミ＝NPSシートでレビュー本文がある回答数。NPS＝NPSシートの回答数。ファンくる＝調査PDF＋本人が書いた調査結果コメントの合計。
+              </p>
+            </CardContent>
+          </Card>
+        </section>
+    </>
+  );
+
   return (
     <DashboardLayout
       breadcrumbs={breadcrumbs}
@@ -554,6 +690,19 @@ export default function StaffDetail() {
         );
       })()}
 
+      {/* ===== スタッフ向け: 3指標＋よかった点・改善点（管理者ページは従来どおり） ===== */}
+      {!IS_ADMIN_BUILD && !loading && (
+        <StaffSimpleSummary
+          nextReservationRate={staffReport ? nextResRate : null}
+          totalCustomers={metrics?.totalCustomers ?? 0}
+          reserved={metrics?.nextReservation ?? 0}
+          utilizationRate={staffReport ? calculateUtilizationRate(metrics?.avgMonthlyCustomers ?? 0, staffReport.employmentType) : null}
+          npsStats={staffNpsStats}
+          npsRecords={staffNpsRecords}
+        />
+      )}
+
+      {IS_ADMIN_BUILD && (<>
       {/* ===== 総合点スコア ===== */}
       {compositeScore && !loading && (
         <section className="mb-6 pt-6 border-t-2 border-primary/20">
@@ -851,140 +1000,16 @@ export default function StaffDetail() {
         );
       })()}
 
-      {/* ===== 1. 個人売上 ===== */}
-      <section className="mb-8 pt-6 border-t-2 border-primary/20">
-        <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-          <DollarSign className="w-5 h-5 text-primary" />
-          個人売上
-          {!isAllPeriod && (
-            <span className="text-xs font-normal text-muted-foreground">— {getPeriodLabel(periodSelection)}</span>
-          )}
-        </h2>
+      {/* ===== 1. 個人売上（スタッフ向けはNPSの後ろ） ===== */}
+      {salesSection}
+      </>)}
 
-        {staffReport ? (
-          <Card className="border-border/50 shadow-sm">
-            <CardContent className="p-5">
-              {metrics && (
-                <div className="mb-3">
-                  <span className="text-[10px] font-medium text-primary/70 bg-primary/5 border border-primary/20 rounded px-1.5 py-0.5">
-                    月末報告書{metrics.monthCount > 1 ? `（${metrics.monthCount}ヶ月分を合算）` : ""}
-                  </span>
-                </div>
-              )}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-                <div>
-                  <div className="text-[10px] text-muted-foreground mb-1">総売上</div>
-                  <div className="font-mono-data text-lg font-bold text-foreground">{formatCurrency(metrics?.totalSales ?? staffReport.totalSales)}</div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-muted-foreground mb-1">技術売上</div>
-                  <div className="font-mono-data text-lg font-bold text-foreground">{formatCurrency(metrics?.techSales ?? staffReport.techSales)}</div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-muted-foreground mb-1">店販売上</div>
-                  <div className="font-mono-data text-lg font-bold text-foreground">{formatCurrency(metrics?.retailSales ?? staffReport.retailSales)}</div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-muted-foreground mb-1">客単価</div>
-                  <div className="font-mono-data text-lg font-bold text-foreground">{formatCurrency(metrics?.unitPrice ?? staffReport.unitPrice)}</div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-muted-foreground mb-1">総客数</div>
-                  <div className="font-mono-data text-lg font-bold text-foreground">{metrics?.totalCustomers ?? staffReport.totalCustomers}名</div>
-                  <div className="text-[9px] text-muted-foreground/70">新規{metrics?.newCustomers ?? 0} / 再来{metrics?.returnCustomers ?? staffReport.returnCustomers}</div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-muted-foreground mb-1">次回予約率</div>
-                  <div className="font-mono-data text-lg font-bold text-foreground">{nextResRate}%</div>
-                </div>
-              </div>
-
-              {/* 行動チェック・ルールチェック */}
-              {(staffReport.behaviorCheck || staffReport.ruleCheck) && (
-                <div className="mt-4 pt-4 border-t border-border/40 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {staffReport.behaviorCheck && (
-                    <div>
-                      <div className="text-[10px] text-muted-foreground mb-1">行動チェック</div>
-                      <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{staffReport.behaviorCheck}</p>
-                    </div>
-                  )}
-                  {staffReport.ruleCheck && (
-                    <div>
-                      <div className="text-[10px] text-muted-foreground mb-1">ルールチェック</div>
-                      <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{staffReport.ruleCheck}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* コメント */}
-              {(staffReport.reviewComment || staffReport.npsComment) && (
-                <div className="mt-4 pt-4 border-t border-border/40 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {staffReport.reviewComment && (
-                    <div>
-                      <div className="text-[10px] text-muted-foreground mb-1">口コミ振り返り</div>
-                      <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{staffReport.reviewComment}</p>
-                    </div>
-                  )}
-                  {staffReport.npsComment && (
-                    <div>
-                      <div className="text-[10px] text-muted-foreground mb-1">NPS振り返り</div>
-                      <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{staffReport.npsComment}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="border-border/50 border-dashed">
-            <CardContent className="p-6 text-center text-muted-foreground">
-              <DollarSign className="w-6 h-6 mx-auto mb-2 opacity-40" />
-              <p className="text-sm">この期間の売上データはありません</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* 口コミ・NPS・ファンくるの件数（月末報告書の有無に関わらず出す） */}
-        <Card className="border-border/50 shadow-sm mt-4">
-          <CardContent className="p-5">
-            <div className="mb-3">
-              <span className="text-[10px] font-medium text-sage/80 bg-sage/5 border border-sage/20 rounded px-1.5 py-0.5">
-                NPSシート・ファンくる{!isAllPeriod ? `（${getPeriodLabel(periodSelection)}）` : ""}
-              </span>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <div className="text-[10px] text-muted-foreground mb-1 flex items-center gap-1">
-                  <MessageSquare className="w-3 h-3" />口コミ
-                </div>
-                <div className="font-mono-data text-lg font-bold text-foreground">{feedbackCounts.reviewCount}件</div>
-              </div>
-              <div>
-                <div className="text-[10px] text-muted-foreground mb-1 flex items-center gap-1">
-                  <Gauge className="w-3 h-3" />NPS
-                </div>
-                <div className="font-mono-data text-lg font-bold text-foreground">{feedbackCounts.npsCount}件</div>
-              </div>
-              <div>
-                <div className="text-[10px] text-muted-foreground mb-1 flex items-center gap-1">
-                  <FolderOpen className="w-3 h-3" />ファンくる
-                </div>
-                <div className="font-mono-data text-lg font-bold text-foreground">{feedbackCounts.fankuruCount}件</div>
-              </div>
-            </div>
-            <p className="text-[10px] text-muted-foreground/70 mt-3 leading-relaxed">
-              口コミ＝NPSシートでレビュー本文がある回答数。NPS＝NPSシートの回答数。ファンくる＝調査PDF＋本人が書いた調査結果コメントの合計。
-            </p>
-          </CardContent>
-        </Card>
-      </section>
-
-
+      {IS_ADMIN_BUILD && (<>
       {/* ===== 2. 個別アドバイス ===== */}
       {staffNpsStats && (
         <AdviceSection stats={staffNpsStats} records={staffNpsRecords} />
       )}
+      </>)}
 
       {/* ===== 3. ファンくるデータ ===== */}
       <section className="mb-8 pt-6 border-t-2 border-sage/20">
@@ -1318,6 +1343,8 @@ export default function StaffDetail() {
           </Card>
         )}
       </section>
+
+      {!IS_ADMIN_BUILD && salesSection}
 
       {/* Score Detail Modal */}
       {selectedScore !== null && (
