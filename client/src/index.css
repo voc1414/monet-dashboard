@@ -153,3 +153,12 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+/* スタッフ向けビルドだけ文字色をダークグレーに（2026-10-02 林さん指示。管理者は従来どおり） */
+:root[data-role="staff"] {
+  --foreground: #333333;
+  --card-foreground: #333333;
+  --popover-foreground: #333333;
+  --accent-foreground: #333333;
+  --sidebar-foreground: #333333;
+}

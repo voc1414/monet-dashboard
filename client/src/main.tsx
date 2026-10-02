@@ -5,6 +5,10 @@ import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
 import "./index.css";
+import { IS_ADMIN_BUILD } from "@/lib/appRole";
+
+// スタッフ向けは文字色を真っ黒から少し柔らかいダークグレーにする（index.css の [data-role="staff"]）
+if (!IS_ADMIN_BUILD) document.documentElement.dataset.role = "staff";
 
 const ADMIN_TOKEN_KEY = "monet_admin_token";
 

@@ -2,6 +2,7 @@
  * スタッフ向けビルド専用の要約（2026-10-02 林さん指示 GF-MDASH-M14）。
  * 次回予約率・稼働率・NPSスコアを1枠ずつ縦に並べ、枠の中に大きい数字と「よかった点・改善点」を出す。
  * 管理者向けビルドでは使わない（総合点・既存アドバイスのまま）。
+ * 色は「数字＋判定バッジ」と改善点の強調語だけに付け、箱やリンクはグレーにそろえる（2026-10-02 林さん指示）。
  */
 import { CalendarCheck, Gauge, BarChart3, ExternalLink } from "lucide-react";
 import type { ReactNode } from "react";
@@ -92,12 +93,12 @@ function GoodImproveCard({
       </h2>
       {number}
       {gi && <div className="flex flex-col gap-2 text-[13px] leading-relaxed">
-        <div className="rounded-lg px-3 py-2.5" style={{ backgroundColor: "#EAF5F3" }}>
-          <div className="text-xs font-bold mb-0.5" style={{ color: EX }}>よかった点</div>
+        <div className="rounded-lg px-3 py-2.5 bg-muted">
+          <div className="text-xs font-bold mb-0.5 text-muted-foreground">よかった点</div>
           {gi.good}
         </div>
-        <div className="rounded-lg px-3 py-2.5" style={{ backgroundColor: "#FBF0EF" }}>
-          <div className="text-xs font-bold mb-0.5" style={{ color: NG }}>改善点</div>
+        <div className="rounded-lg px-3 py-2.5 bg-muted">
+          <div className="text-xs font-bold mb-0.5 text-muted-foreground">改善点</div>
           {gi.improve.lead && <p><Emph text={gi.improve.lead} /></p>}
           {gi.improve.bullets.length > 0 && (
             <ul className="list-disc pl-4 mt-1 space-y-1">
@@ -113,8 +114,7 @@ function GoodImproveCard({
               href={link.href}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs mt-1"
-              style={{ color: EX }}
+              className="inline-flex items-center gap-1 text-xs mt-1 text-foreground underline underline-offset-2"
             >
               {link.label}
               <ExternalLink className="w-3 h-3" />

@@ -652,8 +652,8 @@ export default function StaffDetail() {
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8">
         <div>
           <div className="flex items-center gap-4 mb-2">
-            <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-              <span className="text-primary font-bold text-2xl">{shownName.charAt(0)}</span>
+            <div className={`w-14 h-14 rounded-xl ${IS_ADMIN_BUILD ? "bg-primary/10" : "bg-muted"} flex items-center justify-center shrink-0`}>
+              <span className={`${IS_ADMIN_BUILD ? "text-primary" : "text-foreground"} font-bold text-2xl`}>{shownName.charAt(0)}</span>
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
@@ -691,7 +691,7 @@ export default function StaffDetail() {
             <ClipboardCheck className="w-4 h-4 text-muted-foreground" />
             <span className="text-xs text-muted-foreground">月末報告書</span>
             {hasSubmitted ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${IS_ADMIN_BUILD ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-muted text-muted-foreground border border-border"}`}>
                 <CheckCircle2 className="w-3 h-3" />
                 {getPeriodLabel(periodSelection)} 回答済み
               </span>
