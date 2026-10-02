@@ -5,6 +5,7 @@
  * セクション順（スタッフ）: 3指標＋よかった点・改善点 → ファンくる → NPS結果 → 個人売上（2026-10-02 林さん指示）
  */
 import { useParams } from "wouter";
+import { isFankuruCommentShown } from "@/lib/fankuruComment";
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -248,6 +249,15 @@ const NEGATIVE_KEYWORDS = [
   "狭", "汚", "臭", "がっかり", "ひどい", "最悪", "二度と", "嫌",
 ];
 
+/** スタッフ向けページの大枠の見出し（【重要指標】【顧客満足度】【個人売上】 2026-10-02 林さん指示） */
+function GroupHeading({ children }: { children: string }) {
+  return (
+    <div className="mt-2 mb-4 pb-2 border-b-2 border-foreground/70 text-xl font-extrabold text-foreground tracking-wide">
+      【{children}】
+    </div>
+  );
+}
+
 // ===== Main Component =====
 export default function StaffDetail() {
   const params = useParams<{ storeId: string; staffId: string }>();
@@ -411,7 +421,7 @@ export default function StaffDetail() {
   const filteredFankuruComments = useMemo(() => {
     return rawData
       .filter(r => r.name === staffName && (isAllPeriod || (filterM as string[]).includes(r.reportMonth)))
-      .filter(r => r.fankuruComment && r.fankuruComment.trim() !== "" && r.fankuruComment.trim() !== "なし")
+      .filter(r => isFankuruCommentShown(r.fankuruComment))
       .map(r => ({ month: r.reportMonthLabel, comment: r.fankuruComment }));
   }, [rawData, filterM, isAllPeriod, staffName]);
 
@@ -499,7 +509,7 @@ export default function StaffDetail() {
         <section className="mb-8 pt-6 border-t-2 border-primary/20">
           <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
             <DollarSign className="w-5 h-5 text-primary" />
-            個人売上
+            {IS_ADMIN_BUILD ? "個人売上" : "売上詳細"}
             {!isAllPeriod && (
               <span className="text-xs font-normal text-muted-foreground">— {getPeriodLabel(periodSelection)}</span>
             )}
@@ -691,6 +701,7 @@ export default function StaffDetail() {
       })()}
 
       {/* ===== スタッフ向け: 3指標＋よかった点・改善点（管理者ページは従来どおり） ===== */}
+      {!IS_ADMIN_BUILD && !loading && <GroupHeading>重要指標</GroupHeading>}
       {!IS_ADMIN_BUILD && !loading && (
         <StaffSimpleSummary
           nextReservationRate={staffReport ? nextResRate : null}
@@ -1010,6 +1021,8 @@ export default function StaffDetail() {
         <AdviceSection stats={staffNpsStats} records={staffNpsRecords} />
       )}
       </>)}
+
+      {!IS_ADMIN_BUILD && <GroupHeading>顧客満足度</GroupHeading>}
 
       {/* ===== 3. ファンくるデータ ===== */}
       <section className="mb-8 pt-6 border-t-2 border-sage/20">
@@ -1344,6 +1357,7 @@ export default function StaffDetail() {
         )}
       </section>
 
+      {!IS_ADMIN_BUILD && <GroupHeading>個人売上</GroupHeading>}
       {!IS_ADMIN_BUILD && salesSection}
 
       {/* Score Detail Modal */}

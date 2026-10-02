@@ -5,6 +5,7 @@
  * 個人売上セクションなし
  */
 import { useParams, Link } from "wouter";
+import { isFankuruCommentShown } from "@/lib/fankuruComment";
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -326,7 +327,7 @@ export default function SurveyDetail() {
   const filteredFankuruComments = useMemo(() => {
     return rawData
       .filter(r => r.storeNormalized === storeId && (isAllPeriod || (filterM as string[]).includes(r.reportMonth)))
-      .filter(r => r.fankuruComment && r.fankuruComment.trim() !== "" && r.fankuruComment.trim() !== "なし")
+      .filter(r => isFankuruCommentShown(r.fankuruComment))
       .map(r => ({ month: r.reportMonthLabel, comment: r.fankuruComment }));
   }, [rawData, filterM, isAllPeriod, storeId]);
 
