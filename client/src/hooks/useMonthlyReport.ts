@@ -326,7 +326,7 @@ export function useMonthlyReport() {
     });
     const deduped = deduplicateReports(canonicalized);
 
-    // 呼び名の解決層へ列20 のニックネームを注入する（解決順②）。
+    // 呼び名の解決層へ列20 のニックネームを注入する（解決順①）。
     // useEffect ではなく useMemo の中で行う: resolveStaffDisplayName は render 中に
     // 呼ばれるので、render 後に走る useEffect で注入しても初回描画が氏名のまま残り、
     // 再描画の契機も無いので画面が更新されない。

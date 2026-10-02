@@ -5,18 +5,15 @@
  * （NPS・サロンボード・ファンくる・退社判定・NEW判定・URL /staff/:storeId/:staffId）。
  * ここで差し替えるのは **画面に出る文字だけ**。name は絶対に書き換えない。
  *
- * 解決順（3段・2026-09-03 に②を追加）:
- *   ① Notion「全スタッフ一覧」のニックネーム（人が直した値。最優先）
- *   ② 月末報告書 列20 のニックネーム（L Message の必須入力。自動で毎月増える）
- *   ③ 氏名（＝照合キーそのまま）
+ * 解決順（2段・2026-10-02 に Notion 段を廃止）:
+ *   ① 月末報告書 列20 のニックネーム（L Message の必須入力。自動で毎月増える）
+ *   ② 氏名（＝照合キーそのまま）
  *
- * ②を挟む理由：ニックネームの正本は L Message 側の必須入力欄であり、その回答は
- * 月末報告書スプレッドシートの列20 に毎月入ってくる（2026-08-29 に「写真」列から
- * 差し替え）。ダッシュボードは元々この報告書を実行時に読んでいるので、列20 を
- * 拾うだけで人手ゼロで反映される。Notion へ人が写す運用は作らない
+ * 呼び名の正本は月末報告書スプレッドシートだけ（2026-10-02 林さん決定）。
+ * 以前は Notion「全スタッフ一覧」のニックネーム列を最優先にしていたが、入力先が
+ * 2か所に割れて片方だけ直る事故の元になるため外した。Notion 側の列は読まない。
+ * ダッシュボードは元々この報告書を実行時に読んでいるので、人手ゼロで反映される
  * （CLAUDE.md §0 完全自動化の原則）。
- *
- * ①を②より上に置くのは、Notion で人が直した呼び名を機械が上書きしないため。
  *
  * 照合は必ず「店舗＋人」の組で行う。displayName（Akiko / Mika / Yu / Nao / Mayu /
  * Minaho / Yukiko）は複数店舗に別人として実在するため、名前だけで引くと入れ替わる。
@@ -75,42 +72,6 @@ export function reportNicknameCount(): number {
 }
 
 /**
- * 月末報告書の name にひもづくニックネームを探す。見つからなければ null。
- *
- * name は氏名（「小池明子」）で来ることもサロンボード表示名（「Akiko」）で来ることも
- * あるため、マスタ側は name / displayName の両方を照合対象にする。
- *
- * **店舗が分かるときは「その店舗に居る同名者がちょうど1人」のときだけ返す。**
- * 空振り（店舗表記が揺れている・その店舗に居ない）は氏名に落とす。
- * 下の findReportNickname と同じ規律で、理由も同じ：
- * 「マスタ全体でこの名前は1人だけ」は「画面に出ているこの人がその1人」ではない。
- *
- * 2026-09-04 の独立監査で、ここに全社フォールバックが残っているのを実測された
- * （`resolveStaffDisplayName("Akiko","堀江院2nd")` が 堀江院 小池明子の呼び名を返す。
- *  SurveyList.tsx は NPS の (staff, storeShort) から行を作るので、実データで到達する）。
- * さらに①のこの誤ヒットは②の正しい直接ヒットを上書きするため、②だけ締めても無意味だった。
- * 現在マスタ39人（2026-09-13 時点）の nickname が全て null で画面が壊れていないのは偶然であり、
- * Notion のニックネーム列に1件でも値が入れば発火する。
- */
-function findNickname(name: string, store?: string): string | null {
-  if (!name) return null;
-  const key = normalizeStaffKey(name);
-
-  const matches = STAFF_MASTER.filter(
-    (s) => normalizeStaffKey(s.name) === key || normalizeStaffKey(s.displayName) === key
-  );
-  if (!matches.length) return null;
-
-  if (store) {
-    const st = normStore(store);
-    const inStore = matches.filter((s) => normStore(s.store) === st);
-    return inStore.length === 1 ? inStore[0].nickname : null;
-  }
-
-  return matches.length === 1 ? matches[0].nickname : null;
-}
-
-/**
  * 月末報告書 列20 のニックネームを探す。見つからなければ null。
  *
  * **店舗が分かるときは「店舗＋名前」の直接ヒットだけを採る。** 空振りしたら氏名に落とす。
@@ -166,7 +127,7 @@ function findReportNickname(name: string, store?: string): string | null {
  * @param store 店舗名（正規化前でよい。同名の別人を切り分けるために渡す）
  */
 export function resolveStaffDisplayName(name: string, store?: string): string {
-  return findNickname(name, store) || findReportNickname(name, store) || name;
+  return findReportNickname(name, store) || name;
 }
 
 /** アバターの頭文字。表示名と必ず同じ文字から取る（氏名「小」とニックネーム「Akiko」の食い違いを防ぐ） */

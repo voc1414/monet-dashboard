@@ -1,26 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
 /**
- * 月末報告書 列20 由来のニックネーム（解決順②・2026-09-03）。
+ * 月末報告書 列20 由来のニックネーム（2026-09-03 導入。2026-10-02 から唯一の呼び名の出どころ）。
  *
  * 呼び名の正本は L Message の必須入力欄で、その回答が月末報告書の列20 に毎月入る。
  * ダッシュボードは元々この報告書を実行時に読んでいるので、列20 を拾うだけで
  * 人手ゼロで反映される（CLAUDE.md §0 完全自動化）。
- *
- * ①Notion のニックネームは「人が直した値」なので②より優先される。
- * それを検証するため、実マスタの1名にだけ Notion 側ニックネームを差し込む。
  */
-vi.mock("@/data/staffMaster", async () => {
-  const actual = await vi.importActual<typeof import("@/data/staffMaster")>("@/data/staffMaster");
-  return {
-    ...actual,
-    STAFF_MASTER: actual.STAFF_MASTER.map((s) =>
-      s.name === "中島真優" ? { ...s, nickname: "Notionで直した名" } : s
-    ),
-  };
-});
 
 const { resolveStaffDisplayName, resolveStaffInitial, setReportNicknames, parseReportNickname, reportNicknameCount } =
   await import("@/lib/staffDisplayName");
@@ -189,22 +177,15 @@ describe("報告書のニックネームで画面の呼び名が変わる", () =
   });
 });
 
-describe("解決順（①Notion → ②報告書 → ③氏名）", () => {
-  it("Notion に人が入れた呼び名が報告書より優先される", () => {
-    setReportNicknames([
-      { name: "中島真優", store: "土橋院", nickname: "報告書の名", answerDate: "2026-08-29 10:00:00" },
-    ]);
-    expect(resolveStaffDisplayName("中島真優", "土橋院")).toBe("Notionで直した名");
-  });
-
-  it("Notion が空なら報告書が使われる", () => {
+describe("解決順（報告書 → 氏名）", () => {
+  it("報告書に呼び名があればそれを使う", () => {
     setReportNicknames([
       { name: "坂手芳", store: "堀江院2nd", nickname: "かおるん", answerDate: "2026-08-29 10:00:00" },
     ]);
     expect(resolveStaffDisplayName("坂手芳", "堀江院2nd")).toBe("かおるん");
   });
 
-  it("両方無ければ氏名のまま（導入前と同じ見た目）", () => {
+  it("無ければ氏名のまま（導入前と同じ見た目）", () => {
     expect(resolveStaffDisplayName("坂手芳", "堀江院2nd")).toBe("坂手芳");
   });
 });
@@ -283,8 +264,10 @@ describe("ソース文字列の見張り（useMonthlyReport 側・挙動は見�
     expect(injectAt).toBeLessThan(memoEnd);
   });
 
-  it("呼び名の解決順が3段のまま（式そのものを見張る。コメントではない）", () => {
+  it("呼び名の解決順が「報告書 → 氏名」の2段のまま（式そのものを見張る。コメントではない）", () => {
     const s = src("lib/staffDisplayName.ts");
-    expect(s).toContain("findNickname(name, store) || findReportNickname(name, store) || name");
+    expect(s).toContain("return findReportNickname(name, store) || name;");
+    // Notion を呼び名の出どころに戻さない（2026-10-02 林さん決定：正本はスプレッドシートだけ）
+    expect(s).not.toContain("findNickname(");
   });
 });

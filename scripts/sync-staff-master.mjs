@@ -17,15 +17,14 @@
  *   JSON は Notion の列名そのままの配列。取得日を添える（鮮度が分かるように）:
  *     { "取得日": "2026-08-30",
  *       "rows": [ { "名前": "坂手 芳", "店舗": "堀江院2nd",
- *                   "サロンボード表示名": "坂手", "ニックネーム": null,
+ *                   "サロンボード表示名": "坂手",
  *                   "かな": "さかで かおる", "進捗": "入社済", "退職月": null } ] }
  *   「ダッシュボード対象」の絞り込みは読み出し側で済ませておく（rows は対象者のみ）。
  *
- * 取り込む列は7つだけ（名前・店舗・サロンボード表示名・ニックネーム・かな・退職月・進捗）。
+ * 取り込む列は6つだけ（名前・店舗・サロンボード表示名・かな・退職月・進捗）。
  * 履歴書・労働契約書・雇用形態は人事の正本なので取得しない。
- *
- * 「ニックネーム」列が Notion 側に無い／空のあいだは null になり、画面は氏名表示に
- * フォールバックする（client/src/lib/staffDisplayName.ts）。同期は壊れない。
+ * ニックネームも取らない。呼び名の正本は月末報告書スプレッドシートのニックネーム列
+ * （2026-10-02 林さん決定。client/src/lib/staffDisplayName.ts）。
  *
  * 「かな」列（"せい めい" 形式）は表記ゆれ照合の材料。ここから カタカナ・ローマ字ゆれを
  * 機械生成するので、別名を手で並べる表はもう増やさない（client/src/lib/stylistAlias.ts）。
@@ -111,7 +110,6 @@ async function readRows() {
       名前: plain(props["名前"]),
       店舗: props["店舗"]?.select?.name ?? "",
       サロンボード表示名: plain(props["サロンボード表示名"]),
-      ニックネーム: plain(props["ニックネーム"]) || null,
       かな: plain(props["かな"]),
       進捗: props["進捗"]?.select?.name ?? "",
       退職月: plain(props["退職月"]) || null,
@@ -126,13 +124,11 @@ const staff = rows
     const name = (r["名前"] ?? "").trim();
     const store = (r["店舗"] ?? "").trim();
     const displayName = (r["サロンボード表示名"] ?? "").trim() || name;
-    // 画面表示用。照合には使わない（照合キーは name / displayName のまま）
-    const nickname = (r["ニックネーム"] ?? "").trim() || null;
     // 表記ゆれ照合の材料。"せい めい"（半角スペース区切り）。全角スペースも受ける
     const kana = (r["かな"] ?? "").replace(/[\s　]+/g, " ").trim();
     const retiredMonth = (r["退職月"] ?? "").trim() || null;
     const status = (r["進捗"] ?? "").trim() === "退職" ? "retired" : "active";
-    return { name, store, displayName, nickname, kana, status, retiredMonth };
+    return { name, store, displayName, kana, status, retiredMonth };
   })
   .filter((s) => s.name)
   .sort((a, b) => a.store.localeCompare(b.store, "ja") || a.name.localeCompare(b.name, "ja"));
@@ -170,7 +166,8 @@ const body = `/**
  * 注意: displayName（サロンボード表示名）はローマ字が多く、Akiko / Mika / Yu / Nao /
  * Mayu / Minaho / Yukiko が複数店舗に重複する。照合は必ず store とセットで行う。
  *
- * nickname は画面表示専用。照合キーには使わない（lib/staffDisplayName.ts 参照）。
+ * 呼び名（ニックネーム）はここに持たない。正本は月末報告書スプレッドシートのニックネーム列
+ * （2026-10-02 林さん決定。lib/staffDisplayName.ts 参照）。
  *
  * kana（"せい めい"）は表記ゆれ照合の材料。カタカナ・ローマ字のゆれは lib/stylistAlias.ts が
  * ここから機械生成する。別名を手で並べた表は増やさない（読みを直すなら Notion の「かな」）。
@@ -183,11 +180,6 @@ export type StaffMasterEntry = {
   store: string;
   /** サロンボード・月末報告書に出る表示名 */
   displayName: string;
-  /**
-   * 画面に出す呼び名（Notion「ニックネーム」列）。未入力なら null。
-   * 表示専用。照合キーには一切使わない（lib/staffDisplayName.ts が氏名へフォールバック）
-   */
-  nickname: string | null;
   /**
    * 氏名の読み。"せい めい"（ひらがな・半角スペース区切り）。Notion「かな」列が正本。
    * 表記ゆれ照合の材料で、未入力なら空文字（照合はできるが かな・ローマ字では当たらない）
@@ -204,7 +196,7 @@ ${staff
     (s) =>
       `  { name: ${j(s.name)}, store: ${j(s.store)}, displayName: ${j(
         s.displayName
-      )}, nickname: ${s.nickname ? j(s.nickname) : "null"}, kana: ${j(
+      )}, kana: ${j(
         s.kana
       )}, status: ${j(s.status)}, retiredMonth: ${
         s.retiredMonth ? j(s.retiredMonth) : "null"
