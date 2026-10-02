@@ -118,6 +118,14 @@ function parseCSV(text: string): string[][] {
   return rows;
 }
 
+/**
+ * 「スタッフ選択」の値を読む。数字だけの値（例 福島院 No.1629 の「2579」）はお客様の誤入力で
+ * 誰にも紐付かないため、「選択なし」と同じ扱いにする。店舗のNPSには回答として残る（林さん指示 2026-10-02）。
+ */
+export function parseStaffChoice(raw: string): string {
+  return /^[\s　]*[0-9０-９]+[\s　]*$/.test(raw) ? "" : raw;
+}
+
 async function fetchSheetData(npsAliasMap?: Record<string, string>): Promise<NpsRecord[]> {
   const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_NAME)}`;
   const res = await fetch(url);
@@ -132,7 +140,7 @@ async function fetchSheetData(npsAliasMap?: Record<string, string>): Promise<Nps
     storeName: cols[2] || "",
     storeShort: parseStoreName(cols[2] || "", npsAliasMap),
     menu: cols[3] || "",
-    staff: cols[4] || "",
+    staff: parseStaffChoice(cols[4] || ""),
     npsScore: parseInt(cols[5] || "0", 10),
     priceComment: cols[6] || "",
     spaceComment: cols[7] || "",

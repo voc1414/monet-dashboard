@@ -39,6 +39,30 @@ const RETIRED_STAFF: { name: string; store: string; retiredMonth: string }[] =
  */
 const EXCLUDED_STAFF: string[] = ["佐々木 淳"];
 
+/**
+ * 名簿（Notion「全スタッフ一覧」）に載っていない退職者。店舗とセットで常に除外する。
+ * ファンくるPDFに氏名で残っているため、アンケート一覧に出続けていた（林さん指摘 2026-10-02）。
+ * CLAUDE.md の「姪浜院 藤田は名簿外の退職者」に対応。
+ */
+const OFF_ROSTER_RETIRED: { name: string; store: string }[] = [
+  { name: "藤田", store: "姪浜院" },
+  { name: "ふじたみほ", store: "姪浜院" },
+];
+
+/**
+ * 退職者を本名・かなでも照合する（呼び名だけだと、ファンくるに本名で載る人がすり抜ける）。
+ * 本名・かなは人ごとにほぼ一意なので店舗は問わない（異動前の店舗で調査が残る例: 尾﨑仁美）。
+ */
+function retiredByFullName(staffName: string, targetMonth: string): boolean | null {
+  const key = aliasStaffKey(staffName);
+  for (const s of RETIRED_FROM_MASTER) {
+    if (aliasStaffKey(s.name) === key || aliasStaffKey(s.kana) === key) {
+      return targetMonth >= s.retiredMonth;
+    }
+  }
+  return null;
+}
+
 /** 集計対象外スタッフかどうか（店舗・月に関係なく判定） */
 function isExcludedStaff(staffName: string): boolean {
   const key = aliasStaffKey(staffName);
@@ -82,6 +106,13 @@ export function isRetiredStaff(staffName: string, storeName?: string, month?: st
   if (isExcludedStaff(staffName)) return true;
 
   const targetMonth = month || getCurrentYearMonth();
+
+  if (storeName) {
+    const key = aliasStaffKey(staffName);
+    if (OFF_ROSTER_RETIRED.some((e) => e.store === storeName.trim() && aliasStaffKey(e.name) === key)) return true;
+  }
+  const byFullName = retiredByFullName(staffName, targetMonth);
+  if (byFullName !== null) return byFullName;
 
   // DB連携マップが設定されている場合はDBデータを使用
   if (dbRetiredStaffMap && dbRetiredStaffMap.size > 0) {

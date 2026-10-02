@@ -22,6 +22,7 @@ import { getNpsClass } from "@/lib/npsClass";
 import { isNewStaff, isRetiredStaff } from "@/lib/newBadge";
 import { resolveStaffDisplayName } from "@/lib/staffDisplayName";
 import { useStores } from "@/hooks/useStores";
+import { IS_ADMIN_BUILD } from "@/lib/appRole";
 import { PeriodSelector, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
 import type { PeriodSelection } from "@/components/PeriodSelector";
 
@@ -405,8 +406,8 @@ export default function SurveyList() {
           </Select>
         </div>
 
-        {/* 未マッチアラート */}
-        {!loading && unmatchedStylists.length > 0 && showUnmatchedAlert && (
+        {/* 未マッチアラート（スタッフが直せる内容ではないので、管理者向けビルドだけに出す） */}
+        {IS_ADMIN_BUILD && !loading && unmatchedStylists.length > 0 && showUnmatchedAlert && (
           <motion.div
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
@@ -448,7 +449,7 @@ export default function SurveyList() {
         )}
 
         {/* NPS未マッチアラート */}
-        {!loading && unmatchedNpsStaff.length > 0 && showNpsUnmatchedAlert && (
+        {IS_ADMIN_BUILD && !loading && unmatchedNpsStaff.length > 0 && showNpsUnmatchedAlert && (
           <motion.div
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}

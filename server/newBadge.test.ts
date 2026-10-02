@@ -228,3 +228,23 @@ describe("isNewStaff", () => {
     expect(isNewStaff("yu", "福島院")).toBe(true);
   });
 });
+
+describe("退職者の本名・かな・名簿外での判定（林さん指摘 2026-10-02：アンケート一覧に退職者が出ていた）", () => {
+  it("ファンくるに本名で載る退職者を店舗に関係なく除外する", () => {
+    expect(isRetiredStaff("尾﨑仁美", "堀江院2nd", "")).toBe(true);
+    expect(isRetiredStaff("池内 亜希子", "堀江院2nd", "")).toBe(true);
+    expect(isRetiredStaff("いけうち あきこ", undefined, "")).toBe(true);
+  });
+  it("退職月より前は本名でも退職扱いにしない", () => {
+    expect(isRetiredStaff("満川宏美", "堀江院2nd", "2026-06")).toBe(false);
+  });
+  it("名簿外の退職者（姪浜院 藤田）は姪浜院でだけ除外する", () => {
+    expect(isRetiredStaff("藤田", "姪浜院", "")).toBe(true);
+    expect(isRetiredStaff("ふじたみほ", "姪浜院", "")).toBe(true);
+    expect(isRetiredStaff("藤田", "土橋院", "")).toBe(false);
+  });
+  it("在籍者は本名でも除外しない", () => {
+    expect(isRetiredStaff("木下夕季子", "福島院", "")).toBe(false);
+    expect(isRetiredStaff("山田さやか", "姪浜院", "")).toBe(false);
+  });
+});
