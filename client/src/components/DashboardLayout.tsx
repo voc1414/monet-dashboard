@@ -49,6 +49,7 @@ export default function DashboardLayout({
   const [location] = useLocation();
   // 広告・設定タブは管理者向けビルドにしか無い（スタッフ向けバンドルには存在しない）
   const isAdmin = IS_ADMIN_BUILD;
+  const showHomeCrumb = isAdmin;
   const shownCrumbs = isAdmin ? breadcrumbs : breadcrumbs.filter(c => c.label !== "ホーム");
   const tabs = visibleMainTabs(isAdmin);
   // 設定タブは押しても入れないので出さない（2026-09-13）。判定は navItems.ts に集約。
@@ -139,7 +140,7 @@ export default function DashboardLayout({
         <div className="border-b border-border/40 bg-white/40">
           <div className="container py-3">
             <nav className="flex items-center gap-1.5 text-sm">
-              {isAdmin && (
+              {showHomeCrumb && (
                 <Link href="/">
                   <span className="text-muted-foreground hover:text-primary transition-colors cursor-pointer">
                     ホーム
@@ -148,7 +149,7 @@ export default function DashboardLayout({
               )}
               {shownCrumbs.map((crumb, i) => (
                 <span key={i} className="flex items-center gap-1.5">
-                  {(isAdmin || i > 0) && <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50" />}
+                  {(showHomeCrumb || i > 0) && <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50" />}
                   {crumb.href ? (
                     <Link href={crumb.href}>
                       <span className="text-muted-foreground hover:text-primary transition-colors cursor-pointer">
