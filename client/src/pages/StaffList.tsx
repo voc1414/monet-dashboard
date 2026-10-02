@@ -17,7 +17,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PeriodSelector, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
+import { PeriodSelector, PeriodMonthLabel, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
 import type { PeriodSelection } from "@/components/PeriodSelector";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
@@ -387,6 +387,7 @@ export default function StaffList() {
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
             <Users className="w-5 h-5 text-primary" />
             スタッフ一覧
+            <PeriodMonthLabel selection={periodSelection} allMonths={availableMonths} className="text-2xl" />
           </h1>
           <p className="text-xs text-muted-foreground mt-1">
             {monthLabel}

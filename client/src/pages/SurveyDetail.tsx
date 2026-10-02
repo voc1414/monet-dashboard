@@ -16,7 +16,7 @@ import {
   Sparkles, ChevronDown, Users, Quote
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PeriodSelector, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
+import { PeriodSelector, PeriodMonthLabel, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
 import type { PeriodSelection } from "@/components/PeriodSelector";
 import { Badge } from "@/components/ui/badge";
 import ScoreDetailModal from "@/components/ScoreDetailModal";
@@ -397,6 +397,7 @@ export default function SurveyDetail() {
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
                 {storeId}
+                <PeriodMonthLabel selection={periodSelection} allMonths={allMonths} className="text-2xl md:text-3xl" />
                 {isNewStore(storeId) && (
                   <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none">NEW</span>
                 )}

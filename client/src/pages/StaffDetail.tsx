@@ -17,7 +17,7 @@ import {
   Sparkles, CalendarCheck, Gauge, CircleCheck
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PeriodSelector, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
+import { PeriodSelector, PeriodMonthLabel, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
 import type { PeriodSelection } from "@/components/PeriodSelector";
 import { Badge } from "@/components/ui/badge";
 import ScoreDetailModal from "@/components/ScoreDetailModal";
@@ -307,13 +307,7 @@ export default function StaffDetail() {
     return Array.from(set).sort().reverse();
   }, [npsMonths, fankuruMonths, staffReportMonths]);
 
-  // スタッフ向けは「指定月」で1ヶ月前をはじめから選んでおく（2026-10-02 林さん指示。管理者は従来どおり「先月」）
-  const [periodSelection, setPeriodSelection] = useState<PeriodSelection>(() => {
-    if (IS_ADMIN_BUILD) return getDefaultPeriodSelection();
-    const d = new Date();
-    const prev = new Date(d.getFullYear(), d.getMonth() - 1, 1);
-    return { mode: "specific_month", month: `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}` };
-  });
+  const [periodSelection, setPeriodSelection] = useState<PeriodSelection>(getDefaultPeriodSelection());
   const [selectedScore, setSelectedScore] = useState<number | null>(null);
   const [selectedPdf, setSelectedPdf] = useState<FankuruPdf | null>(null);
   const [showAllReviews, setShowAllReviews] = useState(false);
@@ -665,11 +659,7 @@ export default function StaffDetail() {
               <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
                 {shownName}
                 {/* スタッフ向けは氏名の横に対象の月を大きく出す（2026-10-02 林さん指示） */}
-                {!IS_ADMIN_BUILD && (
-                  <span className="ml-2 text-2xl md:text-3xl font-extrabold text-foreground">
-                    {singleMonth ? `${parseInt(singleMonth.split("-")[1])}月` : getPeriodLabel(periodSelection)}
-                  </span>
-                )}
+                <PeriodMonthLabel selection={periodSelection} allMonths={allMonths} className="text-2xl md:text-3xl" />
                 {staffStore && isNewStaff(staffName, staffStore) && (
                   <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 leading-none">NEW</span>
                 )}

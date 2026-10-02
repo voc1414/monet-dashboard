@@ -23,7 +23,7 @@ import { isNewStaff, isRetiredStaff } from "@/lib/newBadge";
 import { resolveStaffDisplayName } from "@/lib/staffDisplayName";
 import { useStores } from "@/hooks/useStores";
 import { IS_ADMIN_BUILD } from "@/lib/appRole";
-import { PeriodSelector, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
+import { PeriodSelector, PeriodMonthLabel, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
 import type { PeriodSelection } from "@/components/PeriodSelector";
 
 // スタッフ情報（NPS + ファンくるから構築）
@@ -372,6 +372,7 @@ export default function SurveyList() {
             <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
               <ClipboardList className="w-5 h-5 text-primary" />
               アンケート一覧
+              <PeriodMonthLabel selection={periodSelection} allMonths={allMonths} className="text-2xl" />
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
               スタッフ別NPS・ファンくる調査結果

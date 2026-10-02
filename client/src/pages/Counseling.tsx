@@ -11,6 +11,7 @@ import { ClipboardList, Users, Info, Loader2 } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
 import {
   PeriodSelector,
+  PeriodMonthLabel,
   getDefaultPeriodSelection,
   getFilterMonths,
   getPeriodLabel,
@@ -83,6 +84,7 @@ export default function Counseling() {
           <ClipboardList className="w-5 h-5 text-primary" />
           <h1 className="text-xl font-bold text-foreground">
             カウンセリングシート集計
+            <PeriodMonthLabel selection={selection} allMonths={availableMonths} className="text-2xl" />
           </h1>
         </div>
         <p className="text-sm text-muted-foreground">
