@@ -59,6 +59,20 @@ function Kpi({ label, value, unit, level }: { label: string; value: string | nul
   );
 }
 
+/** **…** を赤字の太字にする */
+function Emph({ text }: { text: string }) {
+  const parts = text.split(/\*\*(.+?)\*\*/);
+  return (
+    <>
+      {parts.map((p, i) =>
+        i % 2 === 1
+          ? <strong key={i} className="font-bold" style={{ color: NG }}>{p}</strong>
+          : <span key={i}>{p}</span>
+      )}
+    </>
+  );
+}
+
 function GoodImproveCard({
   icon, title, note, gi, link,
 }: {
@@ -82,7 +96,15 @@ function GoodImproveCard({
         </div>
         <div className="rounded-lg px-3 py-2.5" style={{ backgroundColor: "#FBF0EF" }}>
           <div className="text-xs font-bold mb-0.5" style={{ color: NG }}>改善点</div>
-          {gi.improve}
+          {gi.improve.lead && <p><Emph text={gi.improve.lead} /></p>}
+          {gi.improve.bullets.length > 0 && (
+            <ul className="list-disc pl-4 mt-1 space-y-1">
+              {gi.improve.bullets.map((b, i) => <li key={i}><Emph text={b} /></li>)}
+            </ul>
+          )}
+          {gi.improve.note && (
+            <p className="mt-1.5 text-[12px]">※<Emph text={gi.improve.note} /></p>
+          )}
           {gi.source && <div className="text-[10px] text-muted-foreground mt-1">出典：{gi.source}</div>}
           {link && (
             <a
@@ -165,7 +187,9 @@ export default function StaffSimpleSummary({
           note={`${npsStats.totalResponses}件`}
           gi={{
             good: npsAdvice.strengths[0] ?? "—",
-            improve: npsAdvice.improvements[0] ?? "この水準を維持しましょう。",
+            improve: npsAdvice.improvements[0]
+              ? { lead: null, bullets: [npsAdvice.improvements[0]], note: null }
+              : { lead: "この水準を維持しましょう。", bullets: [], note: null },
             source: null,
           }}
         />

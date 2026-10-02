@@ -11,18 +11,34 @@ export const RESERVATION_TARGET = 85;
 export const UTILIZATION_EXCELLENT = 95;
 export const UTILIZATION_OK = 90;
 
+export interface ImproveBlock {
+  /** 箇条書きの前に置く一文（「あと○名」など）。null なら無し */
+  lead: string | null;
+  bullets: string[];
+  /** 箇条書きの後ろの※書き。null なら無し */
+  note: string | null;
+}
+
+/** 文中の **…** は画面で赤字にする（インパクトのある数字。2026-10-02 林さん指示） */
 export interface GoodImprove {
   good: string;
-  improve: string;
+  improve: ImproveBlock;
   source: string | null;
 }
 
-const RESERVATION_TALK =
-  "アフターで「次回○○のメニューで○月○日の週ころのご来店がおすすめです。こちらの週の前後のご都合はいかがでしょうか？」と、必ず○月の○週まで案内しましょう。ここで大きく次回予約率が変わります。案内後は必ずQRコードから再来クーポンを選んでネット予約していただきます。";
+const RESERVATION_BULLETS = [
+  "アフターで「次回○○のメニューで○月○日の週ころのご来店がおすすめです。こちらの週の前後のご都合はいかがでしょうか？」と、必ず○月の○週まで案内しましょう。ここで大きく次回予約率が変わります。",
+  "案内後は必ずQRコードから再来クーポンを選んでネット予約していただきます。",
+];
 const RESERVATION_SOURCE = "カウンセリング（トーク要点・アフター説明）／オペレーション（退店時）";
 
-const UTILIZATION_TALK =
-  "次回予約は平日の午前から優先的に、オープン時間に案内しましょう（10時オープンなら11時ではなく10時か12時）。予約は数ヶ月先までこまめに管理しましょう。";
+// 1つ目はマニュアル【約12分】予約管理の言葉、2つ目と※書きは林さんの文章（2026-10-02）
+const UTILIZATION_BULLETS = [
+  "次回予約は平日の午前から優先的に、オープン時間に案内しましょう（10時オープンなら11時ではなく10時か12時）。予約は数ヶ月先までこまめに管理しましょう。",
+  "休憩時間や予約枠調整を定期的に行いましょう。",
+];
+const UTILIZATION_NOTE =
+  "予約管理を徹底するだけで**月間で5〜10件**は入客数が変わります。売上に換算すると**7.5万円〜15万円**ほど変わってくるので、隙間時間にご自身の先々の予約管理をまめに行ってくださいますようお願いします。";
 const UTILIZATION_SOURCE = "予約管理（予約管理のルール・次回予約ルール）";
 
 /** 目標85%まであと何名か（staffAdvice と同じ計算） */
@@ -41,7 +57,11 @@ export function reservationGoodImprove(input: {
   if (rate >= RESERVATION_TARGET) {
     return {
       good: `次回予約率${rate}%で目標${RESERVATION_TARGET}%を達成。アフターでの次回予約案内ができています。`,
-      improve: "この水準を維持しましょう。カウンセリングの段階から「次回の来店のタイミング」を伝え、アフターで必ず○月の○週まで案内します。",
+      improve: {
+        lead: "この水準を維持しましょう。",
+        bullets: ["カウンセリングの段階から「次回の来店のタイミング」を伝え、アフターで必ず○月の○週まで案内します。"],
+        note: null,
+      },
       source: RESERVATION_SOURCE,
     };
   }
@@ -52,7 +72,7 @@ export function reservationGoodImprove(input: {
   const needed = reservationsNeeded(totalCustomers, reserved);
   return {
     good,
-    improve: `目標${RESERVATION_TARGET}%まで、あと${needed}名。${RESERVATION_TALK}`,
+    improve: { lead: `目標${RESERVATION_TARGET}%まで、**あと${needed}名**。`, bullets: RESERVATION_BULLETS, note: null },
     source: RESERVATION_SOURCE,
   };
 }
@@ -66,7 +86,7 @@ export function utilizationGoodImprove(input: {
   if (rate >= UTILIZATION_EXCELLENT) {
     return {
       good: `${rate}%でエクセレント。予約枠をしっかり埋められています。`,
-      improve: "この水準を維持しましょう。予約は数ヶ月先までこまめに管理しましょう。",
+      improve: { lead: "この水準を維持しましょう。", bullets: UTILIZATION_BULLETS, note: UTILIZATION_NOTE },
       source: UTILIZATION_SOURCE,
     };
   }
@@ -79,7 +99,11 @@ export function utilizationGoodImprove(input: {
         : `総客数${totalCustomers}名を担当しました。`;
   return {
     good,
-    improve: `エクセレント（${UTILIZATION_EXCELLENT}%）まで、あと${gap}ポイント。${UTILIZATION_TALK}`,
+    improve: {
+      lead: `エクセレント（${UTILIZATION_EXCELLENT}%）まで、**あと${gap}ポイント**。`,
+      bullets: UTILIZATION_BULLETS,
+      note: UTILIZATION_NOTE,
+    },
     source: UTILIZATION_SOURCE,
   };
 }
