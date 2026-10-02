@@ -9,7 +9,7 @@ import { isFankuruCommentShown } from "@/lib/fankuruComment";
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  MapPin, BarChart3, Calendar, Star, MessageSquare,
+  MapPin, BarChart3, Star, MessageSquare,
   FileText, ExternalLink, Loader2, FolderOpen, Eye,
   Lightbulb, CheckCircle2, Target, ArrowUpRight,
   Trophy, ThumbsUp, AlertTriangle, AlertCircle,
@@ -409,7 +409,6 @@ export default function SurveyDetail() {
 
         {/* Month Selector */}
         <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-muted-foreground" />
           <PeriodSelector allMonths={allMonths} selection={periodSelection} onChange={setPeriodSelection} />
         </div>
       </div>
