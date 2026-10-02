@@ -1,6 +1,6 @@
 /*
  * スタッフ向けビルド専用の要約（2026-10-02 林さん指示 GF-MDASH-M14）。
- * 次回予約率・稼働率・NPSスコアを大きく横並びにし、それぞれ「よかった点・改善点」を1つずつ出す。
+ * 次回予約率・稼働率・NPSスコアを1枠ずつ縦に並べ、枠の中に大きい数字と「よかった点・改善点」を出す。
  * 管理者向けビルドでは使わない（総合点・既存アドバイスのまま）。
  */
 import { CalendarCheck, Gauge, BarChart3, ExternalLink } from "lucide-react";
@@ -36,20 +36,19 @@ function utilizationLevel(rate: number): Level {
   return { color: NG, label: "要改善" };
 }
 
-function Kpi({ label, value, unit, level }: { label: string; value: string | null; unit?: string; level: Level }) {
+function BigNumber({ value, unit, level }: { value: string | null; unit?: string; level: Level }) {
   return (
-    <div className="bg-card border border-border/60 rounded-xl px-1 pt-3 pb-2.5 text-center min-w-0">
-      <div className="text-[11px] text-muted-foreground">{label}</div>
+    <div className="flex items-baseline gap-2 mb-2.5">
       <div
-        className="font-mono-data text-[26px] sm:text-3xl font-extrabold leading-tight mt-1 tracking-tight"
+        className="font-mono-data text-4xl font-extrabold leading-none tracking-tight"
         style={{ color: level?.color }}
       >
         {value ?? "—"}
-        {value !== null && unit && <span className="text-sm font-bold">{unit}</span>}
+        {value !== null && unit && <span className="text-lg font-bold">{unit}</span>}
       </div>
       {level && (
         <span
-          className="inline-block mt-1.5 text-[10px] font-bold text-white rounded-full px-2 py-px"
+          className="inline-block text-[11px] font-bold text-white rounded-full px-2 py-px"
           style={{ backgroundColor: level.color }}
         >
           {level.label}
@@ -74,12 +73,14 @@ function Emph({ text }: { text: string }) {
 }
 
 function GoodImproveCard({
-  icon, title, note, gi, link,
+  icon, title, note, number, gi, link,
 }: {
   icon: ReactNode;
   title: string;
   note?: string;
-  gi: GoodImprove;
+  number: ReactNode;
+  /** よかった点・改善点を出せないときは null（数字だけ表示） */
+  gi: GoodImprove | null;
   link?: { href: string; label: string };
 }) {
   return (
@@ -89,7 +90,8 @@ function GoodImproveCard({
         {title}
         {note && <span className="ml-auto text-[11px] font-normal text-muted-foreground">{note}</span>}
       </h2>
-      <div className="flex flex-col gap-2 text-[13px] leading-relaxed">
+      {number}
+      {gi && <div className="flex flex-col gap-2 text-[13px] leading-relaxed">
         <div className="rounded-lg px-3 py-2.5" style={{ backgroundColor: "#EAF5F3" }}>
           <div className="text-xs font-bold mb-0.5" style={{ color: EX }}>よかった点</div>
           {gi.good}
@@ -119,7 +121,7 @@ function GoodImproveCard({
             </a>
           )}
         </div>
-      </div>
+      </div>}
     </section>
   );
 }
@@ -142,58 +144,58 @@ export default function StaffSimpleSummary({
 
   return (
     <div className="flex flex-col gap-3.5 mb-8">
-      <div className="grid grid-cols-3 gap-2">
-        <Kpi
-          label="次回予約率"
-          value={nextReservationRate !== null ? String(nextReservationRate) : null}
-          unit="%"
-          level={nextReservationRate !== null ? reservationLevel(nextReservationRate) : null}
-        />
-        <Kpi
-          label="稼働率"
-          value={utilizationRate !== null ? String(utilizationRate) : null}
-          unit="%"
-          level={utilizationRate !== null ? utilizationLevel(utilizationRate) : null}
-        />
-        <Kpi
-          label="NPSスコア"
-          value={npsScore !== null ? `${npsScore > 0 ? "+" : ""}${npsScore}` : null}
-          level={npsClass ? { color: npsClass.color, label: npsClass.label } : null}
-        />
-      </div>
+      <GoodImproveCard
+        icon={<CalendarCheck className="w-4 h-4 text-muted-foreground" />}
+        title="次回予約"
+        note={nextReservationRate !== null ? `総入客${totalCustomers}名中 ${reserved}名` : undefined}
+        number={
+          <BigNumber
+            value={nextReservationRate !== null ? String(nextReservationRate) : null}
+            unit="%"
+            level={nextReservationRate !== null ? reservationLevel(nextReservationRate) : null}
+          />
+        }
+        gi={nextReservationRate !== null
+          ? reservationGoodImprove({ rate: nextReservationRate, totalCustomers, reserved, npsScore })
+          : null}
+        link={nextReservationRate !== null ? { href: RESERVATION_MANUAL_URL, label: "次回予約率の改善マニュアル" } : undefined}
+      />
 
-      {nextReservationRate !== null && (
-        <GoodImproveCard
-          icon={<CalendarCheck className="w-4 h-4 text-muted-foreground" />}
-          title="次回予約"
-          note={`総入客${totalCustomers}名中 ${reserved}名`}
-          gi={reservationGoodImprove({ rate: nextReservationRate, totalCustomers, reserved, npsScore })}
-          link={{ href: RESERVATION_MANUAL_URL, label: "次回予約率の改善マニュアル" }}
-        />
-      )}
+      <GoodImproveCard
+        icon={<Gauge className="w-4 h-4 text-muted-foreground" />}
+        title="稼働率"
+        number={
+          <BigNumber
+            value={utilizationRate !== null ? String(utilizationRate) : null}
+            unit="%"
+            level={utilizationRate !== null ? utilizationLevel(utilizationRate) : null}
+          />
+        }
+        gi={utilizationRate !== null && nextReservationRate !== null
+          ? utilizationGoodImprove({ rate: utilizationRate, nextReservationRate, totalCustomers })
+          : null}
+      />
 
-      {utilizationRate !== null && nextReservationRate !== null && (
-        <GoodImproveCard
-          icon={<Gauge className="w-4 h-4 text-muted-foreground" />}
-          title="稼働率"
-          gi={utilizationGoodImprove({ rate: utilizationRate, nextReservationRate, totalCustomers })}
-        />
-      )}
-
-      {npsStats && npsAdvice && (npsAdvice.strengths.length > 0 || npsAdvice.improvements.length > 0) && (
-        <GoodImproveCard
-          icon={<BarChart3 className="w-4 h-4 text-muted-foreground" />}
-          title="NPSスコア"
-          note={`${npsStats.totalResponses}件`}
-          gi={{
-            good: npsAdvice.strengths[0] ?? "—",
-            improve: npsAdvice.improvements[0]
-              ? { lead: null, bullets: [npsAdvice.improvements[0]], note: null }
-              : { lead: "この水準を維持しましょう。", bullets: [], note: null },
-            source: null,
-          }}
-        />
-      )}
+      <GoodImproveCard
+        icon={<BarChart3 className="w-4 h-4 text-muted-foreground" />}
+        title="NPSスコア"
+        note={npsStats ? `${npsStats.totalResponses}件` : undefined}
+        number={
+          <BigNumber
+            value={npsScore !== null ? `${npsScore > 0 ? "+" : ""}${npsScore}` : null}
+            level={npsClass ? { color: npsClass.color, label: npsClass.label } : null}
+          />
+        }
+        gi={npsAdvice && (npsAdvice.strengths.length > 0 || npsAdvice.improvements.length > 0)
+          ? {
+              good: npsAdvice.strengths[0] ?? "—",
+              improve: npsAdvice.improvements[0]
+                ? { lead: null, bullets: [npsAdvice.improvements[0]], note: null }
+                : { lead: "この水準を維持しましょう。", bullets: [], note: null },
+              source: null,
+            }
+          : null}
+      />
     </div>
   );
 }
