@@ -45,7 +45,14 @@ function Router() {
         <Route path="/staff" component={StaffList} />
         <Route path="/staff/:storeId/:staffId" component={StaffDetail} />
         <Route path="/survey" component={SurveyList} />
-        <Route path="/survey/:storeId" component={SurveyDetail} />
+        {/* 店舗単位のアンケートも管理者だけ。スタッフ向けで直接開かれたらアンケート一覧へ戻す（2026-10-02 林さん指示） */}
+        {IS_ADMIN_BUILD ? (
+          <Route path="/survey/:storeId" component={SurveyDetail} />
+        ) : (
+          <Route path="/survey/:storeId">
+            <Redirect to="/survey" replace />
+          </Route>
+        )}
         <Route path="/counseling" component={Counseling} />
         {IS_ADMIN_BUILD && <Route path="/store/:storeId/nps" component={NpsOverview} />}
 
