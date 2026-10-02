@@ -94,11 +94,11 @@ function GoodImproveCard({
       {number}
       {gi && <div className="flex flex-col gap-2 text-[13px] leading-relaxed">
         <div className="rounded-lg px-3 py-2.5 border border-muted" style={{ backgroundColor: "#FDFCFA" }}>
-          <div className="text-xs font-bold mb-0.5 text-muted-foreground">よかった点</div>
+          <div className="text-[15px] font-bold mb-1 pb-1 border-b border-muted text-foreground [word-break:keep-all]">よかった点</div>
           {gi.good}
         </div>
         <div className="rounded-lg px-3 py-2.5 border border-muted" style={{ backgroundColor: "#FDFCFA" }}>
-          <div className="text-xs font-bold mb-0.5 text-muted-foreground">改善点</div>
+          <div className="text-[15px] font-bold mb-1 pb-1 border-b border-muted text-foreground [word-break:keep-all]">改善点</div>
           {gi.improve.lead && <p><Emph text={gi.improve.lead} /></p>}
           {gi.improve.bullets.length > 0 && (
             <ul className="list-disc pl-4 mt-1 space-y-1">
