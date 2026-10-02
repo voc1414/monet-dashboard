@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch, Router as WouterRouter } from "wouter";
+import { Redirect, Route, Switch, Router as WouterRouter } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import ScrollToTop from "./components/ScrollToTop";
 import { IS_ADMIN_BUILD } from "./lib/appRole";
@@ -30,15 +30,24 @@ function Router() {
     <>
       <ScrollToTop />
       <Switch>
-        {/* スタッフ向け（ログイン不要）。広告は管理者だけ */}
-        <Route path="/" component={Home} />
-        <Route path="/store/:storeId" component={StoreDetail} />
+        {/*
+          店舗一覧・店舗詳細は管理者だけ（2026-10-02 林さん指示）。
+          スタッフ向けでは「/」（ロゴ・パンくずの「ホーム」）をスタッフ一覧へ送る。
+        */}
+        {IS_ADMIN_BUILD ? (
+          <Route path="/" component={Home} />
+        ) : (
+          <Route path="/">
+            <Redirect to="/staff" replace />
+          </Route>
+        )}
+        {IS_ADMIN_BUILD && <Route path="/store/:storeId" component={StoreDetail} />}
         <Route path="/staff" component={StaffList} />
         <Route path="/staff/:storeId/:staffId" component={StaffDetail} />
         <Route path="/survey" component={SurveyList} />
         <Route path="/survey/:storeId" component={SurveyDetail} />
         <Route path="/counseling" component={Counseling} />
-        <Route path="/store/:storeId/nps" component={NpsOverview} />
+        {IS_ADMIN_BUILD && <Route path="/store/:storeId/nps" component={NpsOverview} />}
 
         {/*
           雇用形態別の売上・広告・設定は管理者向けビルドにだけ登録する。

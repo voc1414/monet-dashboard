@@ -20,6 +20,7 @@ import type { PeriodSelection } from "@/components/PeriodSelector";
 import { Badge } from "@/components/ui/badge";
 import ScoreDetailModal from "@/components/ScoreDetailModal";
 import DashboardLayout from "@/components/DashboardLayout";
+import { IS_ADMIN_BUILD } from "@/lib/appRole";
 import { useNpsData, calculateStoreStats, filterByMonth, getAvailableMonths } from "@/hooks/useNpsData";
 import type { NpsRecord, StoreStats } from "@/hooks/useNpsData";
 import { getNpsClass, NPS_INDUSTRY_AVERAGE } from "@/lib/npsClass";
@@ -805,7 +806,7 @@ export default function SurveyDetail() {
       )}
 
       {/* 店舗詳細リンク */}
-      {!loading && (
+      {!loading && IS_ADMIN_BUILD && (
         <div className="flex justify-center pt-2 pb-4">
           <Link
             href={`/store/${encodeURIComponent(storeId)}`}

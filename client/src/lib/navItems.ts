@@ -3,7 +3,7 @@
  *
  * ここ1箇所を直せば DashboardLayout（スタッフ向け）と AdminLayout（管理者の設定画面）の
  * 両方に効く。ページを物理的に複製せず、`adminOnly` の出し分けだけで仕分ける。
- *   - スタッフ向け … 店舗一覧／スタッフ一覧／アンケート／カウンセリング
+ *   - スタッフ向け … スタッフ一覧／アンケート／カウンセリング（店舗一覧は 2026-10-02 から管理者だけ）
  *   - 管理者向け   … 上記すべて ＋ 雇用形態別の売上 ＋ 広告（Meta） ＋ 設定
  */
 import {
@@ -39,7 +39,8 @@ export const MAIN_TABS: NavItem[] = [
     label: "店舗一覧",
     shortLabel: "店舗一覧",
     icon: Home,
-    adminOnly: false,
+    // 店舗ごとの売上はスタッフに見せない（2026-10-02 林さん指示）
+    adminOnly: true,
     // 店舗詳細も「店舗一覧」の下と見なす（NPS は別画面なので除く）
     isActive: (l) => l === "/" || (l.startsWith("/store") && !l.includes("/nps")),
   },

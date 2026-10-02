@@ -19,9 +19,10 @@ function readClientSource(relative: string): string {
 }
 
 describe("画面の仕分け（スタッフ向け／管理者向け）", () => {
-  it("スタッフ向けは4タブで、広告が含まれない", () => {
+  it("スタッフ向けは3タブで、店舗一覧・広告が含まれない", () => {
     const staffTabs = visibleMainTabs(false);
-    expect(staffTabs.map((t) => t.href)).toEqual(["/", "/staff", "/survey", "/counseling"]);
+    // 店舗一覧はスタッフに見せない（2026-10-02 林さん指示）
+    expect(staffTabs.map((t) => t.href)).toEqual(["/staff", "/survey", "/counseling"]);
     expect(staffTabs.some((t) => t.href === "/ads")).toBe(false);
     expect(staffTabs.some((t) => t.href === "/employment")).toBe(false);
   });

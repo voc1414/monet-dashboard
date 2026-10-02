@@ -396,12 +396,14 @@ export default function StaffList() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Link href="/">
-            <span className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 transition-colors cursor-pointer">
-              <Building2 className="w-4 h-4" />
-              店舗一覧へ
-            </span>
-          </Link>
+          {IS_ADMIN_BUILD && (
+            <Link href="/">
+              <span className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 transition-colors cursor-pointer">
+                <Building2 className="w-4 h-4" />
+                店舗一覧へ
+              </span>
+            </Link>
+          )}
           <PeriodSelector
             allMonths={availableMonths}
             selection={periodSelection}
