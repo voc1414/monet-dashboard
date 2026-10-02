@@ -49,6 +49,7 @@ export default function DashboardLayout({
   const [location] = useLocation();
   // 広告・設定タブは管理者向けビルドにしか無い（スタッフ向けバンドルには存在しない）
   const isAdmin = IS_ADMIN_BUILD;
+  const shownCrumbs = isAdmin ? breadcrumbs : breadcrumbs.filter(c => c.label !== "ホーム");
   const tabs = visibleMainTabs(isAdmin);
   // 設定タブは押しても入れないので出さない（2026-09-13）。判定は navItems.ts に集約。
   const showSettings = shouldShowSettingsTab(isAdmin);
@@ -133,19 +134,21 @@ export default function DashboardLayout({
         </div>
       </header>
 
-      {/* Breadcrumbs */}
-      {breadcrumbs.length > 0 && (
+      {/* Breadcrumbs（スタッフ向けは先頭の「ホーム ＞」を出さない。2026-10-02 林さん指示） */}
+      {shownCrumbs.length > 0 && (
         <div className="border-b border-border/40 bg-white/40">
           <div className="container py-3">
             <nav className="flex items-center gap-1.5 text-sm">
-              <Link href="/">
-                <span className="text-muted-foreground hover:text-primary transition-colors cursor-pointer">
-                  ホーム
-                </span>
-              </Link>
-              {breadcrumbs.map((crumb, i) => (
+              {isAdmin && (
+                <Link href="/">
+                  <span className="text-muted-foreground hover:text-primary transition-colors cursor-pointer">
+                    ホーム
+                  </span>
+                </Link>
+              )}
+              {shownCrumbs.map((crumb, i) => (
                 <span key={i} className="flex items-center gap-1.5">
-                  <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50" />
+                  {(isAdmin || i > 0) && <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50" />}
                   {crumb.href ? (
                     <Link href={crumb.href}>
                       <span className="text-muted-foreground hover:text-primary transition-colors cursor-pointer">
