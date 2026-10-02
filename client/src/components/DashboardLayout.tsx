@@ -5,11 +5,17 @@
  * Typography: Noto Sans JP (body), Inter (data)
  */
 import { Link, useLocation } from "wouter";
-import { ChevronRight, RefreshCw } from "lucide-react";
+import { ChevronRight, Menu, RefreshCw } from "lucide-react";
 import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 
 import DataHealthPanel from "@/components/DataHealthPanel";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { SETTINGS_TAB, shouldShowSettingsTab, visibleMainTabs } from "@/lib/navItems";
 import { IS_ADMIN_BUILD } from "@/lib/appRole";
 import monetLogo from "@/assets/monet-logo.png";
@@ -46,7 +52,7 @@ export default function DashboardLayout({
   loading,
   healthPanel = "issuesOnly",
 }: DashboardLayoutProps) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   // 広告・設定タブは管理者向けビルドにしか無い（スタッフ向けバンドルには存在しない）
   const isAdmin = IS_ADMIN_BUILD;
   const showHomeCrumb = isAdmin;
@@ -130,6 +136,31 @@ export default function DashboardLayout({
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
               </button>
+            )}
+            {/* スタッフ向け: 下部ナビと同じページを右上の三本線からも選べる（2026-10-02 林さん指示） */}
+            {!isAdmin && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="lg:hidden p-2 rounded-lg hover:bg-accent transition-colors text-foreground"
+                    aria-label="ページを選ぶ"
+                  >
+                    <Menu className="w-5 h-5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  {tabs.map((tab) => (
+                    <DropdownMenuItem
+                      key={tab.href}
+                      onSelect={() => setLocation(tab.href)}
+                      className={`gap-2 py-2.5 text-sm ${tab.isActive(location) ? "font-bold text-primary" : ""}`}
+                    >
+                      <tab.icon className="w-4 h-4 shrink-0" />
+                      {tab.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
         </div>
