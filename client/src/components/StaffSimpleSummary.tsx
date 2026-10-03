@@ -27,8 +27,8 @@ type Level = { color: string; label: string } | null;
 
 function reservationLevel(rate: number): Level {
   if (rate >= RESERVATION_TARGET) return { color: EX, label: "エクセレント" };
-  // 71%以上で適正（2026-10-03 林さん指示 GF-MDASH-M16。70%ちょうどは要改善＝次回予約強化の対象と一致）
-  if (rate >= 71) return { color: OK, label: "適正" };
+  // 70.1%以上で適正（2026-10-03 林さん指示 GF-MDASH-M16。70%以下は要改善＝次回予約強化の対象と一致）
+  if (rate > 70) return { color: OK, label: "適正" };
   return { color: NG, label: "要改善" };
 }
 
