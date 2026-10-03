@@ -163,6 +163,8 @@ export interface StaffReport {
   reportMonthLabel: string; // "2月" 形式
   lineUserId: string;
   name: string;
+  /** L Message のシステム表示名（次回予約強化シートとの照合に使う） */
+  systemName: string;
   /** 列20 のニックネーム（L Message の必須入力）。写真URL・空欄のときは "" */
   nickname: string;
   store: string;
@@ -221,7 +223,7 @@ export interface StoreMonthlyStats {
   staffReports: StaffReport[];
 }
 
-function parseCSV(text: string): string[][] {
+export function parseCSV(text: string): string[][] {
   const rows: string[][] = [];
   let current = "";
   let inQuotes = false;
@@ -411,6 +413,7 @@ export function useMonthlyReport() {
             reportMonthLabel: monthNum > 0 ? `${monthNum}月` : "",
             lineUserId: cell(r, "lineUserId"),
             name: cell(r, "name"),
+            systemName: cell(r, "systemName").trim(),
             nickname: parseReportNickname(cell(r, "nickname")),
             store: cell(r, "store").trim(),
             storeNormalized: normalizeStoreName(cell(r, "store")),
