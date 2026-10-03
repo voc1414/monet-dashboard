@@ -14,6 +14,7 @@ import {
   parseBoostAnswers,
   parseScore,
   parseTargetMonth,
+  reservationStreakAt,
   resolveBoostColumns,
   streakByMonth,
   type ReportRow,
@@ -121,6 +122,24 @@ describe("測定開始月（2026年10月分から）", () => {
       ["2026-10", true, true, 1],
       ["2026-09", false, false, 0],
     ]);
+  });
+});
+
+describe("スタッフ個人ページの「◯ヶ月連続」", () => {
+  const r = (reportMonth: string, rate: number) => ({ reportMonth, newCustomers: 0, returnCustomers: 100, nextReservation: rate });
+  const all = ["2026-09", "2026-10", "2026-11", "2026-12", "2027-01"];
+
+  it("その月までの連続月数（未提出の月は据え置き・10月分から数える）", () => {
+    const rows = [r("2026-09", 50), r("2026-10", 60), r("2026-11", 70), /* 12月 未提出 */ r("2027-01", 40)];
+    expect(reservationStreakAt(rows, all, "2026-10")).toBe(1);
+    expect(reservationStreakAt(rows, all, "2026-11")).toBe(2);
+    expect(reservationStreakAt(rows, all, "2027-01")).toBe(3);
+  });
+
+  it("その月が70%超え・測定開始前なら0", () => {
+    const rows = [r("2026-09", 50), r("2026-10", 60), r("2026-11", 80)];
+    expect(reservationStreakAt(rows, all, "2026-11")).toBe(0);
+    expect(reservationStreakAt(rows, all, "2026-09")).toBe(0);
   });
 });
 

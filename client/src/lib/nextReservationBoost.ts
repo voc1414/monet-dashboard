@@ -87,6 +87,26 @@ export function streakByMonth(
   return out;
 }
 
+/**
+ * 1人ぶんの報告書の行（1ヶ月1行）から、month 時点で70%以下が何ヶ月続いているかを返す。
+ * month が70%超え・判定できない・測定開始前なら 0。
+ * スタッフ用の個人ページ（次回予約の「◯ヶ月連続」）で使う（2026-10-03 GF-MDASH-M16）。
+ * allMonths は月末報告書全体の月（その人が出していない月を「据え置き」にするため）。
+ */
+export function reservationStreakAt(
+  rows: Pick<ReportRow, "reportMonth" | "newCustomers" | "returnCustomers" | "nextReservation">[],
+  allMonths: string[],
+  month: string,
+  startMonth: string = BOOST_START_MONTH,
+): number {
+  const rates = new Map<string, number | null>();
+  for (const r of rows) {
+    if (r.reportMonth) rates.set(r.reportMonth, nextReservationRate(r.nextReservation, r.newCustomers, r.returnCustomers));
+  }
+  if (!isMeasuredMonth(month, startMonth) || !isBoostTarget(rates.get(month) ?? null)) return 0;
+  return streakByMonth(allMonths.filter((m) => m <= month), rates, startMonth).get(month) ?? 0;
+}
+
 // ───────────────────────── 強化シートの列解決 ─────────────────────────
 
 export type BoostColumnKey =

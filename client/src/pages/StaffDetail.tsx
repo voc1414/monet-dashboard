@@ -39,6 +39,7 @@ import type { CompositeScoreResult } from "@/lib/compositeScore";
 import { generateStaffAdvice } from "@/lib/staffAdvice";
 import { IS_ADMIN_BUILD } from "@/lib/appRole";
 import StaffSimpleSummary from "@/components/StaffSimpleSummary";
+import { reservationStreakAt } from "@/lib/nextReservationBoost";
 import type { StaffAdvice } from "@/lib/staffAdvice";
 import { filterNpsRecordsForStaff, isNpsRecordOfStaff, npsStaffKey } from "@/lib/npsStaffMatch";
 import { buildNpsFuzzyLinks } from "@/lib/npsFuzzyLink";
@@ -365,6 +366,15 @@ export default function StaffDetail() {
   const staffReport = useMemo(() => reportRowsInPeriod[0] || null, [reportRowsInPeriod]);
 
   const metrics = useMemo(() => aggregateStaffReportMetrics(reportRowsInPeriod), [reportRowsInPeriod]);
+
+  // 次回予約が70%以下で何ヶ月続いているか（期間内で最新の報告月の時点。2026-10-03 GF-MDASH-M16）
+  const reservationStreak = useMemo(() => {
+    if (!staffReport) return 0;
+    const staffRows = pickLatestPerMonth(
+      rawData.filter(r => r.name === staffName && (!staffStore || r.storeNormalized === staffStore)),
+    );
+    return reservationStreakAt(staffRows, reportMonths, staffReport.reportMonth);
+  }, [rawData, staffName, staffStore, reportMonths, staffReport]);
 
   // 次回予約率も期間合算（Σ次回予約数 ÷ Σ客数）
   const nextResRate = metrics?.nextReservationRate ?? 0;
@@ -731,6 +741,7 @@ export default function StaffDetail() {
       {!IS_ADMIN_BUILD && !loading && (
         <StaffSimpleSummary
           nextReservationRate={staffReport ? nextResRate : null}
+          reservationStreak={reservationStreak}
           totalCustomers={metrics?.totalCustomers ?? 0}
           reserved={metrics?.nextReservation ?? 0}
           utilizationRate={staffReport ? calculateUtilizationRate(metrics?.avgMonthlyCustomers ?? 0, staffReport.employmentType) : null}

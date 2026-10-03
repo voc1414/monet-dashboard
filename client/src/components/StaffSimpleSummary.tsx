@@ -4,7 +4,7 @@
  * 管理者向けビルドでは使わない（総合点・既存アドバイスのまま）。
  * 色は「数字＋判定バッジ」と改善点の強調語だけに付け、箱やリンクはグレーにそろえる（2026-10-02 林さん指示）。
  */
-import { CalendarCheck, Gauge, BarChart3, ExternalLink } from "lucide-react";
+import { AlertTriangle, CalendarCheck, Gauge, BarChart3, ExternalLink } from "lucide-react";
 import type { ReactNode } from "react";
 import type { StoreStats, NpsRecord } from "@/hooks/useNpsData";
 import { generateStoreAdvice } from "@/lib/npsAdvice";
@@ -37,7 +37,9 @@ function utilizationLevel(rate: number): Level {
   return { color: NG, label: "要改善" };
 }
 
-function BigNumber({ value, unit, level }: { value: string | null; unit?: string; level: Level }) {
+function BigNumber({
+  value, unit, level, extra,
+}: { value: string | null; unit?: string; level: Level; extra?: ReactNode }) {
   return (
     <div className="flex items-baseline gap-2 mb-2.5">
       <div
@@ -55,6 +57,7 @@ function BigNumber({ value, unit, level }: { value: string | null; unit?: string
           {level.label}
         </span>
       )}
+      {extra}
     </div>
   );
 }
@@ -126,11 +129,32 @@ function GoodImproveCard({
   );
 }
 
+/**
+ * 次回予約が70%以下で続いた月数のアイコン（2ヶ月以上で表示。2026-10-03 林さん指示 GF-MDASH-M16）。
+ * 2ヶ月＝黄、3ヶ月以上＝赤（管理者の次回予約強化タブと同じ色分け）。
+ */
+function StreakIcon({ streak }: { streak: number }) {
+  if (streak < 2) return null;
+  const color = streak >= 3 ? NG : "#D99A2B";
+  return (
+    <span
+      className="inline-flex items-center gap-0.5 text-[11px] font-bold rounded-full px-2 py-px border"
+      style={{ color, borderColor: color }}
+      data-testid="reservation-streak"
+    >
+      <AlertTriangle className="w-3 h-3" />
+      {streak}ヶ月連続
+    </span>
+  );
+}
+
 export default function StaffSimpleSummary({
-  nextReservationRate, totalCustomers, reserved, utilizationRate, npsStats, npsRecords,
+  nextReservationRate, reservationStreak = 0, totalCustomers, reserved, utilizationRate, npsStats, npsRecords,
 }: {
   /** 月末報告書が無い期間は null */
   nextReservationRate: number | null;
+  /** 70%以下が続いている月数（0＝続いていない） */
+  reservationStreak?: number;
   totalCustomers: number;
   reserved: number;
   /** パート等で算出できないときは null */
@@ -153,6 +177,7 @@ export default function StaffSimpleSummary({
             value={nextReservationRate !== null ? String(nextReservationRate) : null}
             unit="%"
             level={nextReservationRate !== null ? reservationLevel(nextReservationRate) : null}
+            extra={nextReservationRate !== null ? <StreakIcon streak={reservationStreak} /> : undefined}
           />
         }
         gi={nextReservationRate !== null
