@@ -94,10 +94,26 @@ const SORT_FIELDS_SHOWN: SortField[] = ALLOW_SALES_RANKING
 /** デスクトップ表の列幅。ヘッダ行と各行で必ず同じ定義を使う（片方だけ直すとズレる） */
 const DESKTOP_GRID_COLS = "grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.5fr)]";
 
+/** スタッフ向け一覧（スマホ）の列幅。見出し行と各行で同じ定義を使う */
+const STAFF_MOBILE_GRID_COLS = "grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)]";
+
+/** スタッフ向けは色を数字1色に絞り、目標に届かないときだけ赤にする */
+const STAFF_WARN = "text-[#C75C5C]";
+const staffUtilClass = (rate: number | null) => (rate !== null && rate <= 89 ? STAFF_WARN : "text-foreground");
+const staffNextResClass = (rate: number) => (rate <= 69 ? STAFF_WARN : "text-foreground");
+const staffNpsClass = (score: number) => (score < 0 ? STAFF_WARN : "text-foreground");
+
 /** Compact NPS badge for staff list */
 function StaffNpsBadge({ npsInfo }: { npsInfo: StaffNpsInfo | undefined }) {
   if (!npsInfo || npsInfo.totalResponses === 0) {
     return <span className="text-xs text-muted-foreground">—</span>;
+  }
+  if (!IS_ADMIN_BUILD) {
+    return (
+      <span className={`font-mono-data text-sm font-bold whitespace-nowrap ${staffNpsClass(npsInfo.npsScore)}`}>
+        {npsInfo.npsScore > 0 ? "+" : ""}{npsInfo.npsScore}
+      </span>
+    );
   }
   const npsClass = getNpsClass(npsInfo.npsScore);
   return (
@@ -558,6 +574,15 @@ export default function StaffList() {
             <span />
           </div>
 
+          {!IS_ADMIN_BUILD && (
+            <div className={`md:hidden grid ${STAFF_MOBILE_GRID_COLS} gap-2 items-center px-3 pb-1.5 mb-1 text-[11px] text-muted-foreground border-b border-border/60 whitespace-nowrap`}>
+              <span>氏名・売上</span>
+              <span className="text-right">稼働率</span>
+              <span className="text-right">次回予約</span>
+              <span className="text-right">NPS</span>
+            </div>
+          )}
+
           <div className="space-y-2">
             {staffList.map((staff, i) => {
               const staffKey = `${staff.answerId}-${i}`;
@@ -575,7 +600,7 @@ export default function StaffList() {
                   transition={{ delay: 0.02 * i }}
                 >
                   <Card
-                    className="border-border/50 shadow-sm hover:shadow-md hover:border-primary/30 transition-all cursor-pointer group"
+                    className={`border-border/50 shadow-sm hover:shadow-md hover:border-primary/30 transition-all cursor-pointer group ${IS_ADMIN_BUILD ? "" : "py-0 gap-0"}`}
                     onClick={() => handleStaffClick(staff.name, staff.storeNormalized)}
                   >
                     <CardContent className="p-0">
@@ -583,9 +608,11 @@ export default function StaffList() {
                       <div className={`hidden md:grid ${DESKTOP_GRID_COLS} gap-3 items-center px-5 py-3`}>
                         {/* 氏名 */}
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                            <span className="text-primary font-bold text-sm">{shownName.charAt(0)}</span>
-                          </div>
+                          {IS_ADMIN_BUILD && (
+                            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                              <span className="text-primary font-bold text-sm">{shownName.charAt(0)}</span>
+                            </div>
+                          )}
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5">
                               <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors truncate">{shownName}</span>
@@ -600,6 +627,13 @@ export default function StaffList() {
                           const scoreKey = `${staff.name}__${staff.storeNormalized}`;
                           const scoreResult = compositeScoreMap.get(scoreKey);
                           if (!scoreResult) return <div className="text-center"><span className="text-xs text-muted-foreground">—</span></div>;
+                          if (!IS_ADMIN_BUILD) {
+                            return (
+                              <div className="text-center">
+                                <span className="font-mono-data text-sm font-bold text-foreground whitespace-nowrap">{scoreResult.total}点</span>
+                              </div>
+                            );
+                          }
                           return (
                             <div className="flex flex-col items-center gap-0.5">
                               <span
@@ -629,27 +663,28 @@ export default function StaffList() {
                         {/* 次回予約率 */}
                         <div className="text-right">
                           <div className="flex flex-col items-end gap-0.5">
-                            <span className={`font-mono-data text-sm font-bold ${
+                            <span className={`font-mono-data text-sm font-bold whitespace-nowrap ${
+                              !IS_ADMIN_BUILD ? staffNextResClass(staff.nextReservationRate) :
                               staff.nextReservationRate >= 85 ? "text-[#2D9C8F]" :
                               staff.nextReservationRate >= 70 ? "text-[#E5B85C]" :
                               "text-[#C75C5C]"
                             }`}>
                               {staff.nextReservationRate}%
                             </span>
-                            {staff.nextReservationRate >= 85 && (
+                            {IS_ADMIN_BUILD && staff.nextReservationRate >= 85 && (
                               <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-1.5 py-0.5 shadow-sm">
                                 <Trophy className="w-2.5 h-2.5 text-amber-500" />
                                 エクセレント！
                                 <Sparkles className="w-2.5 h-2.5 text-amber-400" />
                               </span>
                             )}
-                            {staff.nextReservationRate >= 70 && staff.nextReservationRate <= 84 && (
+                            {IS_ADMIN_BUILD && staff.nextReservationRate >= 70 && staff.nextReservationRate <= 84 && (
                               <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-[#E5B85C] bg-amber-50/60 border border-amber-200/60 rounded-full px-1.5 py-0.5">
                                 <CircleCheck className="w-2.5 h-2.5 text-[#E5B85C]" />
                                 適正
                               </span>
                             )}
-                            {staff.nextReservationRate <= 69 && (
+                            {IS_ADMIN_BUILD && staff.nextReservationRate <= 69 && (
                               <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5">
                                 <AlertTriangle className="w-2.5 h-2.5" />
                                 要改善
@@ -665,23 +700,23 @@ export default function StaffList() {
                         <div className="text-right">
                           {utilRate !== null ? (
                             <div className="flex flex-col items-end gap-0.5">
-                              <span className={`font-mono-data text-sm font-bold ${getUtilizationColor(utilRate)}`}>
+                              <span className={`font-mono-data text-sm font-bold whitespace-nowrap ${IS_ADMIN_BUILD ? getUtilizationColor(utilRate) : staffUtilClass(utilRate)}`}>
                                 {utilRate}%
                               </span>
-                              {utilRate >= 95 && (
+                              {IS_ADMIN_BUILD && utilRate >= 95 && (
                                 <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-1.5 py-0.5 shadow-sm">
                                   <Trophy className="w-2.5 h-2.5 text-amber-500" />
                                   エクセレント！
                                   <Sparkles className="w-2.5 h-2.5 text-amber-400" />
                                 </span>
                               )}
-                              {utilRate >= 90 && utilRate < 95 && (
+                              {IS_ADMIN_BUILD && utilRate >= 90 && utilRate < 95 && (
                                 <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-[#E5B85C] bg-amber-50/60 border border-amber-200/60 rounded-full px-1.5 py-0.5">
                                   <CircleCheck className="w-2.5 h-2.5 text-[#E5B85C]" />
                                   適正
                                 </span>
                               )}
-                              {utilRate <= 89 && (
+                              {IS_ADMIN_BUILD && utilRate <= 89 && (
                                 <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5">
                                   <AlertTriangle className="w-2.5 h-2.5" />
                                   要改善
@@ -698,8 +733,39 @@ export default function StaffList() {
                         </div>
                       </div>
 
-                      {/* Mobile Layout */}
-                      <div className="md:hidden px-3 py-2">
+                      {/* Mobile Layout（スタッフ向け）: 1行リスト。氏名・店舗・点数・売上を左に、数字3つを右に並べ、どれも改行させない */}
+                      {!IS_ADMIN_BUILD && (() => {
+                        const scoreResult = compositeScoreMap.get(`${staff.name}__${staff.storeNormalized}`);
+                        const hasNps = !!npsInfo && npsInfo.totalResponses > 0;
+                        return (
+                          <div className={`md:hidden grid ${STAFF_MOBILE_GRID_COLS} gap-2 items-center px-3 py-2.5`}>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1 min-w-0">
+                                <span className="font-bold text-sm text-foreground truncate whitespace-nowrap">{shownName}</span>
+                                {isNewStaff(staff.name, staff.storeNormalized) && (
+                                  <span className="text-[9px] font-bold text-foreground border border-border rounded px-1 py-0.5 leading-none shrink-0">NEW</span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-muted-foreground truncate whitespace-nowrap">
+                                {staff.storeNormalized}{scoreResult ? ` ${scoreResult.total}点` : ""}
+                              </div>
+                              <div className="font-mono-data text-[13px] font-bold text-foreground whitespace-nowrap">{formatCurrency(metrics.totalSales)}</div>
+                            </div>
+                            <span className={`text-right font-mono-data text-sm font-bold whitespace-nowrap ${utilRate !== null ? staffUtilClass(utilRate) : "text-muted-foreground"}`}>
+                              {utilRate !== null ? `${utilRate}%` : "—"}
+                            </span>
+                            <span className={`text-right font-mono-data text-sm font-bold whitespace-nowrap ${staffNextResClass(staff.nextReservationRate)}`}>
+                              {staff.nextReservationRate}%
+                            </span>
+                            <span className={`text-right font-mono-data text-sm font-bold whitespace-nowrap ${hasNps ? staffNpsClass(npsInfo!.npsScore) : "text-muted-foreground"}`}>
+                              {hasNps ? `${npsInfo!.npsScore > 0 ? "+" : ""}${npsInfo!.npsScore}` : "—"}
+                            </span>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Mobile Layout（管理者向け） */}
+                      <div className={`${IS_ADMIN_BUILD ? "md:hidden" : "hidden"} px-3 py-2`}>
                         <div className="flex items-start gap-2">
                           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
                             <span className="text-primary font-bold text-xs">{shownName.charAt(0)}</span>
