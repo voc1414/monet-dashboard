@@ -1,0 +1,72 @@
+# スタッフ一覧の写し（client/src/data/staffMaster.ts）を毎朝 Notion「全スタッフ一覧」に合わせる。
+# 2026-10-03 林さん指示「毎日自動で更新して」（方式①: 林さんが取り込んで有効化）。
+# Notion は hayashin-guard インテグレーションに接続済み。鍵は repo シークレット NOTION_TOKEN。
+# 変わっていなければ何もしない。変わっていれば 型チェック＋テスト を通したときだけコミットして本番へ反映する。
+name: Sync staff master
+
+on:
+  schedule:
+    - cron: "0 21 * * *" # 毎朝 6:00（日本時間）
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: sync-staff
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Notion から写しを作り直す
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+        run: |
+          before=$(grep -c '{ name:' client/src/data/staffMaster.ts)
+          node scripts/sync-staff-master.mjs
+          after=$(grep -c '{ name:' client/src/data/staffMaster.ts)
+          echo "人数: $before → $after"
+          # 一度に5人以上減ったら Notion 側の誤操作を疑い、反映しない
+          if [ $((before - after)) -ge 5 ]; then
+            echo "::error::一度に $((before - after)) 人減りました。Notion を確認するまで反映しません。"
+            exit 1
+          fi
+      - name: 変わったか
+        id: diff
+        run: |
+          if git diff --quiet -- client/src/data/staffMaster.ts; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "変更なし"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git diff -- client/src/data/staffMaster.ts
+          fi
+      # vite7 と @builder.io/vite-plugin-jsx-loc の peer 衝突があるため legacy-peer-deps 必須
+      - if: steps.diff.outputs.changed == 'true'
+        run: npm ci --legacy-peer-deps
+      - if: steps.diff.outputs.changed == 'true'
+        name: 型チェック (tsc --noEmit)
+        run: npx tsc --noEmit
+      - if: steps.diff.outputs.changed == 'true'
+        name: テスト (vitest)
+        run: npx vitest run
+      - if: steps.diff.outputs.changed == 'true'
+        name: コミットして本番へ反映
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client/src/data/staffMaster.ts
+          git commit -m "スタッフ一覧の写しをNotionに合わせて更新（$(TZ=Asia/Tokyo date +%F)）"
+          git push origin HEAD:main
+          # 自動コミットの push では Deploy Pages が起動しないため、ここで起動する
+          gh workflow run pages.yml --ref main
