@@ -4,6 +4,7 @@
  * 1. 対象者一覧 … 選んだ月に次回予約率70%以下だったスタッフ。連続月数・強化シートの提出状況つき
  * 2. 項目ごとの集計 … 強化シート Q1〜Q17 の自己評価の平均と「2・1」の人数（低い項目が上）
  * 3. 個人ごとの回答 … 17問の自己評価・課題点・翌月のアクション（直近3回を並べる）
+ * 名前を押すと個人ページ（NextReservationBoostPerson.tsx）へ。全期間の推移と全回答を見られる。
  *
  * 次回予約率と連続月数は月末報告書（useMonthlyReport）から計算する。L Message の友だち情報
  * 「次回予約70%以下連続月数」はダッシュボードから読めないので使わない。
@@ -11,7 +12,8 @@
  * 集計ロジックは lib/nextReservationBoost.ts（純関数・server/nextReservationBoost.test.ts で検証）。
  */
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CalendarCheck, Info, Loader2 } from "lucide-react";
+import { Link } from "wouter";
+import { AlertTriangle, CalendarCheck, ChevronRight, Info, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
@@ -24,25 +26,23 @@ import {
   type BoostAnswer,
   type PersonHistory,
   type QuestionStat,
+  type ReportRow,
 } from "@/lib/nextReservationBoost";
 import { isRetiredStaff } from "@/lib/newBadge";
 import { normalizeStaffKey } from "@/lib/staffNameAlias";
 import { resolveStaffDisplayName } from "@/lib/staffDisplayName";
 
-const formatMonth = (ym: string) => {
+export const formatMonth = (ym: string) => {
   if (!ym) return "対象月不明";
   const [y, m] = ym.split("-");
   return `${y}年${parseInt(m)}月`;
 };
 
-export default function NextReservationBoost() {
-  const report = useMonthlyReport();
-  const sheet = useNextReservationBoostSheet();
-  const [month, setMonth] = useState("");
-
-  const reports = useMemo(
+/** 月末報告書を強化ロジックの入力形に変える（一覧・個人ページ共通） */
+export function useBoostReports(rawData: ReturnType<typeof useMonthlyReport>["rawData"]): ReportRow[] {
+  return useMemo(
     () =>
-      report.rawData.map((r) => ({
+      rawData.map((r) => ({
         store: r.storeNormalized,
         name: r.name,
         systemName: r.systemName,
@@ -51,8 +51,19 @@ export default function NextReservationBoost() {
         returnCustomers: r.returnCustomers,
         nextReservation: r.nextReservation,
       })),
-    [report.rawData],
+    [rawData],
   );
+}
+
+/** 個人ページへのリンク先 */
+export const boostPersonHref = (store: string, name: string) =>
+  `/next-reservation/${encodeURIComponent(store)}/${encodeURIComponent(name)}`;
+
+export default function NextReservationBoost() {
+  const report = useMonthlyReport();
+  const sheet = useNextReservationBoostSheet();
+  const [month, setMonth] = useState("");
+  const reports = useBoostReports(report.rawData);
 
   // 既定は月末報告書のある一番新しい月
   useEffect(() => {
@@ -187,7 +198,12 @@ function TargetList({ view, month }: { view: NonNullable<ReturnType<typeof build
                   >
                     <td className="py-2 pr-2 text-xs text-muted-foreground">{t.store}</td>
                     <td className="py-2 pr-2 font-medium text-foreground">
-                      {resolveStaffDisplayName(t.name, t.store)}
+                      <Link
+                        href={boostPersonHref(t.store, t.name)}
+                        className="underline decoration-border underline-offset-4 hover:text-primary hover:decoration-primary"
+                      >
+                        {resolveStaffDisplayName(t.name, t.store)}
+                      </Link>
                       {t.needsInterview && (
                         <span className="ml-2 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
                           面談対象
@@ -222,7 +238,7 @@ function TargetList({ view, month }: { view: NonNullable<ReturnType<typeof build
 }
 
 /** 連続月数の表示。単月は数字だけ、2ヶ月連続は黄色、面談対象（3ヶ月以上）は赤のアラートアイコン付き。 */
-function StreakBadge({ streak }: { streak: number }) {
+export function StreakBadge({ streak }: { streak: number }) {
   if (streak >= INTERVIEW_STREAK) {
     return (
       <span className="inline-flex items-center gap-1 font-mono-data font-bold text-red-600">
@@ -283,7 +299,7 @@ function QuestionStats({ stats, answerCount }: { stats: QuestionStat[]; answerCo
   );
 }
 
-function ScoreCell({ v }: { v: number | null | undefined }) {
+export function ScoreCell({ v }: { v: number | null | undefined }) {
   if (v === null || v === undefined) return <span className="text-muted-foreground">—</span>;
   return <span className={v <= LOW_SCORE_MAX ? "font-bold text-red-600" : ""}>{v}</span>;
 }
@@ -313,6 +329,13 @@ function PersonCard({ person, labels }: { person: PersonHistory; labels: string[
         <div className="mb-3 flex flex-wrap items-baseline gap-x-2">
           <h3 className="text-sm font-bold text-foreground">{resolveStaffDisplayName(person.name, person.store)}</h3>
           <span className="text-xs text-muted-foreground">{person.store}</span>
+          <Link
+            href={boostPersonHref(person.store, person.name)}
+            className="ml-auto inline-flex items-center text-xs text-primary hover:underline"
+          >
+            個人ページ
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[420px] text-sm">

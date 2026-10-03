@@ -338,6 +338,100 @@ function latestPerKey<T extends { answerDate: string }>(items: T[], keyOf: (t: T
   return Array.from(map.values());
 }
 
+/** 報告書の人ごとに「月→次回予約率」をまとめる */
+function ratesByPersonOf(reports: ReportRow[]) {
+  const ratesByPerson = new Map<string, { store: string; name: string; rates: Map<string, number | null> }>();
+  for (const r of reports) {
+    if (!r.reportMonth) continue;
+    const key = `${r.store}__${r.name}`;
+    let p = ratesByPerson.get(key);
+    if (!p) ratesByPerson.set(key, (p = { store: r.store, name: r.name, rates: new Map() }));
+    p.rates.set(r.reportMonth, nextReservationRate(r.nextReservation, r.newCustomers, r.returnCustomers));
+  }
+  return ratesByPerson;
+}
+
+/** 回答を報告書のスタッフに照合し、同じ人・同じ月は新しい回答だけ残す */
+function matchAnswers(reports: ReportRow[], answers: BoostAnswer[], staffKey: (name: string) => string) {
+  const staffList: ReportStaff[] = latestPerKey(
+    reports.map((r) => ({ store: r.store, name: r.name, systemName: r.systemName, answerDate: r.reportMonth })),
+    (s) => `${s.store}__${s.name}`,
+  );
+  const matchedAnswers: { key: string; store: string; name: string; answer: BoostAnswer }[] = [];
+  const unmatchedAll: UnmatchedAnswer[] = [];
+  for (const a of answers) {
+    const m = matchBoostAnswer(a, staffList, staffKey);
+    if (m.matched) matchedAnswers.push({ key: `${m.store}__${m.name}`, store: m.store, name: m.name, answer: a });
+    else unmatchedAll.push({ answer: a, reason: m.reason });
+  }
+  const dedupedMatched = latestPerKey(
+    matchedAnswers.map((x) => ({ ...x, answerDate: x.answer.answerDate })),
+    (x) => `${x.key}__${x.answer.targetMonth}`,
+  );
+  return { dedupedMatched, unmatchedAll };
+}
+
+export interface PersonBoostMonth {
+  month: string;
+  /** 次回予約率（月末報告書が無い・客数0なら null） */
+  rate: number | null;
+  /** 月末報告書を出していたか */
+  reported: boolean;
+  streak: number;
+  isTarget: boolean;
+  /** その月の強化シートの回答（無ければ null） */
+  answer: BoostAnswer | null;
+}
+
+export interface PersonBoostView {
+  store: string;
+  name: string;
+  /** 月ごとの推移（新しい順）。報告書か回答のどちらかがある月 */
+  months: PersonBoostMonth[];
+  /** 強化シートの回答（新しい順） */
+  answers: BoostAnswer[];
+}
+
+/** 個人ページ用: 1人分の次回予約率の推移・連続月数・強化シートの回答をまとめる */
+export function buildPersonBoostView(params: {
+  reports: ReportRow[];
+  answers: BoostAnswer[];
+  store: string;
+  name: string;
+  staffKey: (name: string) => string;
+}): PersonBoostView {
+  const { reports, answers, store, name, staffKey } = params;
+  const key = `${store}__${name}`;
+  const allMonths = Array.from(new Set(reports.map((r) => r.reportMonth).filter(Boolean))).sort();
+  const rates = ratesByPersonOf(reports).get(key)?.rates ?? new Map<string, number | null>();
+  const streaks = streakByMonth(allMonths, rates);
+
+  const { dedupedMatched } = matchAnswers(reports, answers, staffKey);
+  const mine = dedupedMatched
+    .filter((x) => x.key === key)
+    .map((x) => x.answer)
+    .sort((a, b) => b.targetMonth.localeCompare(a.targetMonth) || b.answerDate.localeCompare(a.answerDate));
+  const answerByMonth = new Map(mine.filter((a) => a.targetMonth).map((a) => [a.targetMonth, a]));
+
+  const monthSet = new Set<string>([...Array.from(rates.keys()), ...Array.from(answerByMonth.keys())]);
+  const months: PersonBoostMonth[] = Array.from(monthSet)
+    .sort()
+    .reverse()
+    .map((m) => {
+      const rate = rates.get(m) ?? null;
+      return {
+        month: m,
+        rate,
+        reported: rates.has(m),
+        streak: streaks.get(m) ?? 0,
+        isTarget: isBoostTarget(rate),
+        answer: answerByMonth.get(m) ?? null,
+      };
+    });
+
+  return { store, name, months, answers: mine };
+}
+
 export interface BoostView {
   /** 選べる月（新しい順）＝月末報告書のある月 */
   months: string[];
@@ -363,31 +457,10 @@ export function buildBoostView(params: {
   const months = Array.from(new Set(reports.map((r) => r.reportMonth).filter(Boolean))).sort();
 
   // 人ごとの月→率
-  const ratesByPerson = new Map<string, { store: string; name: string; rates: Map<string, number | null> }>();
-  for (const r of reports) {
-    if (!r.reportMonth) continue;
-    const key = `${r.store}__${r.name}`;
-    let p = ratesByPerson.get(key);
-    if (!p) ratesByPerson.set(key, (p = { store: r.store, name: r.name, rates: new Map() }));
-    p.rates.set(r.reportMonth, nextReservationRate(r.nextReservation, r.newCustomers, r.returnCustomers));
-  }
+  const ratesByPerson = ratesByPersonOf(reports);
 
   // 照合
-  const staffList: ReportStaff[] = latestPerKey(
-    reports.map((r) => ({ store: r.store, name: r.name, systemName: r.systemName, answerDate: r.reportMonth })),
-    (s) => `${s.store}__${s.name}`,
-  );
-  const matchedAnswers: { key: string; store: string; name: string; answer: BoostAnswer }[] = [];
-  const unmatchedAll: UnmatchedAnswer[] = [];
-  for (const a of answers) {
-    const m = matchBoostAnswer(a, staffList, staffKey);
-    if (m.matched) matchedAnswers.push({ key: `${m.store}__${m.name}`, store: m.store, name: m.name, answer: a });
-    else unmatchedAll.push({ answer: a, reason: m.reason });
-  }
-  const dedupedMatched = latestPerKey(
-    matchedAnswers.map((x) => ({ ...x, answerDate: x.answer.answerDate })),
-    (x) => `${x.key}__${x.answer.targetMonth}`,
-  );
+  const { dedupedMatched, unmatchedAll } = matchAnswers(reports, answers, staffKey);
   const submittedKeys = new Set(dedupedMatched.map((x) => `${x.key}__${x.answer.targetMonth}`));
 
   // 1. 対象者一覧

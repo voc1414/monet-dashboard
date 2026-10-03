@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildBoostView,
+  buildPersonBoostView,
   isBoostTarget,
   matchBoostAnswer,
   nextReservationRate,
@@ -268,5 +269,37 @@ describe("画面の組み立て", () => {
       isRetired: (name) => name === "A",
     });
     expect(v2.targets.map((t) => t.name)).toEqual(["C"]);
+  });
+
+  describe("個人ページ", () => {
+    it("月ごとの推移（新しい順）に率・連続月数・提出状況が並ぶ", () => {
+      const p = buildPersonBoostView({ reports, answers, store: "堀江院", name: "A", staffKey: key });
+      expect(p.months.map((m) => [m.month, m.rate, m.streak, m.isTarget, m.answer?.scores[0] ?? null])).toEqual([
+        [m1, 60, 3, true, 2], // 同じ月の再提出は新しい方
+        [m2, 60, 2, true, 3],
+        [m3, 60, 1, true, 4],
+      ]);
+      expect(p.answers.map((a) => a.targetMonth)).toEqual([m1, m2, m3]);
+    });
+
+    it("報告書を出していない月は「報告書なし」で、連続月数は据え置き", () => {
+      const p = buildPersonBoostView({ reports, answers, store: "高槻院", name: "C", staffKey: key });
+      expect(p.months.map((m) => [m.month, m.reported, m.streak])).toEqual([
+        [m1, true, 2],
+        [m3, true, 1],
+      ]);
+    });
+
+    it("70%超えの人は対象外・回答なし", () => {
+      const p = buildPersonBoostView({ reports, answers, store: "堀江院", name: "B", staffKey: key });
+      expect(p.months.map((m) => [m.month, m.isTarget, m.streak])).toEqual([[m1, false, 0]]);
+      expect(p.answers).toEqual([]);
+    });
+
+    it("同じ名前でも店舗が違えば別人（店舗＋名前の組）", () => {
+      const p = buildPersonBoostView({ reports, answers, store: "高槻院", name: "A", staffKey: key });
+      expect(p.months).toEqual([]);
+      expect(p.answers).toEqual([]);
+    });
   });
 });

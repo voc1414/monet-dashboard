@@ -50,7 +50,7 @@ jobs:
       # 次回予約強化（管理者専用・2026-10-03）。強化シートのID とページ本体の文字列で見る。
       - name: スタッフ向けに次回予約強化のページ・強化シートが混ざっていないか検査
         run: |
-          if grep -rq -e '1CZPTmFDfKiEvwYw' -e '未照合の回答' -e '項目ごとの集計' -e 'dev-sample' dist/public/assets; then
+          if grep -rq -e '1CZPTmFDfKiEvwYw' -e '未照合の回答' -e '項目ごとの集計' -e '月ごとの推移' -e 'dev-sample' dist/public/assets; then
             echo "::error::スタッフ向けバンドルに次回予約強化のページか強化シートの読み込みが含まれています"
             exit 1
           fi
