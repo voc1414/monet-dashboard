@@ -148,13 +148,17 @@ export default function NextReservationBoost() {
 
 function TargetList({ view, month }: { view: NonNullable<ReturnType<typeof buildBoostView>>; month: string }) {
   const submitted = view.targets.filter((t) => t.submitted).length;
+  const interview = view.targets.filter((t) => t.needsInterview).length;
+  const twice = view.targets.filter((t) => t.streak === 2).length;
+  const single = view.targets.length - interview - twice;
   return (
     <Card>
       <CardContent className="py-4">
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <h2 className="text-base font-bold text-foreground">対象者一覧（{formatMonth(month)}）</h2>
           <span className="text-[11px] text-muted-foreground">
-            {view.targets.length}人 ／ 強化シート提出 {submitted}人・未提出 {view.targets.length - submitted}人
+            {view.targets.length}人（単月 {single}人・2ヶ月連続 {twice}人・{INTERVIEW_STREAK}ヶ月以上 {interview}人）
+            ／ 強化シート提出 {submitted}人・未提出 {view.targets.length - submitted}人
           </span>
         </div>
         {view.targets.length === 0 ? (
@@ -177,7 +181,9 @@ function TargetList({ view, month }: { view: NonNullable<ReturnType<typeof build
                 {view.targets.map((t) => (
                   <tr
                     key={`${t.store}__${t.name}`}
-                    className={`border-b border-border/30 last:border-0 ${t.needsInterview ? "bg-red-50" : ""}`}
+                    className={`border-b border-border/30 last:border-0 ${
+                      t.needsInterview ? "bg-red-50" : t.streak === 2 ? "bg-amber-50" : ""
+                    }`}
                   >
                     <td className="py-2 pr-2 text-xs text-muted-foreground">{t.store}</td>
                     <td className="py-2 pr-2 font-medium text-foreground">
@@ -189,10 +195,8 @@ function TargetList({ view, month }: { view: NonNullable<ReturnType<typeof build
                       )}
                     </td>
                     <td className="py-2 pr-2 text-right font-mono-data">{t.rate.toFixed(1)}%</td>
-                    <td
-                      className={`py-2 pr-2 text-right font-mono-data ${t.needsInterview ? "font-bold text-red-600" : ""}`}
-                    >
-                      {t.streak}ヶ月
+                    <td className="py-2 pr-2 text-right">
+                      <StreakBadge streak={t.streak} />
                     </td>
                     <td className="py-2 text-xs">
                       {t.submitted ? (
@@ -210,11 +214,32 @@ function TargetList({ view, month }: { view: NonNullable<ReturnType<typeof build
         <p className="mt-3 flex items-start gap-1.5 text-[11px] text-muted-foreground">
           <Info className="mt-0.5 w-3 h-3 shrink-0" />
           連続月数：{BOOST_THRESHOLD}%以下の月は+1、超えた月は0に戻します。月末報告書を出していない月は数字を変えません。
-          {INTERVIEW_STREAK}ヶ月以上は面談対象です。
+          2ヶ月連続は黄色、{INTERVIEW_STREAK}ヶ月以上は赤のアラートで、面談対象です。
         </p>
       </CardContent>
     </Card>
   );
+}
+
+/** 連続月数の表示。単月は数字だけ、2ヶ月連続は黄色、面談対象（3ヶ月以上）は赤のアラートアイコン付き。 */
+function StreakBadge({ streak }: { streak: number }) {
+  if (streak >= INTERVIEW_STREAK) {
+    return (
+      <span className="inline-flex items-center gap-1 font-mono-data font-bold text-red-600">
+        <AlertTriangle className="w-3.5 h-3.5" aria-label={`${streak}ヶ月連続`} />
+        {streak}ヶ月連続
+      </span>
+    );
+  }
+  if (streak === 2) {
+    return (
+      <span className="inline-flex items-center gap-1 font-mono-data font-bold text-amber-600">
+        <AlertTriangle className="w-3.5 h-3.5" aria-label="2ヶ月連続" />
+        2ヶ月連続
+      </span>
+    );
+  }
+  return <span className="font-mono-data text-muted-foreground">単月</span>;
 }
 
 function QuestionStats({ stats, answerCount }: { stats: QuestionStat[]; answerCount: number }) {
