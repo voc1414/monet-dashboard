@@ -40,7 +40,7 @@ import { generateStaffAdvice } from "@/lib/staffAdvice";
 import { IS_ADMIN_BUILD } from "@/lib/appRole";
 import StaffSimpleSummary from "@/components/StaffSimpleSummary";
 import type { StaffAdvice } from "@/lib/staffAdvice";
-import { filterNpsRecordsForStaff } from "@/lib/npsStaffMatch";
+import { filterNpsRecordsForStaff, isNpsRecordOfStaff } from "@/lib/npsStaffMatch";
 import { resolveStaffDisplayName } from "@/lib/staffDisplayName";
 import type { FankuruPdf } from "@/hooks/useFankuruData";
 import {
@@ -285,10 +285,17 @@ export default function StaffDetail() {
     return staffData?.employmentType || "";
   }, [rawData, staffName, staffStore]);
 
-  // 月の管理（NPSの引き当ては必ず「店舗＋名前」。表示名は店舗をまたいで重複する）
-  const npsMonths = useMemo(() => {
-    return getAvailableMonths(filterNpsRecordsForStaff(records, staffName, staffStore));
-  }, [records, staffName, staffStore]);
+  // この人のNPS回答（必ず「店舗＋名前」。表示名は店舗をまたいで重複する）。
+  // 報告書は本名・NPSはニックネームで選ばれていることがあるので、報告書 列20 のニックネームでも引く
+  // （2026-10-03 林さん指示。一覧 StaffList の npsInfoFor と同じ考え方）
+  const staffNpsAll = useMemo(() => {
+    const nickname = resolveStaffDisplayName(staffName, staffStore);
+    if (IS_ADMIN_BUILD || nickname === staffName) return filterNpsRecordsForStaff(records, staffName, staffStore);
+    return records.filter((r) => isNpsRecordOfStaff(r, staffName, staffStore) || isNpsRecordOfStaff(r, nickname, staffStore));
+  }, [records, staffName, staffStore, rawData]);
+
+  // 月の管理
+  const npsMonths = useMemo(() => getAvailableMonths(staffNpsAll), [staffNpsAll]);
 
   const fankuruMonths = useMemo(() => {
     const months = new Set<string>();
@@ -354,14 +361,14 @@ export default function StaffDetail() {
   // 名前だけで引くと Mika（堀江院=西本美華／福島院=松野美香）のような同名の別人の
   // 口コミ・点数が混ざる。一覧(StaffList)は 2026-08-19 に直っており、詳細だけ残っていた。
   const staffNpsRecords = useMemo(() => {
-    const filtered = filterNpsRecordsForStaff(records, staffName, staffStore);
+    const filtered = staffNpsAll;
     if (isAllPeriod) return filtered;
     return filtered.filter(r => {
       if (!r.date) return false;
       const ym = r.date.substring(0, 7).replace(/\//g, "-");
       return (filterM as string[]).includes(ym);
     });
-  }, [records, staffName, staffStore, filterM, isAllPeriod]);
+  }, [staffNpsAll, filterM, isAllPeriod]);
 
   // スタッフ個人のStoreStats相当を計算
   const staffNpsStats = useMemo((): StoreStats | null => {

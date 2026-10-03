@@ -105,6 +105,17 @@ const staffUtilClass = (rate: number | null) => (rate !== null && rate <= 89 ? S
 const staffNextResClass = (rate: number) => (rate <= 69 ? STAFF_WARN : "text-foreground");
 const staffNpsClass = (score: number) => (score < 0 ? STAFF_WARN : "text-foreground");
 
+/** NPS点数の配列から一覧用の集計を作る（推奨者9-10・中立7-8・批判者0-6） */
+const summarizeNps = (scores: number[]): StaffNpsInfo => {
+  const total = scores.length;
+  const avg = scores.reduce((a, b) => a + b, 0) / total;
+  const promoters = scores.filter((s) => s >= 9).length;
+  const passives = scores.filter((s) => s >= 7 && s <= 8).length;
+  const detractors = scores.filter((s) => s <= 6).length;
+  const npsScore = Math.round(((promoters - detractors) / total) * 100);
+  return { totalResponses: total, avgScore: Math.round(avg * 10) / 10, npsScore, promoters, passives, detractors };
+};
+
 /** Compact NPS badge for staff list */
 function StaffNpsBadge({ npsInfo }: { npsInfo: StaffNpsInfo | undefined }) {
   if (!npsInfo || npsInfo.totalResponses === 0) {
@@ -285,10 +296,8 @@ export default function StaffList() {
     });
   }, [npsRecords, filterMonthsResult]);
 
-  // スタッフごとのNPS情報を計算
-  const staffNpsMap = useMemo(() => {
-    const map = new Map<string, StaffNpsInfo>();
-    if (!filteredNps.length) return map;
+  // スタッフごとのNPS回答点数（店舗＋名前キーごと）
+  const npsScoresByKey = useMemo(() => {
 
     // スペース正規化＋小文字化してグルーピング（NPSシートは"Yoshie"、月末報告書は"yoshie"等の大小違いがある）。
     // キーには必ず店舗を含める。表示名は店舗をまたいで重複するため（例: Mika は堀江院=西本美華 と
@@ -303,18 +312,28 @@ export default function StaffList() {
       if (!grouped.has(k)) grouped.set(k, []);
       grouped.get(k)!.push(r.npsScore);
     }
-
-    for (const [name, scores] of Array.from(grouped.entries())) {
-      const total = scores.length;
-      const avg = scores.reduce((a: number, b: number) => a + b, 0) / total;
-      const promoters = scores.filter((s: number) => s >= 9).length;
-      const passives = scores.filter((s: number) => s >= 7 && s <= 8).length;
-      const detractors = scores.filter((s: number) => s <= 6).length;
-      const npsScore = Math.round(((promoters - detractors) / total) * 100);
-      map.set(name, { totalResponses: total, avgScore: Math.round(avg * 10) / 10, npsScore, promoters, passives, detractors });
-    }
-    return map;
+    return grouped;
   }, [filteredNps]);
+
+  // スタッフごとのNPS情報を計算
+  const staffNpsMap = useMemo(() => {
+    const map = new Map<string, StaffNpsInfo>();
+    for (const [key, scores] of Array.from(npsScoresByKey.entries())) map.set(key, summarizeNps(scores));
+    return map;
+  }, [npsScoresByKey]);
+
+  /*
+   * 月末報告書のスタッフのNPS。報告書は本名（中村夏菜子）、NPSはニックネーム（kanako）で
+   * 選ばれていることがあるため、本名と報告書 列20 のニックネームの両方で引いて合算する
+   * （2026-10-03 林さん指示「月末報告書が提出され次第、照らし合わせしてニックネーム変更」）。
+   */
+  const npsInfoFor = (s: { name: string; storeNormalized: string }): StaffNpsInfo | undefined => {
+    const nameKey = npsKeyFor(s);
+    const nickKey = npsStaffKey(resolveStaffDisplayName(s.name, s.storeNormalized), s.storeNormalized);
+    if (IS_ADMIN_BUILD || nameKey === nickKey) return staffNpsMap.get(nameKey);
+    const scores = [...(npsScoresByKey.get(nameKey) ?? []), ...(npsScoresByKey.get(nickKey) ?? [])];
+    return scores.length ? summarizeNps(scores) : undefined;
+  };
 
   /*
    * 月末報告書を出していないスタッフ（例: 2026-09 の下伊福院3名）もアンケートだけは見られるようにする
@@ -393,7 +412,7 @@ export default function StaffList() {
     const map = new Map<string, CompositeScoreResult>();
     for (const staff of staffFiltered) {
       const utilRate = calculateUtilizationRate(staff.avgMonthlyCustomers, staff.employmentType);
-      const npsInfo = staffNpsMap.get(npsKeyFor(staff));
+      const npsInfo = npsInfoFor(staff);
 
 
 
@@ -433,8 +452,8 @@ export default function StaffList() {
         case "nextReservationRate":
           return (a.nextReservationRate - b.nextReservationRate) * dir;
         case "npsScore": {
-          const npsA = staffNpsMap.get(npsKeyFor(a))?.npsScore ?? -999;
-          const npsB = staffNpsMap.get(npsKeyFor(b))?.npsScore ?? -999;
+          const npsA = npsInfoFor(a)?.npsScore ?? -999;
+          const npsB = npsInfoFor(b)?.npsScore ?? -999;
           return (npsA - npsB) * dir;
         }
         case "compositeScore": {
@@ -661,7 +680,7 @@ export default function StaffList() {
               const staffKey = `${staff.answerId}-${i}`;
               const metrics = getMetrics(staff);
               const utilRate = calculateUtilizationRate(staff.avgMonthlyCustomers, staff.employmentType);
-              const npsInfo = staffNpsMap.get(npsKeyFor(staff));
+              const npsInfo = npsInfoFor(staff);
               // 画面に出す呼び名。staff.name は照合キーなので触らない
               const shownName = resolveStaffDisplayName(staff.name, staff.storeNormalized);
 
