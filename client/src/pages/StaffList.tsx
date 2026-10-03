@@ -32,6 +32,8 @@ import { calculateCompositeScore, getCompositeRank } from "@/lib/compositeScore"
 import type { CompositeScoreResult } from "@/lib/compositeScore";
 import { npsStaffKey } from "@/lib/npsStaffMatch";
 import { resolveStaffDisplayName } from "@/lib/staffDisplayName";
+import { fetchPdfData, matchesStylist, normalizeStylistName } from "@/hooks/useFankuruData";
+import type { FankuruPdf } from "@/hooks/useFankuruData";
 import { IS_ADMIN_BUILD } from "@/lib/appRole";
 
 
@@ -241,10 +243,11 @@ export default function StaffList() {
   }, [staffListUnsorted]);
 
   // 店舗一覧（フィルタ用）
+  const [surveyOnlyStores, setSurveyOnlyStores] = useState<string[]>([]);
   const storeList = useMemo(() => {
-    const stores = new Set(staffListActive.map((s) => s.storeNormalized));
+    const stores = new Set([...staffListActive.map((s) => s.storeNormalized), ...surveyOnlyStores]);
     return Array.from(stores).sort((a, b) => a.localeCompare(b, "ja"));
-  }, [staffListActive]);
+  }, [staffListActive, surveyOnlyStores]);
 
   // 検索・店舗フィルタ適用
   const staffFiltered = useMemo(() => {
@@ -270,24 +273,22 @@ export default function StaffList() {
   const npsKeyFor = (s: { name: string; storeNormalized: string }) =>
     npsStaffKey(s.name, s.storeNormalized);
 
+  // 選択期間に入るNPS回答
+  const filteredNps = useMemo(() => {
+    if (filterMonthsResult === "all") return npsRecords;
+    if (filterMonthsResult.length === 1) return filterByMonth(npsRecords, filterMonthsResult[0]);
+    const monthSet = new Set(filterMonthsResult);
+    return npsRecords.filter((r) => {
+      const d = new Date(r.date);
+      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      return monthSet.has(ym);
+    });
+  }, [npsRecords, filterMonthsResult]);
+
   // スタッフごとのNPS情報を計算
   const staffNpsMap = useMemo(() => {
     const map = new Map<string, StaffNpsInfo>();
-    if (!npsRecords.length) return map;
-
-    let filteredNps;
-    if (filterMonthsResult === "all") {
-      filteredNps = npsRecords;
-    } else if (filterMonthsResult.length === 1) {
-      filteredNps = filterByMonth(npsRecords, filterMonthsResult[0]);
-    } else {
-      const monthSet = new Set(filterMonthsResult);
-      filteredNps = npsRecords.filter((r) => {
-        const d = new Date(r.date);
-        const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-        return monthSet.has(ym);
-      });
-    }
+    if (!filteredNps.length) return map;
 
     // スペース正規化＋小文字化してグルーピング（NPSシートは"Yoshie"、月末報告書は"yoshie"等の大小違いがある）。
     // キーには必ず店舗を含める。表示名は店舗をまたいで重複するため（例: Mika は堀江院=西本美華 と
@@ -313,7 +314,79 @@ export default function StaffList() {
       map.set(name, { totalResponses: total, avgScore: Math.round(avg * 10) / 10, npsScore, promoters, passives, detractors });
     }
     return map;
-  }, [npsRecords, filterMonthsResult]);
+  }, [filteredNps]);
+
+  /*
+   * 月末報告書を出していないスタッフ（例: 2026-09 の下伊福院3名）もアンケートだけは見られるようにする
+   * （2026-10-03 林さん指示「NPS・ファンくるだけ月末報告書未報告でもみれるように」）。スタッフ向けのみ。
+   * 選択期間にNPS回答かファンくるPDFがあり、期間内の月末報告書のどの行にも名寄せできない人を拾う。
+   * 売上・稼働率・次回予約は報告書が出所なので「—」のまま。押すと詳細ページでNPS・ファンくるが見える。
+   */
+  const [fankuruAllData, setFankuruAllData] = useState<Record<string, FankuruPdf[]>>({});
+  useEffect(() => {
+    if (IS_ADMIN_BUILD) return;
+    let cancelled = false;
+    fetchPdfData()
+      .then((data) => { if (!cancelled) setFankuruAllData(data); })
+      .catch((err) => console.warn("ファンくるデータ取得エラー:", err));
+    return () => { cancelled = true; };
+  }, []);
+
+  const surveyOnlyStaffAll = useMemo(() => {
+    if (IS_ADMIN_BUILD) return [] as Array<{ name: string; store: string; fankuruCount: number }>;
+    const reported = staffListUnsorted;
+    const reportedNpsKeys = new Set(reported.map((r) => npsStaffKey(r.name, r.storeNormalized)));
+    // 報告書の名前は本名、NPSは呼び名のことがある（例: 岡本院 kanako）。呼び名でも突き合わせる
+    for (const r of reported) reportedNpsKeys.add(npsStaffKey(resolveStaffDisplayName(r.name, r.storeNormalized), r.storeNormalized));
+    const isReported = (name: string, store: string) =>
+      reportedNpsKeys.has(npsStaffKey(name, store)) ||
+      reported.some((r) => r.storeNormalized === store && matchesStylist(name, r.name, store));
+
+    const found = new Map<string, { name: string; store: string; fankuruCount: number }>();
+    for (const r of filteredNps) {
+      const name = r.staff?.trim();
+      if (!name || name === "選択しない") continue;
+      if (isReported(name, r.storeShort)) continue;
+      const key = npsStaffKey(name, r.storeShort);
+      if (!found.has(key)) found.set(key, { name, store: r.storeShort, fankuruCount: 0 });
+    }
+    for (const [store, pdfs] of Object.entries(fankuruAllData)) {
+      for (const pdf of pdfs) {
+        if (!pdf.stylist || pdf.stylist.trim() === "") continue;
+        if (filterMonthsResult !== "all" && !filterMonthsResult.includes(pdf.yearMonth)) continue;
+        if (isReported(pdf.stylist, store) || isReported(normalizeStylistName(pdf.stylist), store)) continue;
+        const existing = Array.from(found.values()).find(
+          (e) => e.store === store && (matchesStylist(pdf.stylist, e.name, store) || npsStaffKey(e.name, store) === npsStaffKey(normalizeStylistName(pdf.stylist), store))
+        );
+        if (existing) {
+          existing.fankuruCount++;
+        } else {
+          const name = normalizeStylistName(pdf.stylist);
+          found.set(npsStaffKey(name, store), { name, store, fankuruCount: 1 });
+        }
+      }
+    }
+    return Array.from(found.values())
+      .filter((e) => !isRetiredStaff(e.name, e.store, ""))
+      .sort((a, b) => a.store.localeCompare(b.store, "ja") || a.name.localeCompare(b.name, "ja"));
+  }, [staffListUnsorted, filteredNps, fankuruAllData, filterMonthsResult]);
+
+  const surveyOnlyStaff = useMemo(() => {
+    return surveyOnlyStaffAll.filter((e) => {
+      if (filterStore !== "all" && e.store !== filterStore) return false;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const shown = resolveStaffDisplayName(e.name, e.store).toLowerCase();
+        return shown.includes(q) || e.name.toLowerCase().includes(q) || e.store.toLowerCase().includes(q);
+      }
+      return true;
+    });
+  }, [surveyOnlyStaffAll, filterStore, searchQuery]);
+
+  useEffect(() => {
+    const next = Array.from(new Set(surveyOnlyStaffAll.map((e) => e.store)));
+    setSurveyOnlyStores((prev) => (prev.join("|") === next.join("|") ? prev : next));
+  }, [surveyOnlyStaffAll]);
 
   // スタッフごとの総合点スコアを計算
   const compositeScoreMap = useMemo(() => {
@@ -501,7 +574,7 @@ export default function StaffList() {
       )}
 
       {/* Empty */}
-      {!loading && !error && staffList.length === 0 && (
+      {!loading && !error && staffList.length === 0 && surveyOnlyStaff.length === 0 && (
         <Card className="border-border/50 border-dashed">
           <CardContent className="p-8 text-center text-muted-foreground">
             <Users className="w-8 h-8 mx-auto mb-2 opacity-40" />
@@ -890,6 +963,51 @@ export default function StaffList() {
             })}
           </div>
         </>
+      )}
+
+      {/* 月末報告書が未提出でも、アンケート（NPS・ファンくる）は見られるようにする（スタッフ向けのみ） */}
+      {!loading && surveyOnlyStaff.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-[15px] font-bold text-foreground mb-1">月末報告書 未提出</h2>
+          <p className="text-xs text-muted-foreground mb-2">アンケート（NPS・ファンくる）だけ見られます</p>
+          <div className={`grid ${STAFF_MOBILE_GRID_COLS} gap-2 items-center px-3 pb-1.5 mb-1 text-[11px] text-muted-foreground border-b border-border/60 whitespace-nowrap`}>
+            <span>氏名</span>
+            <span className="text-right">ファンくる</span>
+            <span className="text-right">NPS件数</span>
+            <span className="text-right">NPS</span>
+          </div>
+          <div className="space-y-2">
+            {surveyOnlyStaff.map((e) => {
+              const npsInfo = staffNpsMap.get(npsStaffKey(e.name, e.store));
+              const hasNps = !!npsInfo && npsInfo.totalResponses > 0;
+              return (
+                <Card
+                  key={`${e.store}__${e.name}`}
+                  className="border-border/50 shadow-sm hover:shadow-md hover:border-primary/30 transition-all cursor-pointer py-0 gap-0"
+                  onClick={() => handleStaffClick(e.name, e.store)}
+                >
+                  <CardContent className="p-0">
+                    <div className={`grid ${STAFF_MOBILE_GRID_COLS} gap-2 items-center px-3 py-2.5`}>
+                      <div className="min-w-0">
+                        <div className="font-bold text-sm text-foreground truncate whitespace-nowrap">{resolveStaffDisplayName(e.name, e.store)}</div>
+                        <div className="text-[11px] text-muted-foreground truncate whitespace-nowrap">{e.store}</div>
+                      </div>
+                      <span className="text-right font-mono-data text-sm font-bold whitespace-nowrap text-foreground">
+                        {e.fankuruCount > 0 ? `${e.fankuruCount}件` : "—"}
+                      </span>
+                      <span className="text-right font-mono-data text-sm font-bold whitespace-nowrap text-foreground">
+                        {hasNps ? `${npsInfo!.totalResponses}件` : "—"}
+                      </span>
+                      <span className={`text-right font-mono-data text-sm font-bold whitespace-nowrap ${hasNps ? staffNpsClass(npsInfo!.npsScore) : "text-muted-foreground"}`}>
+                        {hasNps ? `${npsInfo!.npsScore > 0 ? "+" : ""}${npsInfo!.npsScore}` : "—"}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
       )}
     </DashboardLayout>
   );
