@@ -238,7 +238,7 @@ function MetricTable({
               <th className="text-right font-medium px-3 py-2">CPL</th>
               <th className="text-right font-medium px-3 py-2">CTR</th>
               <th className="text-right font-medium px-3 py-2">CPC</th>
-              <th className="text-right font-medium px-3 py-2">フリーク</th>
+              <th className="text-right font-medium px-3 py-2" title="日ごとのフリークエンシーの平均（期間全体の値ではない）">フリーク(日平均)</th>
             </tr>
           </thead>
           <tbody>
@@ -588,7 +588,7 @@ export default function Ads() {
             <KpiCard label="CPL（リード単価）" value={kpi.cplV > 0 ? yen(kpi.cplV) : "—"} sub="消化額/リード" />
             <KpiCard label="CPC（クリック単価）" value={kpi.cpcV > 0 ? yen(kpi.cpcV) : "—"} sub="消化額/クリック" />
             <KpiCard label="CTR（リンククリック率）" value={kpi.ctrV > 0 ? pct(kpi.ctrV) : "—"} sub="クリック/インプ" />
-            <KpiCard label="フリークエンシー" value={kpi.freqV > 0 ? fr(kpi.freqV) : "—"} sub="適正範囲: 1.0-2.0" />
+            <KpiCard label="フリークエンシー（1日平均）" value={kpi.freqV > 0 ? fr(kpi.freqV) : "—"} sub="日ごとの値の平均。期間全体の値ではない" />
             <KpiCard
               label="新規来店数"
               value={totalNew > 0 ? numf(totalNew) : "—"}
