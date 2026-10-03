@@ -27,6 +27,16 @@ export const INTERVIEW_STREAK = 3;
 export const QUESTION_COUNT = 17;
 /** 「できていない側」とみなす点数の上限（2・1） */
 export const LOW_SCORE_MAX = 2;
+/**
+ * 測定を始める月（2026-10-03 林さん決定：2026年10月分の成果から）。
+ * これより前の月は対象者にも連続月数にも数えない。
+ */
+export const BOOST_START_MONTH = "2026-10";
+
+/** 測定対象の月か */
+export function isMeasuredMonth(month: string, startMonth: string = BOOST_START_MONTH): boolean {
+  return !!month && month >= startMonth;
+}
 
 // ───────────────────────── 次回予約率・連続月数 ─────────────────────────
 
@@ -53,16 +63,21 @@ export function isBoostTarget(rate: number | null): boolean {
  * 連続月数を月ごとに出す。
  * months は判定に使う月の一覧（古い順でなくてもよい）。rateByMonth に無い月・率が null の月は
  * 「報告書を出していない月」として数字を変えない（前の値のまま）。
- * 返り値は months の全月ぶん（その月の判定後の値）。
+ * 返り値は months の全月ぶん（その月の判定後の値）。測定開始前の月は 0。
  */
 export function streakByMonth(
   months: string[],
   rateByMonth: Map<string, number | null>,
+  startMonth: string = BOOST_START_MONTH,
 ): Map<string, number> {
   const sorted = Array.from(new Set(months)).sort();
   const out = new Map<string, number>();
   let streak = 0;
   for (const m of sorted) {
+    if (!isMeasuredMonth(m, startMonth)) {
+      out.set(m, 0);
+      continue;
+    }
     if (rateByMonth.has(m)) {
       const rate = rateByMonth.get(m) ?? null;
       if (rate !== null) streak = isBoostTarget(rate) ? streak + 1 : 0;
@@ -377,6 +392,8 @@ export interface PersonBoostMonth {
   rate: number | null;
   /** 月末報告書を出していたか */
   reported: boolean;
+  /** 測定開始月（BOOST_START_MONTH）以降か */
+  measured: boolean;
   streak: number;
   isTarget: boolean;
   /** その月の強化シートの回答（無ければ null） */
@@ -399,12 +416,14 @@ export function buildPersonBoostView(params: {
   store: string;
   name: string;
   staffKey: (name: string) => string;
+  startMonth?: string;
 }): PersonBoostView {
   const { reports, answers, store, name, staffKey } = params;
+  const startMonth = params.startMonth ?? BOOST_START_MONTH;
   const key = `${store}__${name}`;
   const allMonths = Array.from(new Set(reports.map((r) => r.reportMonth).filter(Boolean))).sort();
   const rates = ratesByPersonOf(reports).get(key)?.rates ?? new Map<string, number | null>();
-  const streaks = streakByMonth(allMonths, rates);
+  const streaks = streakByMonth(allMonths, rates, startMonth);
 
   const { dedupedMatched } = matchAnswers(reports, answers, staffKey);
   const mine = dedupedMatched
@@ -423,8 +442,9 @@ export function buildPersonBoostView(params: {
         month: m,
         rate,
         reported: rates.has(m),
+        measured: isMeasuredMonth(m, startMonth),
         streak: streaks.get(m) ?? 0,
-        isTarget: isBoostTarget(rate),
+        isTarget: isMeasuredMonth(m, startMonth) && isBoostTarget(rate),
         answer: answerByMonth.get(m) ?? null,
       };
     });
@@ -450,8 +470,10 @@ export function buildBoostView(params: {
   month: string;
   staffKey: (name: string) => string;
   isRetired?: (name: string, store: string, month: string) => boolean;
+  startMonth?: string;
 }): BoostView {
   const { reports, answers, questionLabels, month, staffKey } = params;
+  const startMonth = params.startMonth ?? BOOST_START_MONTH;
   const isRetired = params.isRetired ?? (() => false);
 
   const months = Array.from(new Set(reports.map((r) => r.reportMonth).filter(Boolean))).sort();
@@ -466,11 +488,11 @@ export function buildBoostView(params: {
   // 1. 対象者一覧
   const targets: TargetStaff[] = [];
   for (const [key, p] of Array.from(ratesByPerson.entries())) {
-    if (!p.rates.has(month)) continue;
+    if (!isMeasuredMonth(month, startMonth) || !p.rates.has(month)) continue;
     const rate = p.rates.get(month) ?? null;
     if (!isBoostTarget(rate)) continue;
     if (isRetired(p.name, p.store, month)) continue;
-    const streak = streakByMonth(months, p.rates).get(month) ?? 0;
+    const streak = streakByMonth(months, p.rates, startMonth).get(month) ?? 0;
     targets.push({
       store: p.store,
       name: p.name,

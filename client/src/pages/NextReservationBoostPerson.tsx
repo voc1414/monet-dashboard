@@ -2,7 +2,7 @@
  * Page: 次回予約強化 — 個人ページ（管理者専用・2026-10-03）
  *
  * /next-reservation/:store/:name … 対象者一覧の名前から開く。
- * 1. 月ごとの推移 … 次回予約率・連続月数・強化シートの提出状況（全期間）
+ * 1. 月ごとの推移 … 次回予約率・連続月数・強化シートの提出状況（全期間。測定開始前の月は「測定前」）
  * 2. 自己評価 17問 … 提出した全回の点数を横に並べる（2以下は赤字）
  * 3. 課題点・翌月のアクション … 提出した全回
  *
@@ -57,7 +57,7 @@ export default function NextReservationBoostPerson() {
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <h1 className="text-xl font-bold text-foreground">{displayName}</h1>
             <span className="text-sm text-muted-foreground">{store}</span>
-            {latest && latest.streak >= INTERVIEW_STREAK && (
+            {latest && latest.isTarget && latest.streak >= INTERVIEW_STREAK && (
               <span className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-bold text-white">面談対象</span>
             )}
           </div>
@@ -136,11 +136,19 @@ export default function NextReservationBoostPerson() {
                             )}
                           </td>
                           <td className="py-2 pr-2 text-right">
-                            {m.isTarget ? <StreakBadge streak={m.streak} /> : <span className="text-muted-foreground">—</span>}
+                            {!m.measured ? (
+                              <span className="text-xs text-muted-foreground">測定前</span>
+                            ) : m.isTarget ? (
+                              <StreakBadge streak={m.streak} />
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
                           </td>
                           <td className="py-2 text-xs">
                             {m.answer ? (
                               <span className="text-emerald-700">提出済み</span>
+                            ) : !m.measured ? (
+                              <span className="text-muted-foreground">測定前</span>
                             ) : m.isTarget ? (
                               <span className="font-medium text-amber-700">未提出</span>
                             ) : (

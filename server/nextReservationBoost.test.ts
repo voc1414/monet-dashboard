@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  BOOST_START_MONTH,
   buildBoostView,
   buildPersonBoostView,
   isBoostTarget,
@@ -24,6 +25,9 @@ function ymOffset(offset: number): string {
   d.setMonth(d.getMonth() + offset);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
+
+/** 測定開始月の制限をかけない（相対月で組んだテスト用） */
+const ALL = "";
 
 const key = (s: string) => s.replace(/[\s　]/g, "").toLowerCase();
 const fold = (s: string) => s.replace(/^(大阪|広島|福岡|岡山)/, "");
@@ -75,21 +79,48 @@ describe("連続月数", () => {
     const rates = new Map<string, number | null>([
       [m[0], 60], [m[1], 65], [m[2], 80], [m[3], 50], [m[4], 70],
     ]);
-    const s = streakByMonth(m, rates);
+    const s = streakByMonth(m, rates, ALL);
     expect(m.map((x) => s.get(x))).toEqual([1, 2, 0, 1, 2]);
   });
 
   it("報告書を出していない月は判定せず据え置く（3ヶ月連続にも数える）", () => {
     const rates = new Map<string, number | null>([[m[0], 60], [m[1], 65], [m[3], 50]]);
-    const s = streakByMonth(m, rates);
+    const s = streakByMonth(m, rates, ALL);
     expect(m.map((x) => s.get(x))).toEqual([1, 2, 2, 3, 3]);
   });
 
   it("客数0の月も判定できない月として据え置く", () => {
     const rates = new Map<string, number | null>([[m[0], 60], [m[1], null], [m[2], 40]]);
-    const s = streakByMonth(m.slice(0, 3), rates);
+    const s = streakByMonth(m.slice(0, 3), rates, ALL);
     expect(s.get(m[1])).toBe(1);
     expect(s.get(m[2])).toBe(2);
+  });
+});
+
+// 開始月そのものの決まりなので、ここだけ固定の月を使う（今日の日付に依存しない）
+describe("測定開始月（2026年10月分から）", () => {
+  it("開始前の月は連続月数に数えず、開始月から1で数え始める", () => {
+    const m = ["2026-07", "2026-08", "2026-09", "2026-10", "2026-11"];
+    const rates = new Map<string, number | null>(m.map((x) => [x, 50]));
+    const s = streakByMonth(m, rates);
+    expect(BOOST_START_MONTH).toBe("2026-10");
+    expect(m.map((x) => s.get(x))).toEqual([0, 0, 0, 1, 2]);
+  });
+
+  it("開始前の月は対象者一覧に出さない・個人ページでは測定前", () => {
+    const reports: ReportRow[] = [
+      { store: "堀江院", name: "A", systemName: "", reportMonth: "2026-09", newCustomers: 0, returnCustomers: 100, nextReservation: 50 },
+      { store: "堀江院", name: "A", systemName: "", reportMonth: "2026-10", newCustomers: 0, returnCustomers: 100, nextReservation: 50 },
+    ];
+    expect(buildBoostView({ reports, answers: [], questionLabels: [], month: "2026-09", staffKey: key }).targets).toEqual([]);
+    expect(
+      buildBoostView({ reports, answers: [], questionLabels: [], month: "2026-10", staffKey: key }).targets.map((t) => t.streak),
+    ).toEqual([1]);
+    const p = buildPersonBoostView({ reports, answers: [], store: "堀江院", name: "A", staffKey: key });
+    expect(p.months.map((x) => [x.month, x.measured, x.isTarget, x.streak])).toEqual([
+      ["2026-10", true, true, 1],
+      ["2026-09", false, false, 0],
+    ]);
   });
 });
 
@@ -157,6 +188,7 @@ describe("0件のとき", () => {
       questionLabels: [],
       month,
       staffKey: key,
+      startMonth: ALL,
     });
     expect(v.targets).toHaveLength(1);
     expect(v.targets[0].submitted).toBe(false);
@@ -233,7 +265,7 @@ describe("画面の組み立て", () => {
     ans("C", "高槻院", m1, s(1, 3)),
     ans("知らない人", "堀江院", m1, s(4, 4)),
   ];
-  const v = buildBoostView({ reports, answers, questionLabels: [], month: m1, staffKey: key });
+  const v = buildBoostView({ reports, answers, questionLabels: [], month: m1, staffKey: key, startMonth: ALL });
 
   it("70%以下だけが対象で、連続3ヶ月以上は面談対象", () => {
     expect(v.targets.map((t) => [t.name, t.streak, t.needsInterview, t.submitted])).toEqual([
@@ -266,14 +298,14 @@ describe("画面の組み立て", () => {
   it("退職者は対象者一覧から外す", () => {
     const v2 = buildBoostView({
       reports, answers, questionLabels: [], month: m1, staffKey: key,
-      isRetired: (name) => name === "A",
+      isRetired: (name) => name === "A", startMonth: ALL,
     });
     expect(v2.targets.map((t) => t.name)).toEqual(["C"]);
   });
 
   describe("個人ページ", () => {
     it("月ごとの推移（新しい順）に率・連続月数・提出状況が並ぶ", () => {
-      const p = buildPersonBoostView({ reports, answers, store: "堀江院", name: "A", staffKey: key });
+      const p = buildPersonBoostView({ reports, answers, store: "堀江院", name: "A", staffKey: key, startMonth: ALL });
       expect(p.months.map((m) => [m.month, m.rate, m.streak, m.isTarget, m.answer?.scores[0] ?? null])).toEqual([
         [m1, 60, 3, true, 2], // 同じ月の再提出は新しい方
         [m2, 60, 2, true, 3],
@@ -283,7 +315,7 @@ describe("画面の組み立て", () => {
     });
 
     it("報告書を出していない月は「報告書なし」で、連続月数は据え置き", () => {
-      const p = buildPersonBoostView({ reports, answers, store: "高槻院", name: "C", staffKey: key });
+      const p = buildPersonBoostView({ reports, answers, store: "高槻院", name: "C", staffKey: key, startMonth: ALL });
       expect(p.months.map((m) => [m.month, m.reported, m.streak])).toEqual([
         [m1, true, 2],
         [m3, true, 1],
@@ -291,13 +323,13 @@ describe("画面の組み立て", () => {
     });
 
     it("70%超えの人は対象外・回答なし", () => {
-      const p = buildPersonBoostView({ reports, answers, store: "堀江院", name: "B", staffKey: key });
+      const p = buildPersonBoostView({ reports, answers, store: "堀江院", name: "B", staffKey: key, startMonth: ALL });
       expect(p.months.map((m) => [m.month, m.isTarget, m.streak])).toEqual([[m1, false, 0]]);
       expect(p.answers).toEqual([]);
     });
 
     it("同じ名前でも店舗が違えば別人（店舗＋名前の組）", () => {
-      const p = buildPersonBoostView({ reports, answers, store: "高槻院", name: "A", staffKey: key });
+      const p = buildPersonBoostView({ reports, answers, store: "高槻院", name: "A", staffKey: key, startMonth: ALL });
       expect(p.months).toEqual([]);
       expect(p.answers).toEqual([]);
     });

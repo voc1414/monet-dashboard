@@ -19,6 +19,8 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { useNextReservationBoostSheet } from "@/hooks/useNextReservationBoostSheet";
 import {
+  BOOST_START_MONTH,
+  isMeasuredMonth,
   BOOST_THRESHOLD,
   INTERVIEW_STREAK,
   LOW_SCORE_MAX,
@@ -64,11 +66,13 @@ export default function NextReservationBoost() {
   const sheet = useNextReservationBoostSheet();
   const [month, setMonth] = useState("");
   const reports = useBoostReports(report.rawData);
+  // 測定は BOOST_START_MONTH（2026年10月分）から。それより前の月は選ばせない
+  const months = useMemo(() => report.availableMonths.filter((m) => isMeasuredMonth(m)), [report.availableMonths]);
 
-  // 既定は月末報告書のある一番新しい月
+  // 既定は測定対象の月のうち一番新しい月
   useEffect(() => {
-    if (!month && report.availableMonths.length > 0) setMonth(report.availableMonths[0]);
-  }, [month, report.availableMonths]);
+    if (!month && months.length > 0) setMonth(months[0]);
+  }, [month, months]);
 
   const view = useMemo(() => {
     if (!month) return null;
@@ -106,7 +110,8 @@ export default function NextReservationBoost() {
               className="rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground"
               data-testid="select-boost-month"
             >
-              {report.availableMonths.map((m) => (
+              {months.length === 0 && <option value="">—</option>}
+              {months.map((m) => (
                 <option key={m} value={m}>
                   {formatMonth(m)}
                 </option>
@@ -142,6 +147,18 @@ export default function NextReservationBoost() {
             <Loader2 className="w-4 h-4 animate-spin" />
             読み込み中…
           </div>
+        )}
+
+        {!busy && months.length === 0 && (
+          <Card>
+            <CardContent className="flex items-start gap-2 py-6 text-sm text-muted-foreground">
+              <Info className="mt-0.5 w-4 h-4 shrink-0" />
+              <span>
+                測定は{formatMonth(BOOST_START_MONTH)}分の成果から始めます。{formatMonth(BOOST_START_MONTH)}
+                分の月末報告書（11月初めに提出）が入ると、ここに対象者一覧が出ます。
+              </span>
+            </CardContent>
+          </Card>
         )}
 
         {!busy && view && (
