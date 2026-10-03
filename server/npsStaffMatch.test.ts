@@ -104,9 +104,12 @@ describe("ソース文字列の見張り（照合の正本を通っているか�
   it("詳細（StaffDetail）は店舗込みで絞り込む", () => {
     const s = src("pages/StaffDetail.tsx");
     expect(s).toContain('from "@/lib/npsStaffMatch"');
-    // 月の一覧・NPS集計の両方が同じ関数を通ること（片方だけ名前で絞ると別人が混ざる）
-    const hits = s.match(/filterNpsRecordsForStaff\(records, staffName, staffStore\)/g) ?? [];
-    expect(hits.length).toBe(2);
+    // 月の一覧・NPS集計の両方が同じ絞り込み（staffNpsAll）を通ること（片方だけ名前で絞ると別人が混ざる）。
+    // staffNpsAll 自体は正本の関数で「店舗＋名前」照合する（ニックネームでも引くのは 2026-10-03 から）
+    expect(s).toMatch(/filterNpsRecordsForStaff\(records, staffName, staffStore\)/);
+    expect(s).toMatch(/isNpsRecordOfStaff\(r, nickname, staffStore\)/);
+    expect(s).toContain("getAvailableMonths(staffNpsAll)");
+    expect(s).toContain("const filtered = staffNpsAll;");
   });
 
   it("一覧（StaffList）は店舗込みでグルーピングする", () => {
