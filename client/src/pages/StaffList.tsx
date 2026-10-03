@@ -31,6 +31,7 @@ import { getNpsClass } from "@/lib/npsClass";
 import { calculateCompositeScore, getCompositeRank } from "@/lib/compositeScore";
 import type { CompositeScoreResult } from "@/lib/compositeScore";
 import { npsStaffKey } from "@/lib/npsStaffMatch";
+import { buildNpsFuzzyLinks, invertNpsFuzzyLinks } from "@/lib/npsFuzzyLink";
 import { resolveStaffDisplayName } from "@/lib/staffDisplayName";
 import { fetchPdfData, matchesStylist, normalizeStylistName } from "@/hooks/useFankuruData";
 import type { FankuruPdf } from "@/hooks/useFankuruData";
@@ -327,11 +328,24 @@ export default function StaffList() {
    * 選ばれていることがあるため、本名と報告書 列20 のニックネームの両方で引いて合算する
    * （2026-10-03 林さん指示「月末報告書が提出され次第、照らし合わせしてニックネーム変更」）。
    */
+  // 本名・ニックネームのどちらにも一致しないNPS名は、同じ店舗で候補がちょうど1人のときだけ自動でつなぐ
+  // （判定の決まりは lib/npsFuzzyLink.ts。2026-10-03 林さん指示）
+  const npsFuzzyLinks = useMemo(() => {
+    if (IS_ADMIN_BUILD) return new Map<string, string>();
+    return buildNpsFuzzyLinks(
+      filteredNps.map((r) => ({ name: r.staff || "", store: r.storeShort || "" })),
+      rawData.map((r) => ({ name: r.name, store: r.storeNormalized }))
+    );
+  }, [filteredNps, rawData]);
+  const npsFuzzyByPerson = useMemo(() => invertNpsFuzzyLinks(npsFuzzyLinks), [npsFuzzyLinks]);
+
   const npsInfoFor = (s: { name: string; storeNormalized: string }): StaffNpsInfo | undefined => {
     const nameKey = npsKeyFor(s);
+    if (IS_ADMIN_BUILD) return staffNpsMap.get(nameKey);
     const nickKey = npsStaffKey(resolveStaffDisplayName(s.name, s.storeNormalized), s.storeNormalized);
-    if (IS_ADMIN_BUILD || nameKey === nickKey) return staffNpsMap.get(nameKey);
-    const scores = [...(npsScoresByKey.get(nameKey) ?? []), ...(npsScoresByKey.get(nickKey) ?? [])];
+    const keys = Array.from(new Set([nameKey, nickKey, ...(npsFuzzyByPerson.get(nameKey) ?? [])]));
+    if (keys.length === 1) return staffNpsMap.get(nameKey);
+    const scores = keys.flatMap((k) => npsScoresByKey.get(k) ?? []);
     return scores.length ? summarizeNps(scores) : undefined;
   };
 
@@ -357,6 +371,16 @@ export default function StaffList() {
     const reportedNpsKeys = new Set(reported.map((r) => npsStaffKey(r.name, r.storeNormalized)));
     // 報告書の名前は本名、NPSは呼び名のことがある（例: 岡本院 kanako）。呼び名でも突き合わせる
     for (const r of reported) reportedNpsKeys.add(npsStaffKey(resolveStaffDisplayName(r.name, r.storeNormalized), r.storeNormalized));
+    const reportedNameKeys = new Set(reported.map((r) => npsStaffKey(r.name, r.storeNormalized)));
+    // NPS名: 本名・呼び名の一致か、自動の名寄せ（候補ちょうど1人）で今期の報告書の人につながるか。
+    // 一覧の数字（npsInfoFor）と同じ決まりにそろえる＝どちらにも出ない／両方に出る、を起こさない
+    const isReportedNps = (name: string, store: string) => {
+      const k = npsStaffKey(name, store);
+      if (reportedNpsKeys.has(k)) return true;
+      const linked = npsFuzzyLinks.get(k);
+      return !!linked && reportedNameKeys.has(linked);
+    };
+    // ファンくる担当者名: ファンくるの照合（matchesStylist）で今期の報告書の人に当たるか
     const isReported = (name: string, store: string) =>
       reportedNpsKeys.has(npsStaffKey(name, store)) ||
       reported.some((r) => r.storeNormalized === store && matchesStylist(name, r.name, store));
@@ -365,7 +389,7 @@ export default function StaffList() {
     for (const r of filteredNps) {
       const name = r.staff?.trim();
       if (!name || name === "選択しない") continue;
-      if (isReported(name, r.storeShort)) continue;
+      if (isReportedNps(name, r.storeShort)) continue;
       const key = npsStaffKey(name, r.storeShort);
       if (!found.has(key)) found.set(key, { name, store: r.storeShort, fankuruCount: 0 });
     }
@@ -388,7 +412,7 @@ export default function StaffList() {
     return Array.from(found.values())
       .filter((e) => !isRetiredStaff(e.name, e.store, ""))
       .sort((a, b) => a.store.localeCompare(b.store, "ja") || a.name.localeCompare(b.name, "ja"));
-  }, [staffListUnsorted, filteredNps, fankuruAllData, filterMonthsResult]);
+  }, [staffListUnsorted, filteredNps, fankuruAllData, filterMonthsResult, npsFuzzyLinks]);
 
   const surveyOnlyStaff = useMemo(() => {
     return surveyOnlyStaffAll.filter((e) => {

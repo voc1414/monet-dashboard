@@ -40,7 +40,8 @@ import { generateStaffAdvice } from "@/lib/staffAdvice";
 import { IS_ADMIN_BUILD } from "@/lib/appRole";
 import StaffSimpleSummary from "@/components/StaffSimpleSummary";
 import type { StaffAdvice } from "@/lib/staffAdvice";
-import { filterNpsRecordsForStaff, isNpsRecordOfStaff } from "@/lib/npsStaffMatch";
+import { filterNpsRecordsForStaff, isNpsRecordOfStaff, npsStaffKey } from "@/lib/npsStaffMatch";
+import { buildNpsFuzzyLinks } from "@/lib/npsFuzzyLink";
 import { resolveStaffDisplayName } from "@/lib/staffDisplayName";
 import type { FankuruPdf } from "@/hooks/useFankuruData";
 import {
@@ -288,10 +289,21 @@ export default function StaffDetail() {
   // この人のNPS回答（必ず「店舗＋名前」。表示名は店舗をまたいで重複する）。
   // 報告書は本名・NPSはニックネームで選ばれていることがあるので、報告書 列20 のニックネームでも引く
   // （2026-10-03 林さん指示。一覧 StaffList の npsInfoFor と同じ考え方）
+  // 本名・ニックネームのどちらにも一致しないNPS名も、同じ店舗で候補がちょうど1人なら自動でつなぐ（lib/npsFuzzyLink.ts）
   const staffNpsAll = useMemo(() => {
+    if (IS_ADMIN_BUILD) return filterNpsRecordsForStaff(records, staffName, staffStore);
     const nickname = resolveStaffDisplayName(staffName, staffStore);
-    if (IS_ADMIN_BUILD || nickname === staffName) return filterNpsRecordsForStaff(records, staffName, staffStore);
-    return records.filter((r) => isNpsRecordOfStaff(r, staffName, staffStore) || isNpsRecordOfStaff(r, nickname, staffStore));
+    const links = buildNpsFuzzyLinks(
+      records.map((r) => ({ name: r.staff || "", store: r.storeShort || "" })),
+      rawData.map((r) => ({ name: r.name, store: r.storeNormalized }))
+    );
+    const myKey = npsStaffKey(staffName, staffStore || "");
+    return records.filter(
+      (r) =>
+        isNpsRecordOfStaff(r, staffName, staffStore) ||
+        (nickname !== staffName && isNpsRecordOfStaff(r, nickname, staffStore)) ||
+        links.get(npsStaffKey(r.staff || "", r.storeShort || "")) === myKey
+    );
   }, [records, staffName, staffStore, rawData]);
 
   // 月の管理
