@@ -4,11 +4,12 @@
  * ここ1箇所を直せば DashboardLayout（スタッフ向け）と AdminLayout（管理者の設定画面）の
  * 両方に効く。ページを物理的に複製せず、`adminOnly` の出し分けだけで仕分ける。
  *   - スタッフ向け … スタッフ一覧／アンケート／カウンセリング（店舗一覧は 2026-10-02 から管理者だけ）
- *   - 管理者向け   … 上記すべて ＋ 雇用形態別の売上 ＋ 広告（Meta） ＋ 設定
+ *   - 管理者向け   … 上記すべて ＋ 雇用形態別の売上 ＋ 次回予約強化 ＋ 広告（Meta） ＋ 設定
  */
 import {
   AlertTriangle,
   BarChart3,
+  CalendarCheck,
   ClipboardList,
   Home,
   Megaphone,
@@ -76,6 +77,15 @@ export const MAIN_TABS: NavItem[] = [
     // 雇用形態は人事情報。スタッフ同士で見えると比較・詮索の元になるので管理者だけ（2026-09-01）
     adminOnly: true,
     isActive: (l) => l.startsWith("/employment"),
+  },
+  {
+    href: "/next-reservation",
+    label: "次回予約強化",
+    shortLabel: "次回予約",
+    icon: CalendarCheck,
+    // 強化シートの個人の記述（課題点・アクション）を出すので管理者だけ（2026-10-03 林さん決定）
+    adminOnly: true,
+    isActive: (l) => l.startsWith("/next-reservation"),
   },
   {
     href: "/ads",

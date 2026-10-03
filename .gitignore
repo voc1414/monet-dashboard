@@ -111,3 +111,6 @@ temp/
 
 # Manus version file (auto-generated, not part of source)
 client/public/__manus__/version.json
+
+# 次回予約強化タブの画面確認用テストCSV（実在スタッフ名が入るので公開repoに入れない）
+client/dev-sample/

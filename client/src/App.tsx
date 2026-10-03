@@ -17,6 +17,7 @@ import SurveyDetail from "./pages/SurveyDetail";
 import StaffDetail from "./pages/StaffDetail";
 import Counseling from "./pages/Counseling";
 import Ads from "./pages/Ads";
+import NextReservationBoost from "./pages/NextReservationBoost";
 import EmploymentRanking from "./pages/EmploymentRanking";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminAlerts from "./pages/admin/AdminAlerts";
@@ -61,6 +62,7 @@ function Router() {
           スタッフ向けビルドではルートが存在しないので、URL を直打ちしても 404 になる。
         */}
         {IS_ADMIN_BUILD && <Route path="/employment" component={EmploymentRanking} />}
+        {IS_ADMIN_BUILD && <Route path="/next-reservation" component={NextReservationBoost} />}
         {IS_ADMIN_BUILD && <Route path="/ads" component={Ads} />}
         {IS_ADMIN_BUILD && <Route path="/admin/login" component={AdminLogin} />}
         {IS_ADMIN_BUILD && <Route path="/admin" component={AdminAlerts} />}

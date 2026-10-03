@@ -25,6 +25,7 @@ describe("画面の仕分け（スタッフ向け／管理者向け）", () => {
     expect(staffTabs.map((t) => t.href)).toEqual(["/staff", "/survey", "/counseling"]);
     expect(staffTabs.some((t) => t.href === "/ads")).toBe(false);
     expect(staffTabs.some((t) => t.href === "/employment")).toBe(false);
+    expect(staffTabs.some((t) => t.href === "/next-reservation")).toBe(false);
   });
 
   it("管理者向けは既存の全タブ＋雇用形態別の売上＋広告", () => {
@@ -35,6 +36,7 @@ describe("画面の仕分け（スタッフ向け／管理者向け）", () => {
       "/survey",
       "/counseling",
       "/employment",
+      "/next-reservation",
       "/ads",
     ]);
   });
@@ -45,6 +47,8 @@ describe("画面の仕分け（スタッフ向け／管理者向け）", () => {
     // 雇用形態は人事情報。スタッフ同士で見えてはいけない（2026-09-01）
     const employment = MAIN_TABS.find((t) => t.href === "/employment");
     expect(employment?.adminOnly).toBe(true);
+    // 強化シートの個人の記述を出すので管理者だけ（2026-10-03）
+    expect(MAIN_TABS.find((t) => t.href === "/next-reservation")?.adminOnly).toBe(true);
     expect(SETTINGS_TAB.adminOnly).toBe(true);
   });
 
