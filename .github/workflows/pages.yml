@@ -47,6 +47,13 @@ jobs:
             echo "::error::スタッフ向けバンドルに雇用形態別売上のページが含まれています"
             exit 1
           fi
+      # 次回予約強化（管理者専用・2026-10-03）。強化シートのID とページ本体の文字列で見る。
+      - name: スタッフ向けに次回予約強化のページ・強化シートが混ざっていないか検査
+        run: |
+          if grep -rq -e '1CZPTmFDfKiEvwYw' -e '未照合の回答' -e '項目ごとの集計' -e 'dev-sample' dist/public/assets; then
+            echo "::error::スタッフ向けバンドルに次回予約強化のページか強化シートの読み込みが含まれています"
+            exit 1
+          fi
       - name: 管理者向けビルド（新URL /monet-dashboard/admin-view/）
         run: VITE_BASE=/monet-dashboard/admin-view/ VITE_ROLE=admin npx vite build --outDir "$PWD/dist/admin-view"
       - name: 管理者向けを配信先へ配置
