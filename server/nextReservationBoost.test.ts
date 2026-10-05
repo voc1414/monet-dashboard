@@ -15,6 +15,7 @@ import {
   parseScore,
   parseTargetMonth,
   reservationStreakAt,
+  reservationStreakMonthsAt,
   resolveBoostColumns,
   streakByMonth,
   type ReportRow,
@@ -140,6 +141,14 @@ describe("スタッフ個人ページの「◯ヶ月連続」", () => {
     const rows = [r("2026-09", 50), r("2026-10", 60), r("2026-11", 80)];
     expect(reservationStreakAt(rows, all, "2026-11")).toBe(0);
     expect(reservationStreakAt(rows, all, "2026-09")).toBe(0);
+  });
+
+  it("続いている月そのもの（丸の表示用・未提出の月は入れない）", () => {
+    const rows = [r("2026-09", 50), r("2026-10", 60), r("2026-11", 70), /* 12月 未提出 */ r("2027-01", 40)];
+    expect(reservationStreakMonthsAt(rows, all, "2027-01")).toEqual(["2026-10", "2026-11", "2027-01"]);
+    expect(reservationStreakMonthsAt(rows, all, "2026-09")).toEqual([]);
+    const reset = [r("2026-10", 60), r("2026-11", 80), r("2026-12", 50), r("2027-01", 40)];
+    expect(reservationStreakMonthsAt(reset, all, "2027-01")).toEqual(["2026-12", "2027-01"]);
   });
 });
 

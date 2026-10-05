@@ -78,8 +78,10 @@ function Emph({ text }: { text: string }) {
 }
 
 function GoodImproveCard({
-  icon, title, note, number, gi, link,
+  icon, title, note, number, gi, link, accent,
 }: {
+  /** 枠の色（次回予約が連続で70%以下のときだけ） */
+  accent?: string;
   icon: ReactNode;
   title: string;
   note?: string;
@@ -89,7 +91,10 @@ function GoodImproveCard({
   link?: { href: string; label: string };
 }) {
   return (
-    <section className="bg-card border border-border/60 rounded-2xl p-3.5">
+    <section
+      className={`bg-card rounded-2xl p-3.5 ${accent ? "border-2" : "border border-border/60"}`}
+      style={accent ? { borderColor: accent } : undefined}
+    >
       <h2 className="text-[15px] font-bold mb-2.5 flex items-center gap-1.5">
         {icon}
         {title}
@@ -131,31 +136,57 @@ function GoodImproveCard({
 }
 
 /**
- * 次回予約が70%以下で続いた月数のアイコン（2ヶ月以上で表示。2026-10-03 林さん指示 GF-MDASH-M16）。
+ * 次回予約が70%以下で続いた月数（2ヶ月以上で表示。2026-10-03 林さん指示 GF-MDASH-M16）。
  * 2ヶ月＝黄、3ヶ月以上＝赤（管理者の次回予約強化タブと同じ色分け）。
+ * 2026-10-05 見やすさ改善（林さん指示 案1〜4）：塗りつぶしの大きいアイコン・カード枠の色・月ごとの丸・一言メッセージ。
  */
+function streakColor(streak: number): string | undefined {
+  if (streak < 2) return undefined;
+  return streak >= 3 ? NG : "#D99A2B";
+}
+
 function StreakIcon({ streak }: { streak: number }) {
-  if (streak < 2) return null;
-  const color = streak >= 3 ? NG : "#D99A2B";
+  const color = streakColor(streak);
+  if (!color) return null;
   return (
     <span
-      className="inline-flex items-center gap-0.5 text-[11px] font-bold rounded-full px-2 py-px border"
-      style={{ color, borderColor: color }}
+      className="inline-flex items-center gap-1 text-sm font-bold text-white rounded-full px-2.5 py-0.5 self-center"
+      style={{ backgroundColor: color }}
       data-testid="reservation-streak"
     >
-      <AlertTriangle className="w-3 h-3" />
+      <AlertTriangle className="w-4 h-4" />
       {streak}ヶ月連続
     </span>
   );
 }
 
+function StreakDetail({ months }: { months: string[] }) {
+  const color = streakColor(months.length);
+  if (!color) return null;
+  return (
+    <div className="mb-2.5" data-testid="reservation-streak-detail">
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 mb-1">
+        {months.map((m) => (
+          <span key={m} className="inline-flex items-center gap-1 text-xs text-foreground">
+            <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
+            {Number(m.slice(5, 7))}月
+          </span>
+        ))}
+      </div>
+      <p className="text-[13px] font-bold [word-break:keep-all]" style={{ color }}>
+        {months.length}ヶ月続けて70%以下です。<wbr />次の月は70.1%以上を<wbr />目指しましょう。
+      </p>
+    </div>
+  );
+}
+
 export default function StaffSimpleSummary({
-  nextReservationRate, reservationStreak = 0, totalCustomers, reserved, utilizationRate, npsStats, npsRecords,
+  nextReservationRate, reservationStreakMonths = [], totalCustomers, reserved, utilizationRate, npsStats, npsRecords,
 }: {
   /** 月末報告書が無い期間は null */
   nextReservationRate: number | null;
-  /** 70%以下が続いている月数（0＝続いていない） */
-  reservationStreak?: number;
+  /** 70%以下が続いている月（古い順。空＝続いていない） */
+  reservationStreakMonths?: string[];
   totalCustomers: number;
   reserved: number;
   /** パート等で算出できないときは null */
@@ -166,6 +197,7 @@ export default function StaffSimpleSummary({
   const npsScore = npsStats ? npsStats.npsScore : null;
   const npsClass = npsScore !== null ? getNpsClass(npsScore) : null;
   const npsAdvice = npsStats ? generateStoreAdvice(npsStats, npsRecords) : null;
+  const streak = reservationStreakMonths.length;
 
   return (
     <div className="flex flex-col gap-3.5 mb-8">
@@ -173,13 +205,17 @@ export default function StaffSimpleSummary({
         icon={<CalendarCheck className="w-4 h-4 text-muted-foreground" />}
         title="次回予約"
         note={nextReservationRate !== null ? `総入客${totalCustomers}名中 ${reserved}名` : undefined}
+        accent={nextReservationRate !== null ? streakColor(streak) : undefined}
         number={
-          <BigNumber
-            value={nextReservationRate !== null ? String(nextReservationRate) : null}
-            unit="%"
-            level={nextReservationRate !== null ? reservationLevel(nextReservationRate) : null}
-            extra={nextReservationRate !== null ? <StreakIcon streak={reservationStreak} /> : undefined}
-          />
+          <>
+            <BigNumber
+              value={nextReservationRate !== null ? String(nextReservationRate) : null}
+              unit="%"
+              level={nextReservationRate !== null ? reservationLevel(nextReservationRate) : null}
+              extra={nextReservationRate !== null ? <StreakIcon streak={streak} /> : undefined}
+            />
+            {nextReservationRate !== null && <StreakDetail months={reservationStreakMonths} />}
+          </>
         }
         gi={nextReservationRate !== null
           ? reservationGoodImprove({ rate: nextReservationRate, totalCustomers, reserved, npsScore })

@@ -99,12 +99,33 @@ export function reservationStreakAt(
   month: string,
   startMonth: string = BOOST_START_MONTH,
 ): number {
+  return reservationStreakMonthsAt(rows, allMonths, month, startMonth).length;
+}
+
+/**
+ * reservationStreakAt の「続いている月」そのもの（古い順）。月ごとの丸の表示に使う（2026-10-05 GF-MDASH-M16）。
+ * 数え方は streakByMonth と同じ（報告書が無い月・判定できない月は途切れさせない）。
+ */
+export function reservationStreakMonthsAt(
+  rows: Pick<ReportRow, "reportMonth" | "newCustomers" | "returnCustomers" | "nextReservation">[],
+  allMonths: string[],
+  month: string,
+  startMonth: string = BOOST_START_MONTH,
+): string[] {
   const rates = new Map<string, number | null>();
   for (const r of rows) {
     if (r.reportMonth) rates.set(r.reportMonth, nextReservationRate(r.nextReservation, r.newCustomers, r.returnCustomers));
   }
-  if (!isMeasuredMonth(month, startMonth) || !isBoostTarget(rates.get(month) ?? null)) return 0;
-  return streakByMonth(allMonths.filter((m) => m <= month), rates, startMonth).get(month) ?? 0;
+  if (!isMeasuredMonth(month, startMonth) || !isBoostTarget(rates.get(month) ?? null)) return [];
+  let run: string[] = [];
+  const sorted = Array.from(new Set([...allMonths, month])).filter((m) => m <= month).sort();
+  for (const m of sorted) {
+    if (!isMeasuredMonth(m, startMonth) || !rates.has(m)) continue;
+    const rate = rates.get(m) ?? null;
+    if (rate === null) continue;
+    run = isBoostTarget(rate) ? [...run, m] : [];
+  }
+  return run;
 }
 
 // ───────────────────────── 強化シートの列解決 ─────────────────────────
