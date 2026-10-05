@@ -327,7 +327,11 @@ export default function StaffDetail() {
     return Array.from(set).sort().reverse();
   }, [npsMonths, fankuruMonths, staffReportMonths]);
 
-  const [periodSelection, setPeriodSelection] = useState<PeriodSelection>(getDefaultPeriodSelection());
+  // スタッフ一覧の「月末報告書 未提出」欄から来たときは ?month=YYYY-MM の月で開く（2026-10-05）
+  const [periodSelection, setPeriodSelection] = useState<PeriodSelection>(() => {
+    const m = new URLSearchParams(window.location.search).get("month");
+    return m && /^\d{4}-\d{2}$/.test(m) ? { mode: "specific_month", month: m } : getDefaultPeriodSelection();
+  });
   const [selectedScore, setSelectedScore] = useState<number | null>(null);
   const [selectedPdf, setSelectedPdf] = useState<FankuruPdf | null>(null);
   const [showAllReviews, setShowAllReviews] = useState(false);

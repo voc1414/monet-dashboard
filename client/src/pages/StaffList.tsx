@@ -163,7 +163,7 @@ function StaffNpsBadgeMobile({ npsInfo }: { npsInfo: StaffNpsInfo | undefined })
 }
 
 export default function StaffList() {
-  const { rawData, loading, error, availableMonths } = useMonthlyReport();
+  const { rawData, loading, error, availableMonths: reportMonths } = useMonthlyReport();
   const { npsAliasMap } = useStores();
   const { records: npsRecords, loading: npsLoading } = useNpsData(npsAliasMap);
   const [, navigate] = useLocation();
@@ -212,6 +212,21 @@ export default function StaffList() {
       ? <ArrowUp className="w-3 h-3 text-primary" />
       : <ArrowDown className="w-3 h-3 text-primary" />;
   };
+
+  /*
+   * 選べる月。管理者向けは月末報告書がある月だけ。スタッフ向けは NPS 回答がある月も加える
+   * （2026-10-05 林さん指示。報告書が出る前の月でも、NPSだけある人＝例: 高槻院 北相模ひろみ を
+   * 「月末報告書 未提出」欄で見られるように。報告書が出るまでその月は全員が未提出欄に並ぶ）。
+   */
+  const availableMonths = useMemo(() => {
+    if (IS_ADMIN_BUILD) return reportMonths;
+    const months = new Set(reportMonths);
+    for (const r of npsRecords) {
+      const m = /^(\d{4})[-/](\d{1,2})/.exec(r.date ?? "");
+      if (m) months.add(`${m[1]}-${m[2].padStart(2, "0")}`);
+    }
+    return Array.from(months).sort().reverse();
+  }, [reportMonths, npsRecords]);
 
   // 期間セレクタ状態
   const [periodSelection, setPeriodSelection] = useState<PeriodSelection>(getDefaultPeriodSelection());
@@ -1027,7 +1042,13 @@ export default function StaffList() {
                 <Card
                   key={`${e.store}__${e.name}`}
                   className="border-border/50 shadow-sm hover:shadow-md hover:border-primary/30 transition-all cursor-pointer py-0 gap-0"
-                  onClick={() => handleStaffClick(e.name, e.store)}
+                  onClick={() =>
+                    // 報告書の無い月（例: 10月）を見ている時は、個人ページもその月で開く（既定の先月だと空になるため）
+                    navigate(
+                      `/staff/${encodeURIComponent(e.store)}/${encodeURIComponent(e.name)}` +
+                        (filterMonthsResult !== "all" && filterMonthsResult.length === 1 ? `?month=${filterMonthsResult[0]}` : "")
+                    )
+                  }
                 >
                   <CardContent className="p-0">
                     <div className={`grid ${STAFF_MOBILE_GRID_COLS} gap-2 items-center px-3 py-2.5`}>
