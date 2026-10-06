@@ -49,6 +49,7 @@ export const STAFF_MASTER: StaffMasterEntry[] = [
   { name: "原田 明日香", store: "高槻院", displayName: "Asuka", kana: "はらだ あすか", status: "active", retiredMonth: null },
   { name: "田中 莉子", store: "高槻院", displayName: "Mariko", kana: "たなか まりこ", status: "active", retiredMonth: null },
   { name: "藤谷 裕子", store: "高槻院", displayName: "Yuko", kana: "ふじたに ゆうこ", status: "active", retiredMonth: null },
+  { name: "北相模ひろみ", store: "高槻院", displayName: "hiromi", kana: "きたさがみ ひろみ", status: "active", retiredMonth: null },
   { name: "小田りえ", store: "土橋院", displayName: "小田 利恵", kana: "おだ りえ", status: "active", retiredMonth: null },
   { name: "中島真優", store: "土橋院", displayName: "中島 真優", kana: "なかしま まゆ", status: "active", retiredMonth: null },
   { name: "湯木麻由子", store: "土橋院", displayName: "湯木 麻由子", kana: "ゆき まゆこ", status: "active", retiredMonth: null },
