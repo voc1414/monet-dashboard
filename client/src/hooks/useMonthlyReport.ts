@@ -46,6 +46,8 @@ const STORE_NAME_MAP_FALLBACK: Record<string, string> = {
   "土橋院": "土橋院",
   "岡山下伊福院": "下伊福院",
   "下伊福院": "下伊福院",
+    "兵庫岡本院": "岡本院",
+    "岡本院": "岡本院",
 };
 
 // Module-level alias map that can be updated from DB
