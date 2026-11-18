@@ -68,7 +68,7 @@ export const STAFF_MASTER: StaffMasterEntry[] = [
   { name: "坂手 芳", store: "堀江院2nd", displayName: "坂手", kana: "さかで かおる", status: "active", retiredMonth: null },
   { name: "三宅 和美", store: "堀江院2nd", displayName: "Kazumi", kana: "みやけ かずみ", status: "retired", retiredMonth: "2026-03" },
   { name: "池内 亜希子", store: "堀江院2nd", displayName: "Aki", kana: "いけうち あきこ", status: "retired", retiredMonth: "2026-04" },
-  { name: "天野美奈穂", store: "堀江院2nd", displayName: "Minaho", kana: "あまの みなほ", status: "active", retiredMonth: null },
+  { name: "天野美奈穂", store: "堀江院2nd", displayName: "Minaho", kana: "あまの みなほ", status: "retired", retiredMonth: null },
   { name: "徳永 さゆり", store: "堀江院2nd", displayName: "Sayuri", kana: "とくなが さゆり", status: "retired", retiredMonth: "2026-08" },
   { name: "本吉真優", store: "堀江院2nd", displayName: "Mayu", kana: "もとよし まゆ", status: "active", retiredMonth: null },
   { name: "満川宏美", store: "堀江院2nd", displayName: "Hiromi", kana: "みつかわ ひろみ", status: "retired", retiredMonth: "2026-07" },
