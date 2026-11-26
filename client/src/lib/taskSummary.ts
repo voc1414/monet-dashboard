@@ -168,42 +168,93 @@ export function scheduledTimes(def: TaskDef, base: Date, back = 10, ahead = 10):
 }
 
 /** GBP公開履歴を「日本時間の1日＝1回の実行」にまとめる */
+/** GBPを自動更新している院（monet-gbp の locations.json と同じ並び）。1回の公開で各院に「投稿」と「写真」を1件ずつ出す */
+export const GBP_STORES = [
+  "春日院", "本通院", "岡本院", "下伊福院", "姪浜院", "土橋院",
+  "楽々園院", "福島院", "高槻院", "堀江院2nd", "堀江院",
+];
+const GBP_KINDS = ["投稿", "写真"];
+
+/**
+ * GBP公開履歴を「日本時間の1日＝1回の実行」にまとめる。
+ * 院×種類ごとにその日の最後の結果を見る（同じ日にやり直して公開できていれば成功）。
+ * 院×種類の記録が無いものも「記録なし」として失敗に数える。
+ */
+/** GBPの定時の回（月・木 10:00）とみなす時間帯：10:00〜12:00（日本時間）。それ以外の記録は予定外の実行 */
+const GBP_RUN_START_MIN = 10 * 60;
+const GBP_RUN_END_MIN = 12 * 60;
+
+/** その記録が月・木の定時の回の時間帯か */
+export function isScheduledGbp(at: string): boolean {
+  const j = new Date(Date.parse(at) + JST);
+  const min = j.getUTCHours() * 60 + j.getUTCMinutes();
+  const wd = j.getUTCDay();
+  return (wd === 1 || wd === 4) && min >= GBP_RUN_START_MIN && min < GBP_RUN_END_MIN;
+}
+
+/**
+ * 「最近の記録」用に、GBP公開履歴を回ごとの事実にまとめる（定時の回と予定外の実行は別の回）。
+ * ここでは「未公開」「成功」と言い切らない。公開した件数と失敗した院・時刻だけを書く。
+ * 未公開かどうか（記録の欠け・遅れ）の判定は院ごとの判定（gbpSummary.summarize）だけで行う（2026-11-26 独立監査8回目）。
+ */
 export function gbpRuns(entries: GbpEntry[]): TaskLogEntry[] {
-  const byDay = new Map<string, GbpEntry[]>();
+  const groups = new Map<string, GbpEntry[]>();
   for (const e of entries) {
-    const day = new Date(new Date(e.at).getTime() + JST).toISOString().slice(0, 10);
-    byDay.set(day, [...(byDay.get(day) || []), e]);
+    const day = new Date(Date.parse(e.at) + JST).toISOString().slice(0, 10);
+    const key = `${day}-${isScheduledGbp(e.at) ? "S" : "X"}`;
+    groups.set(key, [...(groups.get(key) || []), e]);
   }
-  return [...byDay.values()]
+  return [...groups.values()]
     .map((rows) => {
-      const last = rows.map((r) => r.at).sort().pop()!;
-      const bad = rows.find((r) => r.result === "エラー") || rows.find((r) => r.result === "停止");
+      const last = rows.reduce((m, r) => (Date.parse(r.at) > Date.parse(m) ? r.at : m), rows[0].at);
       const ok = rows.filter((r) => r.result === "公開").length;
+      const bad = rows.filter((r) => r.result !== "公開").sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+      const scheduled = isScheduledGbp(rows[0].at);
+      // 失敗のあとで同じ院・種類が公開できていれば、そう書き添える
+      const later = (b: GbpEntry) =>
+        entries.some((e) => e.store === b.store && e.kind === b.kind && e.result === "公開" && Date.parse(e.at) > Date.parse(b.at));
+      const lines = bad.map((b) => `${b.store}（${b.kind}）${formatJstShort(b.at).slice(-5)} ${b.result}${later(b) ? " → のちに公開" : ""}`);
+      // 定時の回は「全院×投稿・写真（22件）のうち何件を公開したか」を事実として書く。足りなければ緑にしない
+      const expected = GBP_STORES.length * GBP_KINDS.length;
+      const published = new Set(rows.filter((r) => r.result === "公開").map((r) => `${r.store}/${r.kind}`)).size;
+      const partial = scheduled && published < expected;
+      const head = scheduled
+        ? `定時の回：${expected}件中 ${published}件を公開${bad.length ? `・失敗 ${bad.length}件` : ""}`
+        : `予定外の実行：公開 ${ok}件${bad.length ? `・失敗 ${bad.length}件` : ""}`;
       return {
         at: last,
         task: "Googleマップ（GBP）",
-        result: bad ? bad.result : "成功",
-        count: ok,
-        reason: bad ? `${bad.store}：${bad.reason}` : "",
+        result: bad.length ? (bad.some((b) => b.result === "エラー") ? "エラー" : "停止") : partial ? "一部公開" : "公開",
+        count: bad.length || partial ? null : ok,
+        reason: bad.length || partial || !scheduled ? [head, ...lines].join(" — ") : "",
       };
     })
-    .sort((a, b) => b.at.localeCompare(a.at));
+    .sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
 }
 
 /** 「やった」とみなす結果（要確認・対象なしも、動いて結果を出したので予定はこなした） */
-const DONE = new Set(["成功", "要確認", "対象なし"]);
+const DONE = new Set(["成功", "公開", "要確認", "対象なし"]);
 const DAY = 1440 * MIN;
 /** 予定日からの遅れの判定（2026-11-26 林さん）：🟢予定どおり／🟡2日以上超過／🔴3日以上超過 */
 export const YELLOW_DAYS = 2;
 export const RED_DAYS = 3;
 
+/** 予定日から何日たったか（日本時間の暦の日付で数える。11/26 の予定は 11/28 に「2日」） */
+export function calendarDaysLate(missed: number, now: number): number {
+  const day = (t: number) => Math.floor((t + 9 * 3600_000) / 86_400_000);
+  return day(now) - day(missed);
+}
+
 export function summarizeTasks(log: TaskLogEntry[], gbp: GbpEntry[], syncedAt: Date, defs = TASKS): TaskStatus[] {
-  const gbpLog = gbpRuns(gbp);
   return defs.map((def) => {
     const since = new Date(def.since).getTime();
-    // GBP は自動公開が始まる前の記録（手動テスト）を「動いた」に数えない
-    const src = def.source === "gbp" ? gbpLog.filter((e) => new Date(e.at).getTime() >= since - 5 * MIN) : log.filter((e) => e.task === def.name);
-    const mine = src.sort((a, b) => b.at.localeCompare(a.at));
+    // GBP は自動公開が始まる前の記録（手動テスト）を、1日分にまとめる前に外す（同じ日に本番の回があっても混ざらない）
+    const src =
+      def.source === "gbp"
+        ? gbpRuns(gbp.filter((e) => new Date(e.at).getTime() >= since))
+        : log.filter((e) => e.task === def.name);
+    // 日時の書式（+09:00／UTC）が混ざるので、文字ではなく時刻で並べる
+    const mine = src.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
     const latest = mine[0];
     const lastDone = mine.find((e) => DONE.has(e.result));
     const times = scheduledTimes(def, syncedAt, 40, 10);
@@ -223,15 +274,25 @@ export function summarizeTasks(log: TaskLogEntry[], gbp: GbpEntry[], syncedAt: D
     };
 
     if (missed !== undefined) {
-      const lateDays = Math.floor((now - missed) / DAY);
+      const lateDays = calendarDaysLate(missed, now);
       const lamp: Lamp = lateDays >= RED_DAYS ? "red" : lateDays >= YELLOW_DAYS ? "yellow" : "green";
-      const failed = latest && new Date(latest.at).getTime() >= missed - 5 * MIN ? latest.result : undefined;
-      const what = failed ? `${failed}のまま` : "記録なし";
-      const label = lateDays >= 1 ? `${lateDays}日遅れ（${formatJstShort(base.expected)} から${what}）` : `遅れ：${formatJstShort(base.expected)} の分が${failed ?? "記録なし"}`;
+      const failed = latest && new Date(latest.at).getTime() >= missed - 5 * MIN && !DONE.has(latest.result) ? latest.result : undefined;
+      // 括弧の中は日時だけにする（長いと 320px で括弧ごと収まらない）
+      const label =
+        lateDays >= 1
+          ? `${lateDays}日遅れ${failed ? `・直近は${failed}` : ""}（${formatJstShort(base.expected)} から）`
+          : `${failed ?? "遅れ・記録なし"}（${formatJstShort(base.expected)} の分）`;
       return { ...base, lamp, label, lateDays };
     }
     if (pending !== undefined) {
-      return { ...base, lamp: latest ? ("green" as Lamp) : ("gray" as Lamp), label: `${formatJstShort(base.waiting)} の分を待っています` };
+      // 猶予の内側でも、その回の記録が失敗（エラー・停止）なら待たずに失敗として出す
+      // 最後にこなした後に失敗（予定外の時刻の手動実行を含む）があれば、待ち表示にせず失敗として出す
+      if (latest && new Date(latest.at).getTime() > doneAt && !DONE.has(latest.result)) {
+        const when = new Date(latest.at).getTime() >= pending - 5 * MIN ? `${formatJstShort(base.waiting)} の分` : `${formatJstShort(latest.at)} の実行`;
+        return { ...base, lamp: "green" as Lamp, label: `${latest.result}（${when}）`, lateDays: 0 };
+      }
+      const prev = latest?.result === "要確認" ? "（前回は要確認）" : "";
+      return { ...base, lamp: latest ? ("green" as Lamp) : ("gray" as Lamp), label: `${formatJstShort(base.waiting)} の分を待っています${prev}` };
     }
     if (!latest) {
       return { ...base, lamp: "gray", label: `記録は ${formatJstShort(def.since)} から` };
@@ -240,8 +301,8 @@ export function summarizeTasks(log: TaskLogEntry[], gbp: GbpEntry[], syncedAt: D
   });
 }
 
-/** 写しが古すぎないか（1日2回の取り込みなので14時間を超えたら止まっている） */
-export const SYNC_STALE_HOURS = 14;
+/** 写しが古すぎないか（取り込みは 8:30／21:30 で最大13時間空く。GitHub の定時実行の遅れを見込み16時間を超えたら止まっている） */
+export const SYNC_STALE_HOURS = 16;
 export function syncIsStale(syncedAt: Date, now: Date): boolean {
   return now.getTime() - syncedAt.getTime() > SYNC_STALE_HOURS * 60 * MIN;
 }
