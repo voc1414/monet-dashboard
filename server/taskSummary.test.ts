@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatJstShort, gbpRuns, scheduledTimes, summarizeTasks, syncIsStale, type TaskDef, type TaskLogEntry } from "../client/src/lib/taskSummary";
+import { TASKS, formatJstShort, gbpRuns, scheduledTimes, summarizeTasks, syncIsStale, type TaskDef, type TaskLogEntry } from "../client/src/lib/taskSummary";
 import type { GbpEntry } from "../client/src/lib/gbpSummary";
 
 const daily: TaskDef = {
@@ -51,5 +51,15 @@ describe("自動タスク 総合", () => {
   it("取り込みが14時間を超えて止まっていたら気付ける", () => {
     expect(syncIsStale(new Date("2026-11-27T08:30:00+09:00"), new Date("2026-11-27T21:31:00+09:00"))).toBe(false);
     expect(syncIsStale(new Date("2026-11-27T08:30:00+09:00"), new Date("2026-11-27T22:31:00+09:00"))).toBe(true);
+  });
+  it("ルーチン3本は13:30の確認記録で判定する（ブログが無い日は赤）", () => {
+    const blog = TASKS.find((t) => t.name === "ブログ公開")!;
+    expect(blog.times).toEqual(["13:30"]);
+    const ok = summarizeTasks([log("2026-11-27T13:30:05+09:00", "成功", 1, "ブログ公開")], [], new Date("2026-11-27T21:30:00+09:00"), [blog]);
+    expect(ok[0].lamp).toBe("green");
+    const missing = summarizeTasks([log("2026-11-27T13:30:05+09:00", "成功", 1, "ブログ公開")], [], new Date("2026-11-28T14:31:00+09:00"), [blog]);
+    expect(missing[0].lamp).toBe("red");
+    const bad = summarizeTasks([log("2026-11-28T13:30:05+09:00", "エラー", null, "ブログ公開")], [], new Date("2026-11-28T21:30:00+09:00"), [blog]);
+    expect(bad[0].lamp).toBe("red");
   });
 });
