@@ -88,9 +88,8 @@ export const OTHER_TASKS: { name: string; scheduleLabel: string; state: OtherSta
   { name: "monet-gokan.com ブログ公開", scheduleLabel: "毎日 10:30", state: "running", evidence: "11/24・25・26に公開あり" },
   { name: "L Message 流入タグの集計", scheduleLabel: "毎日 2:00", state: "running", evidence: "広告画面に過去7日のLINE登録212件" },
   { name: "口コミ返信（Google・サロンボード）", scheduleLabel: "毎日 12:00", state: "running", evidence: "11/26まで実行ログに成功" },
-  { name: "カウンセリングシート 月次集計", scheduleLabel: "毎月1日", state: "running", evidence: "10月分まで入っている" },
+  { name: "カウンセリングシート 月次集計", scheduleLabel: "毎月1日", state: "running", evidence: "2026年5月〜10月分が入っている" },
   { name: "カウンセリングシート 四半期ダウンロード", scheduleLabel: "1・4・7・10月の1日", state: "scheduled", evidence: "次は1/1" },
-  { name: "カウンセリング集計 取りこぼし補完", scheduleLabel: "登録なし", state: "stopped", evidence: "2025/5〜2026/4が空のまま" },
   { name: "サロンボードの鮮度チェック", scheduleLabel: "毎日 10:00", state: "covered", evidence: "上の「サロンボード取得」と同じ役目" },
 ];
 
