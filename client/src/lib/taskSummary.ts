@@ -1,7 +1,7 @@
 /*
  * monet 自動タスクの総合状況（2026-11-26 林さん「この案で作って」）。
  * 元データ：
- *   - Notion「DB_monet 自動タスク実行記録」の写し（data/taskLog.ts）… Mac mini の3本
+ *   - Notion「DB_monet 自動タスク実行記録」の写し（data/taskLog.ts）… Mac mini の3本＋ルーチン3本（成果物を見て記録）
  *   - Notion「DB_monet GBP公開履歴」の写し（data/gbpHistory.ts）… Googleマップ（Cloud Run）
  * 判定は「写しを作った時刻（syncedAt）」を基準にする。閲覧した時刻で判定すると、
  * 取り込み前に動いた分まで「動いていない」と赤になってしまうため。
@@ -65,6 +65,36 @@ export const TASKS: TaskDef[] = [
     source: "gbp",
   },
   {
+    name: "L Message集計",
+    where: "ルーチン",
+    // ルーチン本体は 毎日 2:00。13:30 に Mac mini（com.monet.tasklog.observe）が成果物を見て記録する
+    scheduleLabel: "毎日 13:30 確認",
+    times: ["13:30"],
+    graceMin: 60,
+    since: "2026-11-27T13:30:00+09:00",
+    source: "log",
+  },
+  {
+    name: "ブログ公開",
+    where: "ルーチン",
+    // ルーチン本体は 毎日 10:30。13:30 に Mac mini（com.monet.tasklog.observe）が成果物を見て記録する
+    scheduleLabel: "毎日 13:30 確認",
+    times: ["13:30"],
+    graceMin: 60,
+    since: "2026-11-27T13:30:00+09:00",
+    source: "log",
+  },
+  {
+    name: "口コミ返信",
+    where: "ルーチン",
+    // ルーチン本体は 毎日 12:00。13:30 に Mac mini（com.monet.tasklog.observe）が成果物を見て記録する
+    scheduleLabel: "毎日 13:30 確認",
+    times: ["13:30"],
+    graceMin: 60,
+    since: "2026-11-27T13:30:00+09:00",
+    source: "log",
+  },
+  {
     name: "HPBブログ 予約登録",
     where: "Mac mini",
     scheduleLabel: "毎日 20:00",
@@ -85,9 +115,6 @@ export type OtherState = "running" | "stopped" | "scheduled" | "covered";
  */
 export const OTHER_TASKS_CHECKED_ON = "2026-11-26";
 export const OTHER_TASKS: { name: string; scheduleLabel: string; state: OtherState; evidence: string }[] = [
-  { name: "monet-gokan.com ブログ公開", scheduleLabel: "毎日 10:30", state: "running", evidence: "11/24・25・26に公開あり" },
-  { name: "L Message 流入タグの集計", scheduleLabel: "毎日 2:00", state: "running", evidence: "広告画面に過去7日のLINE登録212件" },
-  { name: "口コミ返信（Google・サロンボード）", scheduleLabel: "毎日 12:00", state: "running", evidence: "11/26まで実行ログに成功" },
   { name: "カウンセリングシート 月次集計", scheduleLabel: "毎月1日", state: "running", evidence: "2026年5月〜10月分が入っている" },
   { name: "カウンセリングシート 四半期ダウンロード", scheduleLabel: "1・4・7・10月の1日", state: "scheduled", evidence: "次は1/1" },
   { name: "サロンボードの鮮度チェック", scheduleLabel: "毎日 10:00", state: "covered", evidence: "上の「サロンボード取得」と同じ役目" },
