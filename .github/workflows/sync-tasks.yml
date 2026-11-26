@@ -1,6 +1,6 @@
 # 自動タスク実行記録の写し（client/src/data/taskLog.ts）を Notion「DB_monet 自動タスク実行記録」に合わせる。
 # 書き込み元は Mac mini の自動タスク（HPBブログ 6:00・20:00／サロンボード取得 7:30）。
-# 毎日 8:30 と 21:30（日本時間）に取り込み、管理画面の「自動タスク」タブへ反映する。
+# 毎日 8:30 と 21:30（日本時間）に取り込み、管理画面の「自動タスク」タブへ反映する。Googleマップの公開履歴も同時に写す。
 # 写しには取り込み時刻が入るので、毎回コミットされる（画面は「この時刻の時点」で判定するため）。
 # 2026-11-26 林さん「この案で作って」。鍵は repo シークレット NOTION_TOKEN（hayashin-guard）。
 name: Sync task log
@@ -31,6 +31,12 @@ jobs:
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
         run: node scripts/sync-task-log.mjs
+      # Googleマップの公開履歴も同じ時刻に写す（判定時点と写しの時点を揃える。月・木10:30だけだと、
+      # 10:30 までに公開が終わらなかった回が次の木・月まで入らず、公開済みなのに黄になる・2026-11-26 独立監査）
+      - name: Googleマップの公開履歴も写し直す
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+        run: node scripts/sync-gbp-history.mjs
       # vite7 と @builder.io/vite-plugin-jsx-loc の peer 衝突があるため legacy-peer-deps 必須
       - run: npm ci --legacy-peer-deps
       - name: 型チェック (tsc --noEmit)
@@ -43,7 +49,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add client/src/data/taskLog.ts
+          git add client/src/data/taskLog.ts client/src/data/gbpHistory.ts
           git commit -m "自動タスク実行記録の写しをNotionに合わせて更新（$(TZ=Asia/Tokyo date '+%F %H:%M')）"
           git pull --rebase origin main
           git push origin HEAD:main
