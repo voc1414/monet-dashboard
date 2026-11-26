@@ -25,19 +25,9 @@ describe("自動タスク 総合", () => {
     expect(s.lamp).toBe("green");
     expect(s.latest?.count).toBe(14);
   });
-  it("予定の時刻＋猶予を過ぎて記録が無ければ赤（前日の記録だけ）", () => {
-    const [s] = summarizeTasks([log("2026-11-27T07:39:00+09:00", "成功")], [], new Date("2026-11-28T08:31:00+09:00"), [daily]);
-    expect(s.lamp).toBe("red");
-    expect(s.label).toContain("11/28(土) 07:30");
-  });
   it("猶予の内側ならまだ赤にしない", () => {
     const [s] = summarizeTasks([log("2026-11-27T07:39:00+09:00", "成功")], [], new Date("2026-11-28T08:20:00+09:00"), [daily]);
     expect(s.lamp).toBe("green");
-  });
-  it("結果に応じた色：要確認は黄・エラーと停止は赤・対象なしは灰", () => {
-    const at = new Date("2026-11-27T08:30:00+09:00");
-    const lamp = (r: string) => summarizeTasks([log("2026-11-27T07:40:00+09:00", r)], [], at, [daily])[0].lamp;
-    expect([lamp("要確認"), lamp("エラー"), lamp("停止"), lamp("対象なし")]).toEqual(["yellow", "red", "red", "gray"]);
   });
   it("GBPは月・木だけを予定とし、その日の公開をまとめて1回と数える", () => {
     const times = scheduledTimes(gbp, new Date("2026-11-30T12:00:00+09:00"), 3, 4).map((t) => formatJstShort(new Date(t).toISOString()));
@@ -52,14 +42,31 @@ describe("自動タスク 総合", () => {
     expect(syncIsStale(new Date("2026-11-27T08:30:00+09:00"), new Date("2026-11-27T21:31:00+09:00"))).toBe(false);
     expect(syncIsStale(new Date("2026-11-27T08:30:00+09:00"), new Date("2026-11-27T22:31:00+09:00"))).toBe(true);
   });
-  it("ルーチン3本は13:30の確認記録で判定する（ブログが無い日は赤）", () => {
+  it("予定日からの遅れで色を決める：2日未満は緑・2日以上は黄・3日以上は赤", () => {
+    const lamp = (now: string) => summarizeTasks([log("2026-11-27T07:39:00+09:00", "成功")], [], new Date(now), [daily])[0];
+    // 11/28 7:30 の予定をこなしていない
+    const d1 = lamp("2026-11-28T08:31:00+09:00");
+    expect(d1.lamp).toBe("green");
+    expect(d1.label).toContain("11/28(土) 07:30");
+    expect(lamp("2026-11-29T08:31:00+09:00").lamp).toBe("green"); // 1日遅れ
+    expect(lamp("2026-11-30T08:31:00+09:00").lamp).toBe("yellow"); // 2日遅れ
+    expect(lamp("2026-12-01T08:31:00+09:00").lamp).toBe("red"); // 3日遅れ
+    expect(lamp("2026-12-01T08:31:00+09:00").label).toContain("3日遅れ");
+  });
+  it("エラー・停止はこなしていない扱い。要確認・対象なしはこなした扱い", () => {
+    const at = (r: string, now: string) => summarizeTasks([log("2026-11-27T07:40:00+09:00", r)], [], new Date(now), [daily])[0].lamp;
+    expect(at("エラー", "2026-11-27T08:41:00+09:00")).toBe("green"); // 当日はまだ緑（理由は出る）
+    expect(at("エラー", "2026-11-29T08:41:00+09:00")).toBe("yellow");
+    expect(at("停止", "2026-11-30T08:41:00+09:00")).toBe("red");
+    expect(at("要確認", "2026-11-27T08:41:00+09:00")).toBe("green");
+    expect(at("対象なし", "2026-11-27T08:41:00+09:00")).toBe("green");
+  });
+  it("ルーチン3本は13:30の確認記録で判定する", () => {
     const blog = TASKS.find((t) => t.name === "ブログ公開")!;
     expect(blog.times).toEqual(["13:30"]);
     const ok = summarizeTasks([log("2026-11-27T13:30:05+09:00", "成功", 1, "ブログ公開")], [], new Date("2026-11-27T21:30:00+09:00"), [blog]);
     expect(ok[0].lamp).toBe("green");
-    const missing = summarizeTasks([log("2026-11-27T13:30:05+09:00", "成功", 1, "ブログ公開")], [], new Date("2026-11-28T14:31:00+09:00"), [blog]);
-    expect(missing[0].lamp).toBe("red");
-    const bad = summarizeTasks([log("2026-11-28T13:30:05+09:00", "エラー", null, "ブログ公開")], [], new Date("2026-11-28T21:30:00+09:00"), [blog]);
-    expect(bad[0].lamp).toBe("red");
+    const late = summarizeTasks([log("2026-11-27T13:30:05+09:00", "成功", 1, "ブログ公開")], [], new Date("2026-11-30T14:31:00+09:00"), [blog]);
+    expect(late[0].lamp).toBe("yellow");
   });
 });
