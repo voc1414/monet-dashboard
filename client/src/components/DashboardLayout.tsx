@@ -98,7 +98,7 @@ export default function DashboardLayout({
             管理者の9タブは xl（1280px）でもフルラベルだとロゴに重なる（2026-11-26 林さん指摘・実測）ので、
             タブが8本以上のときはフルラベルを 2xl（1536px）からにする。ロゴは縮ませない。
           */}
-          <nav className="hidden lg:flex min-w-0 items-center gap-3 xl:gap-6">
+          <nav className="hidden lg:flex min-w-0 items-center gap-3 lg:mx-4 xl:gap-6">
             {tabs.map((tab) => (
               <Link key={tab.href} href={tab.href}>
                 <span
@@ -126,8 +126,9 @@ export default function DashboardLayout({
           </nav>
 
           <div className="flex items-center gap-3">
+            {/* タブが多いと 1024〜1279px で最終更新の文字がタブに重なるので、その幅では出さない（2026-11-26 独立監査） */}
             {lastUpdated && (
-              <span className="text-xs text-muted-foreground hidden sm:block">
+              <span className={`text-xs text-muted-foreground whitespace-nowrap ${manyTabs ? "hidden xl:block" : "hidden sm:block"}`}>
                 最終更新: {lastUpdated.toLocaleTimeString("ja-JP")}
               </span>
             )}
@@ -218,7 +219,7 @@ export default function DashboardLayout({
         <div
           className={
             compactBottomNav
-              ? // 9個以上（管理者の「自動タスク」追加後）は5列にして、最後の1個が3段目に取り残されないようにする
+              ? // 9個以上は5列、6〜8個は4列（管理者は8個＝4列×2段）。最後の1個が3段目に取り残されないようにする
                 tabs.length + (showSettings ? 1 : 0) > 8
                 ? "grid grid-cols-5 py-1"
                 : "grid grid-cols-4 py-1"
