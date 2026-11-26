@@ -76,28 +76,28 @@ export const TASKS: TaskDef[] = [
   },
 ];
 
-export type OtherState = "running" | "stopped" | "unknown" | "covered";
+export type OtherState = "running" | "stopped" | "scheduled" | "covered";
 
 /**
  * 実行記録をまだ書いていないmonet関係の自動タスク。
- * このMac miniのCoworkでは全部オフだが、別の場所（林さんのMacBookのCoworkと思われる・未確認）で動いているものがある。
- * 状態は 2026-11-26 に成果物を見て確かめた結果で、自動では変わらない。記録を書く仕組みを入れたら TASKS へ移す。
+ * 2026-10-28 に Cowork から claude.ai のルーチン（スケジュール済みタスク）へ移って動いている（一覧＝claude.ai/code/routines）。
+ * 状態は 2026-11-26 にルーチン一覧と成果物を見て確かめた結果で、自動では変わらない。記録を書く仕組みを入れたら TASKS へ移す。
  */
 export const OTHER_TASKS_CHECKED_ON = "2026-11-26";
 export const OTHER_TASKS: { name: string; scheduleLabel: string; state: OtherState; evidence: string }[] = [
-  { name: "monet-gokan.com ブログ公開", scheduleLabel: "毎日", state: "running", evidence: "11/24・25・26に公開あり" },
-  { name: "L Message 流入タグの集計", scheduleLabel: "毎日", state: "running", evidence: "広告画面に過去7日のLINE登録212件" },
+  { name: "monet-gokan.com ブログ公開", scheduleLabel: "毎日 10:30", state: "running", evidence: "11/24・25・26に公開あり" },
+  { name: "L Message 流入タグの集計", scheduleLabel: "毎日 2:00", state: "running", evidence: "広告画面に過去7日のLINE登録212件" },
+  { name: "口コミ返信（Google・サロンボード）", scheduleLabel: "毎日 12:00", state: "running", evidence: "11/26まで実行ログに成功" },
   { name: "カウンセリングシート 月次集計", scheduleLabel: "毎月1日", state: "running", evidence: "10月分まで入っている" },
-  { name: "カウンセリング集計 取りこぼし補完", scheduleLabel: "毎日", state: "stopped", evidence: "2025年5月〜2026年4月が空のまま" },
-  { name: "カウンセリングシート 四半期ダウンロード", scheduleLabel: "1・4・7・10月の1日", state: "unknown", evidence: "次は1/1。動く場所が分からない" },
-  { name: "口コミ返信（Google・サロンボード）", scheduleLabel: "毎日", state: "unknown", evidence: "返信の状況をまだ見ていない" },
-  { name: "サロンボードの鮮度チェック", scheduleLabel: "毎日", state: "covered", evidence: "上の「サロンボード取得」が同じ役目" },
+  { name: "カウンセリングシート 四半期ダウンロード", scheduleLabel: "1・4・7・10月の1日", state: "scheduled", evidence: "次は1/1" },
+  { name: "カウンセリング集計 取りこぼし補完", scheduleLabel: "登録なし", state: "stopped", evidence: "2025/5〜2026/4が空のまま" },
+  { name: "サロンボードの鮮度チェック", scheduleLabel: "毎日 10:00", state: "covered", evidence: "上の「サロンボード取得」と同じ役目" },
 ];
 
 export const OTHER_STATE: Record<OtherState, { lamp: Lamp; label: string }> = {
   running: { lamp: "green", label: "動いている" },
   stopped: { lamp: "red", label: "止まっている" },
-  unknown: { lamp: "gray", label: "未確認" },
+  scheduled: { lamp: "gray", label: "登録あり" },
   covered: { lamp: "gray", label: "代わりあり" },
 };
 
