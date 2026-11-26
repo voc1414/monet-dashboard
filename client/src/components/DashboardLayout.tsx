@@ -214,7 +214,10 @@ export default function DashboardLayout({
         <div
           className={
             compactBottomNav
-              ? "grid grid-cols-4 py-1"
+              ? // 9個以上（管理者の「自動タスク」追加後）は5列にして、最後の1個が3段目に取り残されないようにする
+                tabs.length + (showSettings ? 1 : 0) > 8
+                ? "grid grid-cols-5 py-1"
+                : "grid grid-cols-4 py-1"
               : "flex items-center justify-around h-14"
           }
         >
