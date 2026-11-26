@@ -69,4 +69,22 @@ describe("自動タスク 総合", () => {
     const late = summarizeTasks([log("2026-11-27T13:30:05+09:00", "成功", 1, "ブログ公開")], [], new Date("2026-11-30T14:31:00+09:00"), [blog]);
     expect(late[0].lamp).toBe("yellow");
   });
+  it("1日以内の遅れは緑のままだが遅れ日数と文言で知らせる", () => {
+    const [s] = summarizeTasks([log("2026-11-27T07:39:00+09:00", "成功")], [], new Date("2026-11-28T08:31:00+09:00"), [daily]);
+    expect(s.lamp).toBe("green");
+    expect(s.lateDays).toBe(0);
+    expect(s.label).toContain("遅れ");
+  });
+  it("猶予の内側は「待っています」", () => {
+    const [s] = summarizeTasks([log("2026-11-27T07:39:00+09:00", "成功")], [], new Date("2026-11-28T07:50:00+09:00"), [daily]);
+    expect(s.label).toContain("待っています");
+    expect(s.lateDays).toBeUndefined();
+  });
+  it("GBPは自動公開が始まる前の記録（手動テスト）を成功に数えない", () => {
+    const test = g("2026-11-26T00:28:00Z", "堀江院", "公開");
+    const [s] = summarizeTasks([], [test], new Date("2026-11-27T21:30:00+09:00"), [gbp]);
+    expect(s.lamp).toBe("gray");
+    expect(s.latest).toBeUndefined();
+  });
 });
+

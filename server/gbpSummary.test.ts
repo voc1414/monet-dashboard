@@ -44,4 +44,11 @@ describe("Googleマップ 院ごとの状況（予定日からの遅れで色）
     expect(formatJst("2026-11-26T00:28:00Z")).toBe("11/26(木) 09:28");
     expect(formatJst(undefined)).toBe("—");
   });
+  it("開始前のテスト公開は「予定どおり」にせず、灰で件数を添える", () => {
+    const [s] = summarize([e("A", "写真", "公開", "2026-11-26T00:28:00Z")], at("2026-11-27T21:30:00+09:00"), ["A"]);
+    expect(s.lamp).toBe("gray");
+    expect(s.label).toContain("テスト 1件");
+    expect(s.photos).toBe(1);
+  });
 });
+
