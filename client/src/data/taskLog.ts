@@ -2,9 +2,16 @@
 import type { TaskLogEntry } from "@/lib/taskSummary";
 
 /** この写しを作った時刻。画面の判定はこの時刻を「いま」として行う */
-export const TASK_LOG_SYNCED_AT = "2026-11-26T14:37:11.671Z";
+export const TASK_LOG_SYNCED_AT = "2026-11-26T21:51:03.266Z";
 
 export const TASK_LOG: TaskLogEntry[] = [
+  {
+    "at": "2026-11-27T06:00:00.000+09:00",
+    "task": "HPBブログ 原稿づくり",
+    "result": "対象なし",
+    "count": null,
+    "reason": "11/29(日)分は開始日より前のため作成なし — 新しい院: 春日院（H000828551・stores.jsonにあり投稿対象外）はサロンボードの店舗切替に出ていないため投稿対象にせず"
+  },
   {
     "at": "2026-11-26T20:47:00.000+09:00",
     "task": "HPBブログ 予約登録",
