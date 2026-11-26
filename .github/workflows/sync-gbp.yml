@@ -1,11 +1,11 @@
 # Googleマップ（GBP）公開履歴の写し（client/src/data/gbpHistory.ts）を Notion「DB_monet GBP公開履歴」に合わせる。
-# 公開は Cloud Run Job「monet-gbp」が月・木 10:00（日本時間）。その30分後に取り込んで管理画面へ反映する。
+# 公開は Cloud Run Job「monet-gbp」が月・木 10:00（日本時間）。定時の取り込みは sync-tasks.yml（8:30／21:30）で行う。
 # 2026-11-26 林さん「その形で作って」。Notion は hayashin-guard に接続済み。鍵は repo シークレット NOTION_TOKEN。
 name: Sync GBP history
 
+# 2026-11-26：定時の取り込みは sync-tasks.yml（8:30／21:30）に一本化した。ここは手動実行用に残す
+# （別の時刻に写すと、画面の「◯時点」より新しい公開記録が混ざるため・独立監査）。
 on:
-  schedule:
-    - cron: "30 1 * * 1,4" # 月・木 10:30（日本時間）
   workflow_dispatch:
 
 permissions:
