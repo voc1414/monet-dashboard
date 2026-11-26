@@ -16,7 +16,8 @@
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "sync:staff": "node scripts/sync-staff-master.mjs",
     "sync:stores": "node scripts/sync-store-master.mjs",
-    "sync:gbp": "node scripts/sync-gbp-history.mjs"
+    "sync:gbp": "node scripts/sync-gbp-history.mjs",
+    "sync:tasks": "node scripts/sync-task-log.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.693.0",
