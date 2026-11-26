@@ -21,8 +21,14 @@ export const GBP_STORES = [
   "楽々園院", "福島院", "高槻院", "堀江院2nd", "堀江院",
 ];
 
-/** 月・木の週2回なので、公開が8日以上空いたら止まっていると見なす */
-export const STALE_DAYS = 8;
+import { RED_DAYS, TASKS, YELLOW_DAYS, scheduledTimes, type Lamp } from "./taskSummary";
+
+/**
+ * 院ごとの色も自動タスクと同じ決まり（2026-11-26 林さん「揃えて」）：
+ * 最後に公開した後の、公開できていない最初の予定（月・木 10:00＋猶予）からの日数で
+ * 🟢2日未満／🟡2日以上／🔴3日以上。予定が始まる前（記録を取り始める前）は灰。
+ */
+const GBP_DEF = TASKS.find((t) => t.source === "gbp")!;
 
 export interface StoreStatus {
   store: string;
@@ -32,14 +38,18 @@ export interface StoreStatus {
   photos: number;
   /** 直近の記録が停止・エラーならその行 */
   problem?: GbpEntry;
-  stale: boolean;
-  /** 赤で出す理由（空なら正常） */
-  alert: string;
+  lamp: Lamp;
+  /** 状態の一言 */
+  label: string;
 }
 
 const DAY = 86_400_000;
+const MIN = 60_000;
 
-export function summarize(entries: GbpEntry[], now: Date, stores = GBP_STORES): StoreStatus[] {
+export function summarize(entries: GbpEntry[], now: Date, stores = GBP_STORES, def = GBP_DEF): StoreStatus[] {
+  const times = scheduledTimes(def, now, 40, 0);
+  const since = new Date(def.since).getTime();
+  const t = now.getTime();
   return stores.map((store) => {
     const mine = entries.filter((e) => e.store === store).sort((a, b) => b.at.localeCompare(a.at));
     const ok = mine.filter((e) => e.result === "公開");
@@ -48,24 +58,24 @@ export function summarize(entries: GbpEntry[], now: Date, stores = GBP_STORES): 
     const last = ok[0]?.at;
     const latest = mine[0];
     const problem = latest && latest.result !== "公開" ? latest : undefined;
-    const stale = !last || now.getTime() - new Date(last).getTime() >= STALE_DAYS * DAY;
-    const alert = problem
-      ? `直近が${problem.result}（${problem.kind}）`
-      : !last
-        ? "公開の記録なし"
-        : stale
-          ? `${STALE_DAYS}日以上公開なし`
-          : "";
-    return {
+    const doneAt = last ? new Date(last).getTime() : -Infinity;
+    const missed = times.find((x) => x >= since && x + def.graceMin * MIN <= t && x > doneAt + 5 * MIN);
+    const base = {
       store,
       lastPost,
       lastPhoto,
       posts: ok.filter((e) => e.kind === "投稿").length,
       photos: ok.filter((e) => e.kind === "写真").length,
       problem,
-      stale,
-      alert,
     };
+    if (missed === undefined) {
+      if (!last && t < since) return { ...base, lamp: "gray" as Lamp, label: `自動公開は ${formatJst(def.since)} から` };
+      return { ...base, lamp: "green" as Lamp, label: problem ? `直近が${problem.result}（${problem.kind}）` : "予定どおり" };
+    }
+    const lateDays = Math.floor((t - missed) / DAY);
+    const lamp: Lamp = lateDays >= RED_DAYS ? "red" : lateDays >= YELLOW_DAYS ? "yellow" : "green";
+    const label = lateDays >= 1 ? `${lateDays}日遅れ（${formatJst(new Date(missed).toISOString())} から公開なし）` : `${formatJst(new Date(missed).toISOString())} の公開なし`;
+    return { ...base, lamp, label };
   });
 }
 
