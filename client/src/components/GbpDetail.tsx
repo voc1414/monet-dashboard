@@ -9,6 +9,7 @@ import { GBP_HISTORY } from "@/data/gbpHistory";
 import { formatJst, isBeforeAuto, summarize, type StoreStatus } from "@/lib/gbpSummary";
 import { TASK_LOG_SYNCED_AT } from "@/data/taskLog";
 import type { Lamp } from "@/lib/taskSummary";
+import { Label } from "@/components/StatusLabel";
 
 const ROW: Record<Lamp, string> = { green: "", gray: "", yellow: "bg-amber-50 text-amber-800", red: "bg-red-50 text-red-700" };
 const TEXT: Record<Lamp, string> = { green: "text-emerald-600", gray: "text-muted-foreground", yellow: "text-amber-800", red: "text-red-700" };
@@ -17,9 +18,22 @@ const DOT: Record<Lamp, string> = { green: "bg-emerald-500", gray: "bg-slate-300
 /** 文字の色：ランプ（遅れの日数）が緑でも、1日以内の遅れ・停止・エラーは文字で知らせる */
 function tone(s: StoreStatus): string {
   if (s.lamp !== "green") return TEXT[s.lamp];
-  if (s.lateDays !== undefined) return "text-amber-700";
   if (s.problem) return "text-red-700";
+  if (s.lateDays !== undefined) return "text-amber-700";
   return TEXT.green;
+}
+
+/** 理由文の「 — 」区切りを1区切り1行で出す（自動タスク側と同じ。短い切れ端が1〜2文字で次の行に落ちないように） */
+function Reason({ text }: { text: string }) {
+  return (
+    <>
+      {text.split(" — ").map((t, i) => (
+        <span key={i} className="block [word-break:auto-phrase] [overflow-wrap:anywhere] [text-wrap:pretty]">
+          {t}
+        </span>
+      ))}
+    </>
+  );
 }
 
 function Dot({ lamp }: { lamp: Lamp }) {
@@ -30,12 +44,13 @@ export default function GbpDetail() {
   // 自動タスクと同じ時点（取り込んだ時刻）で判定する
   const status = useMemo(() => summarize(GBP_HISTORY, new Date(TASK_LOG_SYNCED_AT)), []);
   const recent = useMemo(
-    () => [...GBP_HISTORY].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 40),
+    () => [...GBP_HISTORY].sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 40),
     [],
   );
   const red = status.filter((s) => s.lamp === "red").length;
   const yellow = status.filter((s) => s.lamp === "yellow").length;
-  const soft = status.filter((s) => s.lamp === "green" && s.lateDays !== undefined).length;
+  const soft = status.filter((s) => s.lamp === "green" && s.lateDays !== undefined && !s.problem).length;
+  const failed = status.filter((s) => s.lamp === "green" && s.problem).length;
 
   return (
     <div className="space-y-6">
@@ -45,8 +60,8 @@ export default function GbpDetail() {
     <section className="rounded-2xl border border-border/60 bg-white/70 p-4 shadow-sm">
       <h3 className="mb-3 text-sm font-bold text-foreground">
         院ごとの状況
-        <span className={`ml-2 inline-block whitespace-nowrap text-xs ${red ? "text-red-600" : yellow || soft ? "text-amber-700" : "text-emerald-600"}`}>
-          {red ? `直すこと ${red}院` : yellow ? `確認すること ${yellow}院` : soft ? `1日以内の遅れ ${soft}院` : "遅れている院はありません"}
+        <span className={`block whitespace-nowrap text-xs sm:ml-2 sm:inline-block ${red || failed ? "text-red-600" : yellow || soft ? "text-amber-700" : "text-emerald-600"}`}>
+          {[red && `3日以上の遅れ ${red}院`, yellow && `2日以上の遅れ ${yellow}院`, failed && `失敗 ${failed}院`, soft && `1日以内の遅れ ${soft}院`].filter(Boolean).join(" ／ ") || "遅れている院はありません"}
         </span>
       </h3>
       <ul className="space-y-2 lg:hidden" data-testid="gbp-status-cards">
@@ -55,14 +70,14 @@ export default function GbpDetail() {
             <div className="flex flex-wrap items-center gap-x-2">
               <Dot lamp={s.lamp} />
               <span className="text-sm font-bold whitespace-nowrap">{s.store}</span>
-              <span className={`ml-auto font-medium [word-break:auto-phrase] ${tone(s)}`}>{s.label}</span>
+              <span className={`ml-auto font-medium [word-break:auto-phrase] ${tone(s)}`}><Label text={s.label} /></span>
             </div>
-            {s.problem?.reason && <div className="mt-1 opacity-80 [word-break:auto-phrase] [text-wrap:pretty]">{s.problem.reason}</div>}
+            {s.problem?.reason && <div className="mt-1 opacity-80"><Reason text={s.problem.reason} /></div>}
             <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
               <dt className="text-muted-foreground">最後の投稿</dt>
-              <dd className="tabular-nums">{formatJst(s.lastPost)}（{s.posts}件）</dd>
+              <dd className="tabular-nums"><span className="whitespace-nowrap">{formatJst(s.lastPost)}</span><span className="whitespace-nowrap">（{s.posts}件）</span></dd>
               <dt className="text-muted-foreground">最後の写真</dt>
-              <dd className="tabular-nums">{formatJst(s.lastPhoto)}（{s.photos}件）</dd>
+              <dd className="tabular-nums"><span className="whitespace-nowrap">{formatJst(s.lastPhoto)}</span><span className="whitespace-nowrap">（{s.photos}件）</span></dd>
             </dl>
           </li>
         ))}
@@ -93,8 +108,8 @@ export default function GbpDetail() {
                 <td className="py-1.5 pr-3 text-right tabular-nums">{s.posts}</td>
                 <td className="py-1.5 pr-3 text-right tabular-nums">{s.photos}</td>
                 <td className="py-1.5 text-xs">
-                  <span className={tone(s)}>{s.label}</span>
-                  {s.problem?.reason && <div className="text-[11px] opacity-80">{s.problem.reason}</div>}
+                  <span className={tone(s)}><Label text={s.label} /></span>
+                  {s.problem?.reason && <div className="text-[11px] opacity-80"><Reason text={s.problem.reason} /></div>}
                 </td>
               </tr>
             ))}
@@ -119,7 +134,7 @@ export default function GbpDetail() {
               {isBeforeAuto(e) && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-amber-800">自動公開前のテスト</span>}
               <span className="text-muted-foreground tabular-nums">{formatJst(e.at)}</span>
               {e.link && (
-                <a href={e.link} target="_blank" rel="noreferrer" className="ml-auto inline-flex items-center gap-1 text-primary">
+                <a href={e.link} target="_blank" rel="noreferrer" className="ml-auto inline-flex min-h-[44px] items-center gap-1 px-1 text-primary">
                   Googleで見る <ExternalLink className="w-3 h-3" />
                 </a>
               )}
@@ -130,8 +145,11 @@ export default function GbpDetail() {
               )}
               <div className="min-w-0 text-sm">
                 {e.theme && <div className="mb-1 text-xs text-muted-foreground">{e.theme}</div>}
-                {e.text && <p className="whitespace-pre-wrap break-words line-clamp-6 [word-break:auto-phrase]">{e.text}</p>}
-                {e.reason && <p className="text-xs text-red-700">{e.reason}</p>}
+                {e.text && (
+                  // 長い投稿本文は普通の和文の改行。写真の説明など短い文は単語の途中で割らない
+                  <p className={`whitespace-pre-wrap break-words line-clamp-6 ${e.kind === "写真" || e.text.length <= 40 ? "[word-break:auto-phrase]" : ""}`}>{e.text}</p>
+                )}
+                {e.reason && <p className={`text-xs ${e.result === "公開" ? "text-muted-foreground" : "text-red-700"}`}><Reason text={e.reason} /></p>}
               </div>
             </div>
           </article>

@@ -73,7 +73,7 @@ export default function DashboardLayout({
       <header className="sticky top-0 z-50 border-b border-border/60 bg-white/85 backdrop-blur-md">
         <div className="container flex items-center justify-between h-16">
           <Link href="/">
-            <div className="flex shrink-0 items-center gap-3 group cursor-pointer">
+            <div className="flex min-h-[44px] shrink-0 items-center gap-3 group cursor-pointer">
               <img
                 src={MONET_LOGO}
                 alt="monet"
@@ -102,7 +102,7 @@ export default function DashboardLayout({
             {tabs.map((tab) => (
               <Link key={tab.href} href={tab.href}>
                 <span
-                  className={`flex items-center gap-1.5 xl:gap-2 whitespace-nowrap text-sm font-medium transition-colors hover:text-primary ${
+                  className={`flex min-h-[44px] items-center gap-1.5 xl:gap-2 whitespace-nowrap text-sm font-medium transition-colors hover:text-primary ${
                     tab.isActive(location) ? "text-foreground" : "text-muted-foreground"
                   }`}
                 >
@@ -136,7 +136,7 @@ export default function DashboardLayout({
               <button
                 onClick={onRefresh}
                 disabled={loading}
-                className="p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground disabled:opacity-50"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground disabled:opacity-50"
                 title="データを更新"
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
@@ -174,11 +174,11 @@ export default function DashboardLayout({
       {/* Breadcrumbs（スタッフ向けは先頭の「ホーム ＞」を出さない。2026-10-02 林さん指示） */}
       {shownCrumbs.length > 0 && (
         <div className="border-b border-border/40 bg-white/40">
-          <div className="container py-3">
+          <div className="container py-0.5">
             <nav className="flex items-center gap-1.5 text-sm">
               {showHomeCrumb && (
                 <Link href="/">
-                  <span className="text-muted-foreground hover:text-primary transition-colors cursor-pointer">
+                  <span className="inline-flex min-h-[44px] min-w-[44px] items-center text-muted-foreground hover:text-primary transition-colors cursor-pointer">
                     ホーム
                   </span>
                 </Link>
@@ -188,7 +188,7 @@ export default function DashboardLayout({
                   {(showHomeCrumb || i > 0) && <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50" />}
                   {crumb.href ? (
                     <Link href={crumb.href}>
-                      <span className="text-muted-foreground hover:text-primary transition-colors cursor-pointer">
+                      <span className="inline-flex min-h-[44px] items-center text-muted-foreground hover:text-primary transition-colors cursor-pointer">
                         {crumb.label}
                       </span>
                     </Link>
