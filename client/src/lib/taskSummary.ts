@@ -138,6 +138,10 @@ export interface TaskStatus {
   /** 判定時点で、記録があるはずだった最後の予定時刻 */
   expected?: string;
   next?: string;
+  /** こなせていない予定からの日数（遅れていなければ undefined）。0〜1日は緑のまま、文字で知らせる */
+  lateDays?: number;
+  /** 猶予の内側で、まだ記録を待っている予定 */
+  waiting?: string;
 }
 
 const MIN = 60_000;
@@ -196,28 +200,38 @@ export const RED_DAYS = 3;
 export function summarizeTasks(log: TaskLogEntry[], gbp: GbpEntry[], syncedAt: Date, defs = TASKS): TaskStatus[] {
   const gbpLog = gbpRuns(gbp);
   return defs.map((def) => {
-    const mine = (def.source === "gbp" ? gbpLog : log.filter((e) => e.task === def.name)).sort((a, b) =>
-      b.at.localeCompare(a.at),
-    );
+    const since = new Date(def.since).getTime();
+    // GBP は自動公開が始まる前の記録（手動テスト）を「動いた」に数えない
+    const src = def.source === "gbp" ? gbpLog.filter((e) => new Date(e.at).getTime() >= since - 5 * MIN) : log.filter((e) => e.task === def.name);
+    const mine = src.sort((a, b) => b.at.localeCompare(a.at));
     const latest = mine[0];
     const lastDone = mine.find((e) => DONE.has(e.result));
     const times = scheduledTimes(def, syncedAt, 40, 10);
-    const since = new Date(def.since).getTime();
     const now = syncedAt.getTime();
     const next = times.find((t) => t > now);
-    const due = times.filter((t) => t >= since && t + def.graceMin * MIN <= now).pop();
-    // 最後にこなした後の、こなせていない最初の予定（猶予を過ぎたもの）
     const doneAt = lastDone ? new Date(lastDone.at).getTime() : -Infinity;
+    // 最後にこなした後の、こなせていない最初の予定（猶予を過ぎたもの）
     const missed = times.find((t) => t >= since && t + def.graceMin * MIN <= now && t > doneAt + 5 * MIN);
-    const expected = missed !== undefined ? new Date(missed).toISOString() : due !== undefined ? new Date(due).toISOString() : undefined;
-    const base = { def, latest, expected, next: next !== undefined ? new Date(next).toISOString() : undefined };
+    // 猶予の内側でまだ記録が無い予定（実行中かもしれない）
+    const pending = times.find((t) => t >= since && t <= now && now < t + def.graceMin * MIN && t > doneAt + 5 * MIN);
+    const base = {
+      def,
+      latest,
+      expected: missed !== undefined ? new Date(missed).toISOString() : undefined,
+      next: next !== undefined ? new Date(next).toISOString() : undefined,
+      waiting: pending !== undefined ? new Date(pending).toISOString() : undefined,
+    };
 
     if (missed !== undefined) {
       const lateDays = Math.floor((now - missed) / DAY);
       const lamp: Lamp = lateDays >= RED_DAYS ? "red" : lateDays >= YELLOW_DAYS ? "yellow" : "green";
-      const what = latest && new Date(latest.at).getTime() >= missed - 5 * MIN ? `${latest.result}のまま` : "実行記録がない";
-      const label = lateDays >= 1 ? `${lateDays}日遅れ（${formatJstShort(base.expected)} から${what}）` : `${formatJstShort(base.expected)} の${what === "実行記録がない" ? "実行記録がない" : latest!.result}`;
-      return { ...base, lamp, label };
+      const failed = latest && new Date(latest.at).getTime() >= missed - 5 * MIN ? latest.result : undefined;
+      const what = failed ? `${failed}のまま` : "記録なし";
+      const label = lateDays >= 1 ? `${lateDays}日遅れ（${formatJstShort(base.expected)} から${what}）` : `遅れ：${formatJstShort(base.expected)} の分が${failed ?? "記録なし"}`;
+      return { ...base, lamp, label, lateDays };
+    }
+    if (pending !== undefined) {
+      return { ...base, lamp: latest ? ("green" as Lamp) : ("gray" as Lamp), label: `${formatJstShort(base.waiting)} の分を待っています` };
     }
     if (!latest) {
       return { ...base, lamp: "gray", label: `記録は ${formatJstShort(def.since)} から` };

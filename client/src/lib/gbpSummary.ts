@@ -41,10 +41,17 @@ export interface StoreStatus {
   lamp: Lamp;
   /** 状態の一言 */
   label: string;
+  /** こなせていない公開予定からの日数（遅れていなければ undefined） */
+  lateDays?: number;
 }
 
 const DAY = 86_400_000;
 const MIN = 60_000;
+
+/** 自動公開が始まる前の記録（手動テスト）か */
+export function isBeforeAuto(e: GbpEntry, def = GBP_DEF): boolean {
+  return new Date(e.at).getTime() < new Date(def.since).getTime() - 5 * MIN;
+}
 
 export function summarize(entries: GbpEntry[], now: Date, stores = GBP_STORES, def = GBP_DEF): StoreStatus[] {
   const times = scheduledTimes(def, now, 40, 0);
@@ -55,10 +62,11 @@ export function summarize(entries: GbpEntry[], now: Date, stores = GBP_STORES, d
     const ok = mine.filter((e) => e.result === "公開");
     const lastPost = ok.find((e) => e.kind === "投稿")?.at;
     const lastPhoto = ok.find((e) => e.kind === "写真")?.at;
-    const last = ok[0]?.at;
-    const latest = mine[0];
+    const auto = mine.filter((e) => !isBeforeAuto(e, def));
+    const autoOk = auto.filter((e) => e.result === "公開");
+    const latest = auto[0];
     const problem = latest && latest.result !== "公開" ? latest : undefined;
-    const doneAt = last ? new Date(last).getTime() : -Infinity;
+    const doneAt = autoOk[0] ? new Date(autoOk[0].at).getTime() : -Infinity;
     const missed = times.find((x) => x >= since && x + def.graceMin * MIN <= t && x > doneAt + 5 * MIN);
     const base = {
       store,
@@ -68,14 +76,18 @@ export function summarize(entries: GbpEntry[], now: Date, stores = GBP_STORES, d
       photos: ok.filter((e) => e.kind === "写真").length,
       problem,
     };
+    const tests = mine.length - auto.length;
     if (missed === undefined) {
-      if (!last && t < since) return { ...base, lamp: "gray" as Lamp, label: `自動公開は ${formatJst(def.since)} から` };
+      if (!autoOk.length) {
+        const note = tests ? `（開始前のテスト ${tests}件）` : "";
+        return { ...base, lamp: "gray" as Lamp, label: `自動公開は ${formatJst(def.since)} から${note}` };
+      }
       return { ...base, lamp: "green" as Lamp, label: problem ? `直近が${problem.result}（${problem.kind}）` : "予定どおり" };
     }
     const lateDays = Math.floor((t - missed) / DAY);
     const lamp: Lamp = lateDays >= RED_DAYS ? "red" : lateDays >= YELLOW_DAYS ? "yellow" : "green";
-    const label = lateDays >= 1 ? `${lateDays}日遅れ（${formatJst(new Date(missed).toISOString())} から公開なし）` : `${formatJst(new Date(missed).toISOString())} の公開なし`;
-    return { ...base, lamp, label };
+    const label = lateDays >= 1 ? `${lateDays}日遅れ（${formatJst(new Date(missed).toISOString())} から公開なし）` : `遅れ：${formatJst(new Date(missed).toISOString())} の公開なし`;
+    return { ...base, lamp, label, lateDays };
   });
 }
 
