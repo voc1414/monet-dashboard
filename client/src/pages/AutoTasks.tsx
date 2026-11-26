@@ -112,7 +112,7 @@ export default function AutoTasks() {
                 )}
                 <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 pl-[18px] text-xs">
                   <dt className="text-muted-foreground">予定</dt>
-                  <dd>{s.def.scheduleLabel}（{s.def.where}）</dd>
+                  <dd>{s.def.scheduleLabel}<span className="whitespace-nowrap">（{s.def.where}）</span></dd>
                   <dt className="text-muted-foreground">最後に動いた</dt>
                   <dd className="tabular-nums">{formatJstShort(s.latest?.at)}</dd>
                   <dt className="text-muted-foreground">次の予定</dt>
