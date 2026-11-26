@@ -11,7 +11,9 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { GBP_HISTORY } from "@/data/gbpHistory";
 import { TASK_LOG, TASK_LOG_SYNCED_AT } from "@/data/taskLog";
 import {
-  PAUSED_TASKS,
+  OTHER_STATE,
+  OTHER_TASKS,
+  OTHER_TASKS_CHECKED_ON,
   SYNC_STALE_HOURS,
   formatJstShort,
   gbpRuns,
@@ -61,7 +63,7 @@ export default function AutoTasks() {
       ? { lamp: "red" as Lamp, text: `直すこと ${red}本`, sub: "止まっている・失敗したタスクがあります" }
       : yellow
         ? { lamp: "yellow" as Lamp, text: `確認すること ${yellow}本`, sub: "動いたが、人が見る必要があります" }
-        : { lamp: "green" as Lamp, text: "直すことはありません", sub: "すべて予定どおり動いています" };
+        : { lamp: "green" as Lamp, text: "直すことはありません", sub: "記録のあるタスクはすべて予定どおり" };
 
   return (
     <DashboardLayout breadcrumbs={[{ label: "自動タスク" }]}>
@@ -186,22 +188,35 @@ export default function AutoTasks() {
         </section>
 
         <section className="rounded-2xl border border-border/60 bg-white/70 p-4 shadow-sm">
-          <h2 className="text-sm font-bold text-foreground">止まっている自動タスク（Cowork）</h2>
-          <p className="mt-1 mb-3 text-xs text-muted-foreground">
-            Coworkに登録されたまま、2026年10月28日以降すべてオフになっています。止めた理由の記録は見つかっていません。
+          <h2 className="text-sm font-bold text-foreground">記録をまだ書いていない自動タスク</h2>
+          <p className="mt-1 mb-3 text-xs text-muted-foreground [text-wrap:pretty]">
+            {`このMac mini以外で動いているタスクです。${OTHER_TASKS_CHECKED_ON.slice(5).replace("-", "/")}に成果物を見て確かめた結果で、自動では変わりません。`}
           </p>
-          <ul className="grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2" data-testid="tasks-paused">
-            {PAUSED_TASKS.map((t) => (
-              <li key={t.name} className="flex items-baseline gap-2">
-                <Dot lamp="gray" />
-                <span className="min-w-0">
-                  {t.name}
-                  <span className="ml-1.5 text-xs text-muted-foreground whitespace-nowrap">
-                    {t.scheduleLabel}・最後に動いた {t.lastRun ? t.lastRun.slice(5).replace("-", "/") : "記録なし"}
+          <ul className="grid gap-x-6 gap-y-2.5 text-sm sm:grid-cols-2" data-testid="tasks-other">
+            {OTHER_TASKS.map((t) => {
+              const st = OTHER_STATE[t.state];
+              return (
+                <li key={t.name} className="flex items-baseline gap-2">
+                  <Dot lamp={st.lamp} />
+                  <span className="min-w-0">
+                    <span className="block">
+                      {t.name.split(" ").map((w, i) => (
+                        <span key={i} className="whitespace-nowrap">
+                          {i > 0 && " "}
+                          {w}
+                        </span>
+                      ))}
+                      <span className={`ml-1.5 text-xs font-medium whitespace-nowrap ${LAMP[st.lamp].text}`}>{st.label}</span>
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      <span className="whitespace-nowrap">{t.scheduleLabel}</span>
+                      {"・"}
+                      <span className="whitespace-nowrap">{t.evidence}</span>
+                    </span>
                   </span>
-                </span>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         </section>
       </div>
