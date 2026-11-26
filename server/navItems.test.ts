@@ -26,6 +26,7 @@ describe("画面の仕分け（スタッフ向け／管理者向け）", () => {
     expect(staffTabs.some((t) => t.href === "/ads")).toBe(false);
     expect(staffTabs.some((t) => t.href === "/employment")).toBe(false);
     expect(staffTabs.some((t) => t.href === "/next-reservation")).toBe(false);
+    expect(staffTabs.some((t) => t.href === "/google-map")).toBe(false);
   });
 
   it("管理者向けは既存の全タブ＋雇用形態別の売上＋広告", () => {
@@ -38,6 +39,7 @@ describe("画面の仕分け（スタッフ向け／管理者向け）", () => {
       "/employment",
       "/next-reservation",
       "/ads",
+      "/google-map",
     ]);
   });
 
@@ -94,6 +96,7 @@ describe("画面の仕分け（スタッフ向け／管理者向け）", () => {
     const adminOnlyRoutes = [
       "/employment",
       "/ads",
+      "/google-map",
       "/admin/login",
       "/admin",
       "/admin/stores",
@@ -110,6 +113,7 @@ describe("画面の仕分け（スタッフ向け／管理者向け）", () => {
     // 素の <Route path="/ads"> が残っていたら常時登録されてしまう
     expect(app).not.toMatch(/^\s*<Route path="\/ads"/m);
     expect(app).not.toMatch(/^\s*<Route path="\/employment"/m);
+    expect(app).not.toMatch(/^\s*<Route path="\/google-map"/m);
     expect(app).not.toMatch(/^\s*<Route path="\/admin/m);
   });
 

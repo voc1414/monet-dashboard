@@ -4,7 +4,7 @@
  * ここ1箇所を直せば DashboardLayout（スタッフ向け）と AdminLayout（管理者の設定画面）の
  * 両方に効く。ページを物理的に複製せず、`adminOnly` の出し分けだけで仕分ける。
  *   - スタッフ向け … スタッフ一覧／アンケート／カウンセリング（店舗一覧は 2026-10-02 から管理者だけ）
- *   - 管理者向け   … 上記すべて ＋ 雇用形態別の売上 ＋ 次回予約強化 ＋ 広告（Meta） ＋ 設定
+ *   - 管理者向け   … 上記すべて ＋ 雇用形態別の売上 ＋ 次回予約強化 ＋ 広告（Meta） ＋ Googleマップ ＋ 設定
  */
 import {
   AlertTriangle,
@@ -12,6 +12,7 @@ import {
   CalendarCheck,
   ClipboardList,
   Home,
+  MapPin,
   Megaphone,
   MessageSquareText,
   Settings,
@@ -95,6 +96,15 @@ export const MAIN_TABS: NavItem[] = [
     // 広告費・CPA は店舗スタッフに見せない（2026-08-31 林さん指示）
     adminOnly: true,
     isActive: (l) => l.startsWith("/ads"),
+  },
+  {
+    href: "/google-map",
+    label: "Googleマップ",
+    shortLabel: "Gマップ",
+    icon: MapPin,
+    // GBP自動更新の公開状況。運用の管理情報なので管理者だけ（2026-11-26 林さん「その形で作って」）
+    adminOnly: true,
+    isActive: (l) => l.startsWith("/google-map"),
   },
 ];
 

@@ -1,0 +1,63 @@
+# Googleマップ（GBP）公開履歴の写し（client/src/data/gbpHistory.ts）を Notion「DB_monet GBP公開履歴」に合わせる。
+# 公開は Cloud Run Job「monet-gbp」が月・木 10:00（日本時間）。その30分後に取り込んで管理画面へ反映する。
+# 2026-11-26 林さん「その形で作って」。Notion は hayashin-guard に接続済み。鍵は repo シークレット NOTION_TOKEN。
+name: Sync GBP history
+
+on:
+  schedule:
+    - cron: "30 1 * * 1,4" # 月・木 10:30（日本時間）
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: sync-gbp
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - name: Notion から写しを作り直す
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+        run: node scripts/sync-gbp-history.mjs
+      - name: 変わったか
+        id: diff
+        run: |
+          if git diff --quiet -- client/src/data/gbpHistory.ts; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "変更なし"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git diff --stat -- client/src/data/gbpHistory.ts
+          fi
+      # vite7 と @builder.io/vite-plugin-jsx-loc の peer 衝突があるため legacy-peer-deps 必須
+      - if: steps.diff.outputs.changed == 'true'
+        run: npm ci --legacy-peer-deps
+      - if: steps.diff.outputs.changed == 'true'
+        name: 型チェック (tsc --noEmit)
+        run: npx tsc --noEmit
+      - if: steps.diff.outputs.changed == 'true'
+        name: テスト (vitest)
+        run: npx vitest run
+      - if: steps.diff.outputs.changed == 'true'
+        name: コミットして本番へ反映
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client/src/data/gbpHistory.ts
+          git commit -m "Googleマップ公開履歴の写しをNotionに合わせて更新（$(TZ=Asia/Tokyo date '+%F %H:%M')）"
+          git pull --rebase origin main
+          git push origin HEAD:main
+          # 自動コミットの push では Deploy Pages が起動しないため、ここで起動する
+          gh workflow run pages.yml --ref main
