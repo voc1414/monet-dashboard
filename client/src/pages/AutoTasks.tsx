@@ -5,9 +5,10 @@
  *   Notion「DB_monet GBP公開履歴」→ data/gbpHistory.ts（Googleマップタブと同じ写し）
  * 判定は写しを作った時刻（TASK_LOG_SYNCED_AT）を基準にする。理由は lib/taskSummary.ts の冒頭。
  */
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Activity } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
+import GbpDetail from "@/components/GbpDetail";
 import { GBP_HISTORY } from "@/data/gbpHistory";
 import { TASK_LOG, TASK_LOG_SYNCED_AT } from "@/data/taskLog";
 import {
@@ -50,6 +51,19 @@ export default function AutoTasks() {
   const syncedAt = useMemo(() => new Date(TASK_LOG_SYNCED_AT), []);
   const status = useMemo(() => summarizeTasks(TASK_LOG, GBP_HISTORY, syncedAt), [syncedAt]);
   const stale = syncIsStale(syncedAt, new Date());
+  // Googleマップの院ごとの詳細（旧Gマップタブ）。/google-map から来たときは開いた状態で出す
+  const [gbpOpen, setGbpOpen] = useState(() => typeof window !== "undefined" && window.location.hash === "#gbp");
+  const gbpRef = useRef<HTMLDetailsElement>(null);
+  const openGbp = () => {
+    setGbpOpen(true);
+    // 開いた中身が描画されてから動かす（描画前だと位置がずれて動かないことがある）
+    setTimeout(() => gbpRef.current?.scrollIntoView({ block: "start" }), 60);
+  };
+  useEffect(() => {
+    if (gbpOpen) setTimeout(() => gbpRef.current?.scrollIntoView({ block: "start" }), 60);
+    // 初回だけ
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const red = status.filter((s) => s.lamp === "red").length;
   const yellow = status.filter((s) => s.lamp === "yellow").length;
   const recent = useMemo(
@@ -95,7 +109,7 @@ export default function AutoTasks() {
 
         <section className="rounded-2xl border border-border/60 bg-white/70 p-4 shadow-sm">
           <h2 className="mb-3 text-sm font-bold text-foreground">動いている自動タスク</h2>
-          <ul className="space-y-2 sm:hidden" data-testid="tasks-cards">
+          <ul className="space-y-2 md:hidden" data-testid="tasks-cards">
             {status.map((s) => (
               <li key={s.def.name} className={`rounded-xl border border-border/40 p-3 ${LAMP[s.lamp].row}`}>
                 <div className="flex flex-wrap items-center gap-x-2">
@@ -118,10 +132,15 @@ export default function AutoTasks() {
                   <dt className="text-muted-foreground">次の予定</dt>
                   <dd className="tabular-nums">{formatJstShort(s.next)}</dd>
                 </dl>
+                {s.def.source === "gbp" && (
+                  <button type="button" onClick={openGbp} className="mt-2 ml-[18px] inline-flex min-h-[44px] items-center text-xs font-medium text-primary">
+                    院ごとの公開を見る
+                  </button>
+                )}
               </li>
             ))}
           </ul>
-          <div className="hidden overflow-x-auto sm:block">
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm" data-testid="tasks-status">
               <thead>
                 <tr className="text-left text-xs text-muted-foreground">
@@ -141,6 +160,11 @@ export default function AutoTasks() {
                         {s.def.name}
                       </div>
                       <div className="pl-[18px] text-[11px] text-muted-foreground">{s.def.where}</div>
+                      {s.def.source === "gbp" && (
+                        <button type="button" onClick={openGbp} className="ml-[18px] py-1 text-[11px] font-medium text-primary hover:underline">
+                          院ごとの公開を見る
+                        </button>
+                      )}
                     </td>
                     <td className="py-2 pr-3 whitespace-nowrap">{s.def.scheduleLabel}</td>
                     <td className="py-2 pr-3 whitespace-nowrap tabular-nums">{formatJstShort(s.latest?.at)}</td>
@@ -162,6 +186,20 @@ export default function AutoTasks() {
             </table>
           </div>
         </section>
+
+        <details
+          id="gbp"
+          ref={gbpRef}
+          open={gbpOpen}
+          onToggle={(e) => setGbpOpen(e.currentTarget.open)}
+          className="scroll-mt-20 rounded-2xl border border-border/60 bg-white/70 px-4 shadow-sm"
+          data-testid="gbp-detail"
+        >
+          <summary className="flex min-h-[48px] cursor-pointer items-center text-sm font-bold text-foreground">
+            Googleマップ 院ごとの公開状況
+          </summary>
+          <div className="pb-4">{gbpOpen && <GbpDetail />}</div>
+        </details>
 
         <section className="space-y-2">
           <h2 className="text-sm font-bold text-foreground">最近の記録</h2>

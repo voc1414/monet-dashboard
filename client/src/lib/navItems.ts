@@ -13,7 +13,6 @@ import {
   CalendarCheck,
   ClipboardList,
   Home,
-  MapPin,
   Megaphone,
   MessageSquareText,
   Settings,
@@ -97,15 +96,6 @@ export const MAIN_TABS: NavItem[] = [
     // 広告費・CPA は店舗スタッフに見せない（2026-08-31 林さん指示）
     adminOnly: true,
     isActive: (l) => l.startsWith("/ads"),
-  },
-  {
-    href: "/google-map",
-    label: "Googleマップ",
-    shortLabel: "Gマップ",
-    icon: MapPin,
-    // GBP自動更新の公開状況。運用の管理情報なので管理者だけ（2026-11-26 林さん「その形で作って」）
-    adminOnly: true,
-    isActive: (l) => l.startsWith("/google-map"),
   },
   {
     href: "/auto-tasks",
