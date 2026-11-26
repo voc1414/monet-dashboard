@@ -64,6 +64,8 @@ export default function DashboardLayout({
   // それを超えたら2行グリッドに切り替える。1行に詰めると「カウンセリング」等が
   // 3行に折り返して56pxのバーからはみ出し、末尾の1文字が切れる（2026-09-01 実測）。
   const compactBottomNav = tabs.length + (showSettings ? 1 : 0) > 5;
+  // 上部タブのフルラベルは、本数が多いと 1280px でもロゴに重なる
+  const manyTabs = tabs.length >= 8;
 
   return (
     <div className="min-h-screen bg-background">
@@ -71,7 +73,7 @@ export default function DashboardLayout({
       <header className="sticky top-0 z-50 border-b border-border/60 bg-white/85 backdrop-blur-md">
         <div className="container flex items-center justify-between h-16">
           <Link href="/">
-            <div className="flex items-center gap-3 group cursor-pointer">
+            <div className="flex shrink-0 items-center gap-3 group cursor-pointer">
               <img
                 src={MONET_LOGO}
                 alt="monet"
@@ -93,8 +95,10 @@ export default function DashboardLayout({
             ロゴに重なるため、lg 未満は下部ナビに任せる。
             lg〜xl 未満はまだ幅が足りないので短いラベル・狭い gap にする
             （1024px でフルラベルにするとロゴとの隙間が 0 になる・2026-09-01 実測）。
+            管理者の9タブは xl（1280px）でもフルラベルだとロゴに重なる（2026-11-26 林さん指摘・実測）ので、
+            タブが8本以上のときはフルラベルを 2xl（1536px）からにする。ロゴは縮ませない。
           */}
-          <nav className="hidden lg:flex items-center gap-3 xl:gap-6">
+          <nav className="hidden lg:flex min-w-0 items-center gap-3 xl:gap-6">
             {tabs.map((tab) => (
               <Link key={tab.href} href={tab.href}>
                 <span
@@ -103,8 +107,8 @@ export default function DashboardLayout({
                   }`}
                 >
                   <tab.icon className="w-4 h-4 shrink-0" />
-                  <span className="xl:hidden">{tab.shortLabel}</span>
-                  <span className="hidden xl:inline">{tab.label}</span>
+                  <span className={manyTabs ? "2xl:hidden" : "xl:hidden"}>{tab.shortLabel}</span>
+                  <span className={manyTabs ? "hidden 2xl:inline" : "hidden xl:inline"}>{tab.label}</span>
                 </span>
               </Link>
             ))}
