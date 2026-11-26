@@ -40,7 +40,6 @@ describe("画面の仕分け（スタッフ向け／管理者向け）", () => {
       "/employment",
       "/next-reservation",
       "/ads",
-      "/google-map",
       "/auto-tasks",
     ]);
   });
