@@ -6,9 +6,10 @@
  * 判定は写しを作った時刻（TASK_LOG_SYNCED_AT）を基準にする。理由は lib/taskSummary.ts の冒頭。
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Activity } from "lucide-react";
+import { Activity, ChevronRight } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
 import GbpDetail from "@/components/GbpDetail";
+import { isBeforeAuto, summarize as summarizeStores } from "@/lib/gbpSummary";
 import { GBP_HISTORY } from "@/data/gbpHistory";
 import { TASK_LOG, TASK_LOG_SYNCED_AT } from "@/data/taskLog";
 import {
@@ -21,6 +22,7 @@ import {
   summarizeTasks,
   syncIsStale,
   type Lamp,
+  type TaskStatus,
 } from "@/lib/taskSummary";
 
 const LAMP: Record<Lamp, { dot: string; row: string; text: string }> = {
@@ -43,16 +45,50 @@ function Reason({ text }: { text: string }) {
   );
 }
 
+const RANK: Record<Lamp, number> = { gray: 0, green: 1, yellow: 2, red: 3 };
+
+/** 文字の色：ランプは遅れの日数で決まる（2日で黄・3日で赤）。緑のままでも遅れ・失敗・要確認は文字で知らせる */
+function tone(s: TaskStatus): string {
+  if (s.lamp !== "green") return LAMP[s.lamp].text;
+  if (s.lateDays !== undefined) return "text-amber-700";
+  const r = s.latest?.result;
+  if (s.waiting) return "text-muted-foreground";
+  if (r === "エラー" || r === "停止") return "text-red-700";
+  if (r === "要確認") return "text-amber-700";
+  return LAMP.green.text;
+}
+
 function Dot({ lamp }: { lamp: Lamp }) {
   return <span className={`inline-block h-2.5 w-2.5 flex-none rounded-full ${LAMP[lamp].dot}`} aria-hidden />;
 }
 
 export default function AutoTasks() {
   const syncedAt = useMemo(() => new Date(TASK_LOG_SYNCED_AT), []);
-  const status = useMemo(() => summarizeTasks(TASK_LOG, GBP_HISTORY, syncedAt), [syncedAt]);
+  const stores = useMemo(() => summarizeStores(GBP_HISTORY, syncedAt), [syncedAt]);
+  const storeAlert = stores.some((x) => x.lamp === "yellow" || x.lamp === "red");
+  const status = useMemo(
+    () =>
+      summarizeTasks(TASK_LOG, GBP_HISTORY, syncedAt).map((s) => {
+        // Googleマップは院ごとの遅れもこの行と上の帯に出す（院の欄を開かなくても気づけるように）
+        if (s.def.source !== "gbp") return s;
+        const late = stores.filter((x) => x.lateDays !== undefined);
+        if (!late.length) return s;
+        const max = Math.max(...late.map((x) => x.lateDays!));
+        const worst = late.reduce((a, b) => (RANK[b.lamp] > RANK[a.lamp] ? b : a));
+        return {
+          ...s,
+          lamp: RANK[worst.lamp] > RANK[s.lamp] ? worst.lamp : s.lamp,
+          lateDays: Math.max(s.lateDays ?? -1, max),
+          label: `${late.length}院が遅れ（最大${max}日）`,
+        };
+      }),
+    [syncedAt, stores],
+  );
   const stale = syncIsStale(syncedAt, new Date());
   // Googleマップの院ごとの詳細（旧Gマップタブ）。/google-map から来たときは開いた状態で出す
-  const [gbpOpen, setGbpOpen] = useState(() => typeof window !== "undefined" && window.location.hash === "#gbp");
+  const [gbpOpen, setGbpOpen] = useState(
+    () => storeAlert || (typeof window !== "undefined" && window.location.hash === "#gbp"),
+  );
   const gbpRef = useRef<HTMLDetailsElement>(null);
   const openGbp = () => {
     setGbpOpen(true);
@@ -66,8 +102,10 @@ export default function AutoTasks() {
   }, []);
   const red = status.filter((s) => s.lamp === "red").length;
   const yellow = status.filter((s) => s.lamp === "yellow").length;
+  const lateSoft = status.filter((s) => s.lamp === "green" && s.lateDays !== undefined).length;
   const recent = useMemo(
-    () => [...TASK_LOG, ...gbpRuns(GBP_HISTORY)].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 30),
+    // Googleマップの自動公開前の手動テストは「動いた記録」に並べない
+    () => [...TASK_LOG, ...gbpRuns(GBP_HISTORY.filter((e) => !isBeforeAuto(e)))].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 30),
     [],
   );
 
@@ -77,7 +115,9 @@ export default function AutoTasks() {
       ? { lamp: "red" as Lamp, text: `直すこと ${red}本`, sub: "予定日より3日以上遅れているタスクがあります" }
       : yellow
         ? { lamp: "yellow" as Lamp, text: `確認すること ${yellow}本`, sub: "予定日より2日以上遅れているタスクがあります" }
-        : { lamp: "green" as Lamp, text: "直すことはありません", sub: "遅れているタスクはありません" };
+        : lateSoft
+          ? { lamp: "green" as Lamp, text: "直すことはありません", sub: `1日以内の遅れが${lateSoft}本（2日続くと黄）` }
+          : { lamp: "green" as Lamp, text: "直すことはありません", sub: "遅れているタスクはありません" };
 
   return (
     <DashboardLayout breadcrumbs={[{ label: "自動タスク" }]}>
@@ -87,7 +127,7 @@ export default function AutoTasks() {
             <Activity className="w-5 h-5 text-primary" />
             自動タスク
           </h1>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-xs text-muted-foreground [word-break:auto-phrase] [text-wrap:pretty]">
             {"monetの自動タスクが予定どおり動いたかの一覧です。毎日 8:30 と 21:30 に更新されます。予定日より2日以上遅れると黄、3日以上遅れると赤になります。"}
           </p>
         </div>
@@ -109,25 +149,25 @@ export default function AutoTasks() {
 
         <section className="rounded-2xl border border-border/60 bg-white/70 p-4 shadow-sm">
           <h2 className="mb-3 text-sm font-bold text-foreground">動いている自動タスク</h2>
-          <ul className="space-y-2 md:hidden" data-testid="tasks-cards">
+          <ul className="space-y-2 lg:hidden" data-testid="tasks-cards">
             {status.map((s) => (
               <li key={s.def.name} className={`rounded-xl border border-border/40 p-3 ${LAMP[s.lamp].row}`}>
                 <div className="flex flex-wrap items-center gap-x-2">
                   <Dot lamp={s.lamp} />
                   <span className="font-bold whitespace-nowrap">{s.def.name}</span>
-                  <span className={`ml-auto text-xs font-medium whitespace-nowrap ${LAMP[s.lamp].text}`}>
+                  <span className={`ml-auto text-xs font-medium whitespace-nowrap ${tone(s)}`}>
                     {s.label.length > 6 ? "" : s.label}
                     {s.latest?.count != null && s.label === s.latest.result && <span className="ml-1 font-normal tabular-nums">{s.latest.count}件</span>}
                   </span>
                 </div>
-                {s.label.length > 6 && <div className={`mt-1 pl-[18px] text-xs font-medium ${LAMP[s.lamp].text}`}>{s.label}</div>}
+                {s.label.length > 6 && <div className={`mt-1 pl-[18px] text-xs font-medium [word-break:auto-phrase] ${tone(s)}`}>{s.label}</div>}
                 {s.latest?.reason && s.latest.result !== "成功" && (
-                  <div className={`mt-1 pl-[18px] text-xs break-words [word-break:auto-phrase] [text-wrap:pretty] ${LAMP[s.lamp].text} opacity-80`}><Reason text={s.latest.reason} /></div>
+                  <div className={`mt-1 pl-[18px] text-xs break-words [word-break:auto-phrase] [text-wrap:pretty] ${tone(s)} opacity-80`}><Reason text={s.latest.reason} /></div>
                 )}
                 <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 pl-[18px] text-xs">
                   <dt className="text-muted-foreground">予定</dt>
                   <dd>{s.def.scheduleLabel}<span className="whitespace-nowrap">（{s.def.where}）</span></dd>
-                  <dt className="text-muted-foreground">最後に動いた</dt>
+                  <dt className="text-muted-foreground">最後の記録</dt>
                   <dd className="tabular-nums">{formatJstShort(s.latest?.at)}</dd>
                   <dt className="text-muted-foreground">次の予定</dt>
                   <dd className="tabular-nums">{formatJstShort(s.next)}</dd>
@@ -140,13 +180,13 @@ export default function AutoTasks() {
               </li>
             ))}
           </ul>
-          <div className="hidden overflow-x-auto md:block">
+          <div className="hidden overflow-x-auto lg:block">
             <table className="w-full text-sm" data-testid="tasks-status">
               <thead>
                 <tr className="text-left text-xs text-muted-foreground">
                   <th className="py-1.5 pr-3 font-medium">タスク</th>
                   <th className="py-1.5 pr-3 font-medium">予定</th>
-                  <th className="py-1.5 pr-3 font-medium">最後に動いた</th>
+                  <th className="py-1.5 pr-3 font-medium">最後の記録</th>
                   <th className="py-1.5 pr-3 font-medium">次の予定</th>
                   <th className="py-1.5 font-medium">状態</th>
                 </tr>
@@ -161,7 +201,7 @@ export default function AutoTasks() {
                       </div>
                       <div className="pl-[18px] text-[11px] text-muted-foreground">{s.def.where}</div>
                       {s.def.source === "gbp" && (
-                        <button type="button" onClick={openGbp} className="ml-[18px] py-1 text-[11px] font-medium text-primary hover:underline">
+                        <button type="button" onClick={openGbp} className="ml-[18px] inline-flex min-h-[44px] items-center text-xs font-medium text-primary hover:underline">
                           院ごとの公開を見る
                         </button>
                       )}
@@ -169,7 +209,7 @@ export default function AutoTasks() {
                     <td className="py-2 pr-3 whitespace-nowrap">{s.def.scheduleLabel}</td>
                     <td className="py-2 pr-3 whitespace-nowrap tabular-nums">{formatJstShort(s.latest?.at)}</td>
                     <td className="py-2 pr-3 whitespace-nowrap tabular-nums">{formatJstShort(s.next)}</td>
-                    <td className={`py-2 text-xs ${LAMP[s.lamp].text}`}>
+                    <td className={`py-2 text-xs ${tone(s)}`}>
                       <div className="font-medium whitespace-nowrap">
                         {s.label}
                         {s.latest?.count != null && s.label === s.latest.result && (
@@ -192,10 +232,11 @@ export default function AutoTasks() {
           ref={gbpRef}
           open={gbpOpen}
           onToggle={(e) => setGbpOpen(e.currentTarget.open)}
-          className="scroll-mt-20 rounded-2xl border border-border/60 bg-white/70 px-4 shadow-sm"
+          className="group scroll-mt-20 rounded-2xl border border-border/60 bg-white/70 px-4 shadow-sm"
           data-testid="gbp-detail"
         >
-          <summary className="flex min-h-[48px] cursor-pointer items-center text-sm font-bold text-foreground">
+          <summary className="flex min-h-[48px] cursor-pointer list-none items-center gap-1.5 text-sm font-bold text-foreground [&::-webkit-details-marker]:hidden">
+            <ChevronRight className="h-4 w-4 flex-none text-muted-foreground transition-transform group-open:rotate-90" aria-hidden />
             Googleマップ 院ごとの公開状況
           </summary>
           <div className="pb-4">{gbpOpen && <GbpDetail />}</div>
@@ -213,7 +254,7 @@ export default function AutoTasks() {
                 <li key={`${e.at}-${e.task}-${i}`} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-4 py-2 text-sm">
                   <span className="text-xs text-muted-foreground tabular-nums whitespace-nowrap">{formatJstShort(e.at)}</span>
                   <span className="font-medium whitespace-nowrap">{e.task}</span>
-                  <span className={`inline-flex items-center gap-1.5 text-xs ${LAMP[lamp].text}`}>
+                  <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs ${LAMP[lamp].text}`}>
                     <Dot lamp={lamp} />
                     {e.result}
                     {e.count != null && <span className="tabular-nums">{e.count}件</span>}
@@ -227,7 +268,7 @@ export default function AutoTasks() {
 
         <section className="rounded-2xl border border-border/60 bg-white/70 p-4 shadow-sm">
           <h2 className="text-sm font-bold text-foreground">記録をまだ書いていない自動タスク</h2>
-          <p className="mt-1 mb-3 text-xs text-muted-foreground [text-wrap:pretty]">
+          <p className="mt-1 mb-3 text-xs text-muted-foreground [word-break:auto-phrase] [text-wrap:pretty]">
             {`claude.aiのルーチンで動いているタスクです。${OTHER_TASKS_CHECKED_ON.slice(5).replace("-", "/")}に成果物を見て確かめた結果で、自動では変わりません。`}
           </p>
           <ul className="grid gap-x-6 gap-y-2.5 text-sm sm:grid-cols-2" data-testid="tasks-other">
