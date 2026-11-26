@@ -190,7 +190,7 @@ export default function AutoTasks() {
         <section className="rounded-2xl border border-border/60 bg-white/70 p-4 shadow-sm">
           <h2 className="text-sm font-bold text-foreground">記録をまだ書いていない自動タスク</h2>
           <p className="mt-1 mb-3 text-xs text-muted-foreground [text-wrap:pretty]">
-            {`このMac mini以外で動いているタスクです。${OTHER_TASKS_CHECKED_ON.slice(5).replace("-", "/")}に成果物を見て確かめた結果で、自動では変わりません。`}
+            {`claude.aiのルーチンで動いているタスクです。${OTHER_TASKS_CHECKED_ON.slice(5).replace("-", "/")}に成果物を見て確かめた結果で、自動では変わりません。`}
           </p>
           <ul className="grid gap-x-6 gap-y-2.5 text-sm sm:grid-cols-2" data-testid="tasks-other">
             {OTHER_TASKS.map((t) => {
@@ -200,10 +200,10 @@ export default function AutoTasks() {
                   <Dot lamp={st.lamp} />
                   <span className="min-w-0">
                     <span className="block">
-                      {t.name.split(" ").map((w, i) => (
-                        <span key={i} className="whitespace-nowrap">
+                      {t.name.split(" ").map((w, i, all) => (
+                        <span key={i}>
                           {i > 0 && " "}
-                          {w}
+                          <span className={all.length > 1 ? "whitespace-nowrap" : "[word-break:auto-phrase]"}>{w}</span>
                         </span>
                       ))}
                       <span className={`ml-1.5 text-xs font-medium whitespace-nowrap ${LAMP[st.lamp].text}`}>{st.label}</span>
