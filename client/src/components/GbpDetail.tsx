@@ -6,34 +6,41 @@
 import { useMemo } from "react";
 import { ExternalLink } from "lucide-react";
 import { GBP_HISTORY } from "@/data/gbpHistory";
-import { STALE_DAYS, formatJst, summarize } from "@/lib/gbpSummary";
+import { formatJst, summarize } from "@/lib/gbpSummary";
+import { TASK_LOG_SYNCED_AT } from "@/data/taskLog";
+import type { Lamp } from "@/lib/taskSummary";
+
+const ROW: Record<Lamp, string> = { green: "", gray: "", yellow: "bg-amber-50 text-amber-800", red: "bg-red-50 text-red-700" };
+const TEXT: Record<Lamp, string> = { green: "text-emerald-600", gray: "text-muted-foreground", yellow: "text-amber-800", red: "text-red-700" };
 
 export default function GbpDetail() {
-  const status = useMemo(() => summarize(GBP_HISTORY, new Date()), []);
+  // 自動タスクと同じ時点（取り込んだ時刻）で判定する
+  const status = useMemo(() => summarize(GBP_HISTORY, new Date(TASK_LOG_SYNCED_AT)), []);
   const recent = useMemo(
     () => [...GBP_HISTORY].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 40),
     [],
   );
-  const alerts = status.filter((s) => s.alert).length;
+  const red = status.filter((s) => s.lamp === "red").length;
+  const yellow = status.filter((s) => s.lamp === "yellow").length;
 
   return (
     <div className="space-y-6">
       <p className="text-xs text-muted-foreground [text-wrap:pretty]">
-        {`月・木 10:00 に最新情報と写真を自動公開。赤は「直近が停止・エラー」か「${STALE_DAYS}日以上公開なし」の院です。`}
+        {"月・木 10:00 に最新情報と写真を自動公開。予定日より2日以上公開が無いと黄、3日以上で赤になります。"}
       </p>
     <section className="rounded-2xl border border-border/60 bg-white/70 p-4 shadow-sm">
       <h3 className="mb-3 text-sm font-bold text-foreground">
         院ごとの状況
-        <span className={`ml-2 text-xs ${alerts ? "text-red-600" : "text-emerald-600"}`}>
-          {alerts ? `要確認 ${alerts}院` : "全院正常"}
+        <span className={`ml-2 inline-block whitespace-nowrap text-xs ${red ? "text-red-600" : yellow ? "text-amber-700" : "text-emerald-600"}`}>
+          {red ? `直すこと ${red}院` : yellow ? `確認すること ${yellow}院` : "遅れている院はありません"}
         </span>
       </h3>
-      <ul className="space-y-2 sm:hidden" data-testid="gbp-status-cards">
+      <ul className="space-y-2 md:hidden" data-testid="gbp-status-cards">
         {status.map((s) => (
-          <li key={s.store} className={`rounded-xl border border-border/40 p-3 text-xs ${s.alert ? "bg-red-50 text-red-700" : ""}`}>
+          <li key={s.store} className={`rounded-xl border border-border/40 p-3 text-xs ${ROW[s.lamp]}`}>
             <div className="flex flex-wrap items-baseline gap-x-2">
               <span className="text-sm font-bold whitespace-nowrap">{s.store}</span>
-              <span className="ml-auto font-medium whitespace-nowrap">{s.alert || <span className="text-emerald-600">正常</span>}</span>
+              <span className={`ml-auto font-medium [word-break:auto-phrase] ${TEXT[s.lamp]}`}>{s.label}</span>
             </div>
             {s.problem?.reason && <div className="mt-1 opacity-80 [word-break:auto-phrase] [text-wrap:pretty]">{s.problem.reason}</div>}
             <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
@@ -45,7 +52,7 @@ export default function GbpDetail() {
           </li>
         ))}
       </ul>
-      <div className="hidden overflow-x-auto sm:block">
+      <div className="hidden overflow-x-auto md:block">
         <table className="w-full text-sm" data-testid="gbp-status">
           <thead>
             <tr className="text-left text-xs text-muted-foreground">
@@ -59,14 +66,14 @@ export default function GbpDetail() {
           </thead>
           <tbody>
             {status.map((s) => (
-              <tr key={s.store} className={`border-t border-border/40 ${s.alert ? "bg-red-50 text-red-700" : ""}`}>
+              <tr key={s.store} className={`border-t border-border/40 ${ROW[s.lamp]}`}>
                 <td className="py-1.5 pr-3 font-medium whitespace-nowrap">{s.store}</td>
                 <td className="py-1.5 pr-3 whitespace-nowrap tabular-nums">{formatJst(s.lastPost)}</td>
                 <td className="py-1.5 pr-3 whitespace-nowrap tabular-nums">{formatJst(s.lastPhoto)}</td>
                 <td className="py-1.5 pr-3 text-right tabular-nums">{s.posts}</td>
                 <td className="py-1.5 pr-3 text-right tabular-nums">{s.photos}</td>
                 <td className="py-1.5 text-xs">
-                  {s.alert || <span className="text-emerald-600">正常</span>}
+                  <span className={TEXT[s.lamp]}>{s.label}</span>
                   {s.problem?.reason && <div className="text-[11px] opacity-80">{s.problem.reason}</div>}
                 </td>
               </tr>
