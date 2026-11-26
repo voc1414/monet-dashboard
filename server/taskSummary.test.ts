@@ -32,15 +32,24 @@ describe("自動タスク 総合", () => {
   it("GBPは月・木だけを予定とし、その日の公開をまとめて1回と数える", () => {
     const times = scheduledTimes(gbp, new Date("2026-11-30T12:00:00+09:00"), 3, 4).map((t) => formatJstShort(new Date(t).toISOString()));
     expect(times).toEqual(["11/30(月) 10:00", "12/3(木) 10:00"]);
-    const runs = gbpRuns([g("2026-11-30T01:01:00Z", "春日院", "公開"), g("2026-11-30T01:02:00Z", "本通院", "エラー")]);
+    const two = ["春日院", "本通院"];
+    const ph = (at: string, store: string, result: string) => ({ ...g(at, store, result), kind: "写真" });
+    const runs = gbpRuns(
+      [g("2026-11-30T01:01:00Z", "春日院", "公開"), ph("2026-11-30T01:01:30Z", "春日院", "公開"), g("2026-11-30T01:02:00Z", "本通院", "エラー"), ph("2026-11-30T01:02:30Z", "本通院", "公開")],
+      two,
+    );
     expect(runs).toHaveLength(1);
-    expect(runs[0]).toMatchObject({ result: "エラー", count: 1, reason: "本通院：失敗の理由" });
+    // 1院でも未公開なら、その回は失敗。件数は出さず、理由に未公開の院を全部並べる
+    expect(runs[0].result).toBe("エラー");
+    expect(runs[0].count).toBeNull();
+    expect(runs[0].reason).toContain("22件中 3件を公開・失敗 1件");
+    expect(runs[0].reason).toContain("本通院（投稿）");
     const [s] = summarizeTasks([], [g("2026-11-30T01:01:00Z", "春日院", "公開")], new Date("2026-11-30T21:30:00+09:00"), [gbp]);
     expect(s.lamp).toBe("green");
   });
-  it("取り込みが14時間を超えて止まっていたら気付ける", () => {
-    expect(syncIsStale(new Date("2026-11-27T08:30:00+09:00"), new Date("2026-11-27T21:31:00+09:00"))).toBe(false);
-    expect(syncIsStale(new Date("2026-11-27T08:30:00+09:00"), new Date("2026-11-27T22:31:00+09:00"))).toBe(true);
+  it("取り込みが16時間を超えて止まっていたら気付ける", () => {
+    expect(syncIsStale(new Date("2026-11-27T08:30:00+09:00"), new Date("2026-11-28T00:29:00+09:00"))).toBe(false);
+    expect(syncIsStale(new Date("2026-11-27T08:30:00+09:00"), new Date("2026-11-28T00:31:00+09:00"))).toBe(true);
   });
   it("予定日からの遅れで色を決める：2日未満は緑・2日以上は黄・3日以上は赤", () => {
     const lamp = (now: string) => summarizeTasks([log("2026-11-27T07:39:00+09:00", "成功")], [], new Date(now), [daily])[0];
@@ -85,6 +94,66 @@ describe("自動タスク 総合", () => {
     const [s] = summarizeTasks([], [test], new Date("2026-11-27T21:30:00+09:00"), [gbp]);
     expect(s.lamp).toBe("gray");
     expect(s.latest).toBeUndefined();
+  });
+  it("猶予の内側でも、その回が失敗なら「待っています」にしない", () => {
+    const hpb = TASKS.find((t) => t.name === "HPBブログ 予約登録")!;
+    const [s] = summarizeTasks(
+      [log("2026-12-02T20:40:00+09:00", "成功", 1, hpb.name), log("2026-12-03T20:40:00+09:00", "エラー", null, hpb.name)],
+      [], new Date("2026-12-03T21:30:00+09:00"), [hpb],
+    );
+    expect(s.label).toContain("エラー");
+    expect(s.label).not.toContain("待っています");
+    expect(s.lateDays).toBe(0);
+  });
+  it("遅れは暦の日付で数える（11/26 20:00 の分は 11/28 に2日）", () => {
+    const hpb = TASKS.find((t) => t.name === "HPBブログ 予約登録")!;
+    const [s] = summarizeTasks([log("2026-11-25T20:40:00+09:00", "成功", 1, hpb.name)], [], new Date("2026-11-28T08:30:00+09:00"), [hpb]);
+    expect(s.lateDays).toBe(2);
+    expect(s.lamp).toBe("yellow");
+  });
+  it("GBP：定時の回（10:00〜12:00）と、その後のやり直しは別の回として並べる", () => {
+    const ph = (at: string, store: string, result: string) => ({ ...g(at, store, result), kind: "写真" });
+    const runs = gbpRuns([g("2026-12-03T01:03:00Z", "春日院", "エラー"), ph("2026-12-03T01:04:00Z", "春日院", "公開"), g("2026-12-03T05:00:00Z", "春日院", "公開")], ["春日院"]);
+    expect(runs).toHaveLength(2);
+    // 新しい順：14:00 のやり直しは成功、10:03 の定時の回はエラー
+    expect(runs[0].result).toBe("公開");
+    expect(runs[0].reason).toContain("予定外");
+    // 10:03 の失敗には「のちに公開」と書き添える
+    expect(runs[1].reason).toContain("のちに公開");
+    expect(runs[1].result).toBe("エラー");
+    expect(runs[1].reason).toContain("定時の回");
+  });
+  it("GBP：定時の回の最中（猶予の内側）は、まだ記録の無い院を未公開と数えない", () => {
+    const runs = gbpRuns([g("2026-12-07T01:05:00Z", "春日院", "公開")], ["春日院", "本通院"], Date.parse("2026-12-07T10:40:00+09:00"));
+    expect(runs[0].reason).not.toContain("記録なし");
+  });
+  it("GBP：最近の記録は事実だけ（院の記録が欠けていても「未公開」と言い切らない・判定は院ごとの表で行う）", () => {
+    const ph = (at: string, store: string, result: string) => ({ ...g(at, store, result), kind: "写真" });
+    const runs = gbpRuns([g("2026-12-03T01:03:00Z", "春日院", "公開"), ph("2026-12-03T01:04:00Z", "春日院", "公開")]);
+    // 定時の回で22件そろっていなければ、緑の「公開」にせず「一部公開」と件数で書く
+    expect(runs[0].result).toBe("一部公開");
+    expect(runs[0].reason).toContain("22件中 2件を公開");
+    expect(runs[0].reason).not.toContain("未公開");
+  });
+  it("予定外の時刻の失敗は、待ち表示の間も失敗として出す", () => {
+    const hpb = TASKS.find((t) => t.name === "HPBブログ 予約登録")!;
+    const [s] = summarizeTasks(
+      [log("2026-12-02T20:40:00+09:00", "成功", 1, hpb.name), log("2026-12-03T15:00:00+09:00", "エラー", null, hpb.name)],
+      [], new Date("2026-12-03T21:30:00+09:00"), [hpb],
+    );
+    expect(s.label).toContain("エラー");
+    expect(s.label).not.toContain("待っています");
+  });
+  it("日時の書き方が混ざっても（+09:00 と UTC）時刻の順で最新を選ぶ", () => {
+    const hpb = TASKS.find((t) => t.name === "HPBブログ 予約登録")!;
+    // 20:10 にエラー（+09:00）、23:50 に再試行して成功（UTC で 14:50Z）
+    const [s] = summarizeTasks(
+      [log("2026-12-03T20:10:00+09:00", "エラー", null, hpb.name), log("2026-12-03T14:50:00Z", "成功", 1, hpb.name)],
+      [], new Date("2026-12-04T08:30:00+09:00"), [hpb],
+    );
+    expect(s.latest?.result).toBe("成功");
+    expect(s.lamp).toBe("green");
+    expect(s.label).toBe("成功");
   });
 });
 
