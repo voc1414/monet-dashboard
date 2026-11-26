@@ -74,10 +74,10 @@ export default function AutoTasks() {
   const headline = stale
     ? { lamp: "red" as Lamp, text: "取り込みが止まっています", sub: `この画面は${SYNC_STALE_HOURS}時間以上更新されていません` }
     : red
-      ? { lamp: "red" as Lamp, text: `直すこと ${red}本`, sub: "止まっている・失敗したタスクがあります" }
+      ? { lamp: "red" as Lamp, text: `直すこと ${red}本`, sub: "予定日より3日以上遅れているタスクがあります" }
       : yellow
-        ? { lamp: "yellow" as Lamp, text: `確認すること ${yellow}本`, sub: "動いたが、人が見る必要があります" }
-        : { lamp: "green" as Lamp, text: "直すことはありません", sub: "記録のあるタスクはすべて予定どおり" };
+        ? { lamp: "yellow" as Lamp, text: `確認すること ${yellow}本`, sub: "予定日より2日以上遅れているタスクがあります" }
+        : { lamp: "green" as Lamp, text: "直すことはありません", sub: "遅れているタスクはありません" };
 
   return (
     <DashboardLayout breadcrumbs={[{ label: "自動タスク" }]}>
@@ -88,7 +88,7 @@ export default function AutoTasks() {
             自動タスク
           </h1>
           <p className="mt-1 text-xs text-muted-foreground">
-            {"monetの自動タスクが予定どおり動いたかの一覧です。毎日 8:30 と 21:30 に更新されます。予定の時刻を過ぎても記録が無いものは赤になります。"}
+            {"monetの自動タスクが予定どおり動いたかの一覧です。毎日 8:30 と 21:30 に更新されます。予定日より2日以上遅れると黄、3日以上遅れると赤になります。"}
           </p>
         </div>
 
@@ -121,7 +121,7 @@ export default function AutoTasks() {
                   </span>
                 </div>
                 {s.label.length > 6 && <div className={`mt-1 pl-[18px] text-xs font-medium ${LAMP[s.lamp].text}`}>{s.label}</div>}
-                {s.latest?.reason && s.lamp !== "green" && (
+                {s.latest?.reason && s.latest.result !== "成功" && (
                   <div className={`mt-1 pl-[18px] text-xs break-words [word-break:auto-phrase] [text-wrap:pretty] ${LAMP[s.lamp].text} opacity-80`}><Reason text={s.latest.reason} /></div>
                 )}
                 <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 pl-[18px] text-xs">
@@ -176,7 +176,7 @@ export default function AutoTasks() {
                           <span className="ml-1 font-normal tabular-nums">{s.latest.count}件</span>
                         )}
                       </div>
-                      {s.latest?.reason && s.lamp !== "green" && (
+                      {s.latest?.reason && s.latest.result !== "成功" && (
                         <div className="mt-0.5 min-w-[12rem] text-[11px] opacity-80 [word-break:auto-phrase] [text-wrap:pretty]"><Reason text={s.latest.reason} /></div>
                       )}
                     </td>
