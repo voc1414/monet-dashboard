@@ -5,6 +5,10 @@ const templateRoot = path.resolve(import.meta.dirname);
 
 export default defineConfig({
   root: templateRoot,
+  esbuild: {
+    // client の tsx をテストから描画するとき、React を暗黙のグローバルにしない
+    jsx: "automatic",
+  },
   resolve: {
     alias: {
       "@": path.resolve(templateRoot, "client", "src"),

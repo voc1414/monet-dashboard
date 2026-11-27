@@ -22,7 +22,7 @@ import { getNpsClass } from "@/lib/npsClass";
 import { isNewStaff, isRetiredStaff } from "@/lib/newBadge";
 import { resolveStaffDisplayName } from "@/lib/staffDisplayName";
 import { useStores } from "@/hooks/useStores";
-import { IS_ADMIN_BUILD } from "@/lib/appRole";
+import { useIsEffectiveAdmin } from "@/contexts/ViewRole";
 import { PeriodSelector, PeriodMonthLabel, getDefaultPeriodSelection, getFilterMonths, getPeriodLabel } from "@/components/PeriodSelector";
 import type { PeriodSelection } from "@/components/PeriodSelector";
 
@@ -33,6 +33,7 @@ interface StaffEntry {
 }
 
 export default function SurveyList() {
+  const isAdmin = useIsEffectiveAdmin();
   const { npsAliasMap } = useStores();
   const { records: npsRecords, loading: npsLoading, lastUpdated, refresh } = useNpsData(npsAliasMap);
 
@@ -76,7 +77,7 @@ export default function SurveyList() {
     return Array.from(set).sort().reverse();
   }, [npsMonths, fankuruMonths]);
 
-  const [periodSelection, setPeriodSelection] = useState<PeriodSelection>(getDefaultPeriodSelection());
+  const [periodSelection, setPeriodSelection] = useState<PeriodSelection>(getDefaultPeriodSelection(isAdmin));
   const filterMonths = useMemo(() => getFilterMonths(periodSelection, allMonths), [periodSelection, allMonths]);
   const isAllPeriod = filterMonths === "all";
 
@@ -408,7 +409,7 @@ export default function SurveyList() {
         </div>
 
         {/* 未マッチアラート（スタッフが直せる内容ではないので、管理者向けビルドだけに出す） */}
-        {IS_ADMIN_BUILD && !loading && unmatchedStylists.length > 0 && showUnmatchedAlert && (
+        {isAdmin && !loading && unmatchedStylists.length > 0 && showUnmatchedAlert && (
           <motion.div
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
@@ -450,7 +451,7 @@ export default function SurveyList() {
         )}
 
         {/* NPS未マッチアラート */}
-        {IS_ADMIN_BUILD && !loading && unmatchedNpsStaff.length > 0 && showNpsUnmatchedAlert && (
+        {isAdmin && !loading && unmatchedNpsStaff.length > 0 && showNpsUnmatchedAlert && (
           <motion.div
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}

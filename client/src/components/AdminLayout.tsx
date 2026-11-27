@@ -5,6 +5,8 @@ import { useState, type ReactNode } from "react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { Button } from "@/components/ui/button";
 import { MAIN_TABS, SETTINGS_PAGES, SETTINGS_TAB } from "@/lib/navItems";
+import { IS_ADMIN_BUILD } from "@/lib/appRole";
+import { RoleViewSwitch } from "@/components/RoleViewSwitch";
 
 import monetLogo from "@/assets/monet-logo.png";
 
@@ -45,6 +47,13 @@ export default function AdminLayout({ children, breadcrumbs = [], title }: Admin
     <div className="min-h-screen bg-background">
       {/* Top Header */}
       <header className="sticky top-0 z-50 border-b border-border/60 bg-white/85 backdrop-blur-md">
+        {IS_ADMIN_BUILD && (
+          <div className="border-b border-border/50 bg-white">
+            <div className="container flex items-center justify-center py-1.5 sm:justify-end">
+              <RoleViewSwitch />
+            </div>
+          </div>
+        )}
         <div className="container flex items-center justify-between h-16">
           <div className="flex items-center gap-4">
             {/* Mobile Menu Toggle */}

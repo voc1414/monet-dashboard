@@ -6,6 +6,7 @@ import { useState, useMemo, useCallback } from "react";
 import { Calendar } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { IS_ADMIN_BUILD } from "@/lib/appRole";
+import { useIsEffectiveAdmin } from "@/contexts/ViewRole";
 
 export type PeriodMode = "last_month" | "specific_month" | "yearly" | "custom_range" | "all";
 
@@ -212,8 +213,8 @@ export function PeriodSelector({ allMonths, selection, onChange }: PeriodSelecto
  * デフォルトの期間選択。
  * 管理者向けは「先月」。スタッフ向けは「指定月」で1ヶ月前を選んでおく（2026-10-02 林さん指示）。
  */
-export function getDefaultPeriodSelection(): PeriodSelection {
-  if (IS_ADMIN_BUILD) return { mode: "last_month" };
+export function getDefaultPeriodSelection(isAdmin: boolean = IS_ADMIN_BUILD): PeriodSelection {
+  if (isAdmin) return { mode: "last_month" };
   const now = new Date();
   const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   return { mode: "specific_month", month: `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}` };
@@ -221,14 +222,15 @@ export function getDefaultPeriodSelection(): PeriodSelection {
 
 /**
  * スタッフ向けにページ名の横へ大きく出す対象期間（例「9月」）。1ヶ月なら「○月」、それ以外は期間名。
- * 管理者向けビルドでは出さない（2026-10-02 林さん指示）。
+ * 管理者表示では出さない（2026-10-02 林さん指示）。スタッフ表示に切り替えたときは出す。
  */
 export function PeriodMonthLabel({ selection, allMonths, className = "" }: {
   selection: PeriodSelection;
   allMonths: string[];
   className?: string;
 }) {
-  if (IS_ADMIN_BUILD) return null;
+  const isAdmin = useIsEffectiveAdmin();
+  if (isAdmin) return null;
   const months = getFilterMonths(selection, allMonths);
   const text = months !== "all" && months.length === 1
     ? `${parseInt(months[0].split("-")[1])}月`

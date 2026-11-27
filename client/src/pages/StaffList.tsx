@@ -35,7 +35,7 @@ import { buildNpsFuzzyLinks, invertNpsFuzzyLinks } from "@/lib/npsFuzzyLink";
 import { resolveStaffDisplayName } from "@/lib/staffDisplayName";
 import { fetchPdfData, matchesStylist, normalizeStylistName } from "@/hooks/useFankuruData";
 import type { FankuruPdf } from "@/hooks/useFankuruData";
-import { IS_ADMIN_BUILD } from "@/lib/appRole";
+import { useIsEffectiveAdmin } from "@/contexts/ViewRole";
 
 
 const formatCurrency = (n: number) => {
@@ -87,12 +87,12 @@ const SORT_LABELS: Record<SortField, string> = {
  * 店舗・勤務形態・次回予約率・NPS・稼働率の並べ替えは他人との優劣ではないので残す。
  * 雇用形態別の売上(/employment)は 2026-09-01 に別の理由（人事情報）で管理者限定。
  */
-const ALLOW_SALES_RANKING = IS_ADMIN_BUILD;
-
 /** 並び替えボタンに出す順序。スタッフ向けでは順位付けになる2項目を落とす */
-const SORT_FIELDS_SHOWN: SortField[] = ALLOW_SALES_RANKING
-  ? ["compositeScore", "nextReservationRate", "utilizationRate", "npsScore", "totalSales", "storeNormalized", "employmentType"]
-  : ["nextReservationRate", "utilizationRate", "npsScore", "storeNormalized", "employmentType"];
+function sortFieldsFor(allowSalesRanking: boolean): SortField[] {
+  return allowSalesRanking
+    ? ["compositeScore", "nextReservationRate", "utilizationRate", "npsScore", "totalSales", "storeNormalized", "employmentType"]
+    : ["nextReservationRate", "utilizationRate", "npsScore", "storeNormalized", "employmentType"];
+}
 
 /** デスクトップ表の列幅。ヘッダ行と各行で必ず同じ定義を使う（片方だけ直すとズレる） */
 const DESKTOP_GRID_COLS = "grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.5fr)]";
@@ -119,10 +119,11 @@ const summarizeNps = (scores: number[]): StaffNpsInfo => {
 
 /** Compact NPS badge for staff list */
 function StaffNpsBadge({ npsInfo }: { npsInfo: StaffNpsInfo | undefined }) {
+  const isAdmin = useIsEffectiveAdmin();
   if (!npsInfo || npsInfo.totalResponses === 0) {
     return <span className="text-xs text-muted-foreground">—</span>;
   }
-  if (!IS_ADMIN_BUILD) {
+  if (!isAdmin) {
     return (
       <span className={`font-mono-data text-sm font-bold whitespace-nowrap ${staffNpsClass(npsInfo.npsScore)}`}>
         {npsInfo.npsScore > 0 ? "+" : ""}{npsInfo.npsScore}
@@ -163,6 +164,9 @@ function StaffNpsBadgeMobile({ npsInfo }: { npsInfo: StaffNpsInfo | undefined })
 }
 
 export default function StaffList() {
+  const isAdmin = useIsEffectiveAdmin();
+  const allowSalesRanking = isAdmin;
+  const sortFieldsShown = sortFieldsFor(allowSalesRanking);
   const { rawData, loading, error, availableMonths: reportMonths } = useMonthlyReport();
   const { npsAliasMap } = useStores();
   const { records: npsRecords, loading: npsLoading } = useNpsData(npsAliasMap);
@@ -196,7 +200,7 @@ export default function StaffList() {
 
   const handleSort = (field: SortField) => {
     // スタッフ向けでは売上・総合点の順位付けを行わない（呼び口が増えても塞がるよう入口で弾く）
-    if (!ALLOW_SALES_RANKING && (field === "totalSales" || field === "compositeScore")) return;
+    if (!allowSalesRanking && (field === "totalSales" || field === "compositeScore")) return;
     if (sortField === field) {
       setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
     } else {
@@ -219,17 +223,17 @@ export default function StaffList() {
    * 「月末報告書 未提出」欄で見られるように。報告書が出るまでその月は全員が未提出欄に並ぶ）。
    */
   const availableMonths = useMemo(() => {
-    if (IS_ADMIN_BUILD) return reportMonths;
+    if (isAdmin) return reportMonths;
     const months = new Set(reportMonths);
     for (const r of npsRecords) {
       const m = /^(\d{4})[-/](\d{1,2})/.exec(r.date ?? "");
       if (m) months.add(`${m[1]}-${m[2].padStart(2, "0")}`);
     }
     return Array.from(months).sort().reverse();
-  }, [reportMonths, npsRecords]);
+  }, [isAdmin, reportMonths, npsRecords]);
 
   // 期間セレクタ状態
-  const [periodSelection, setPeriodSelection] = useState<PeriodSelection>(getDefaultPeriodSelection());
+  const [periodSelection, setPeriodSelection] = useState<PeriodSelection>(getDefaultPeriodSelection(isAdmin));
 
   // 期間フィルタから対象月リストを取得
   const filterMonthsResult = useMemo(
@@ -346,17 +350,17 @@ export default function StaffList() {
   // 本名・ニックネームのどちらにも一致しないNPS名は、同じ店舗で候補がちょうど1人のときだけ自動でつなぐ
   // （判定の決まりは lib/npsFuzzyLink.ts。2026-10-03 林さん指示）
   const npsFuzzyLinks = useMemo(() => {
-    if (IS_ADMIN_BUILD) return new Map<string, string>();
+    if (isAdmin) return new Map<string, string>();
     return buildNpsFuzzyLinks(
       filteredNps.map((r) => ({ name: r.staff || "", store: r.storeShort || "" })),
       rawData.map((r) => ({ name: r.name, store: r.storeNormalized }))
     );
-  }, [filteredNps, rawData]);
+  }, [isAdmin, filteredNps, rawData]);
   const npsFuzzyByPerson = useMemo(() => invertNpsFuzzyLinks(npsFuzzyLinks), [npsFuzzyLinks]);
 
   const npsInfoFor = (s: { name: string; storeNormalized: string }): StaffNpsInfo | undefined => {
     const nameKey = npsKeyFor(s);
-    if (IS_ADMIN_BUILD) return staffNpsMap.get(nameKey);
+    if (isAdmin) return staffNpsMap.get(nameKey);
     const nickKey = npsStaffKey(resolveStaffDisplayName(s.name, s.storeNormalized), s.storeNormalized);
     const keys = Array.from(new Set([nameKey, nickKey, ...(npsFuzzyByPerson.get(nameKey) ?? [])]));
     if (keys.length === 1) return staffNpsMap.get(nameKey);
@@ -372,16 +376,16 @@ export default function StaffList() {
    */
   const [fankuruAllData, setFankuruAllData] = useState<Record<string, FankuruPdf[]>>({});
   useEffect(() => {
-    if (IS_ADMIN_BUILD) return;
+    if (isAdmin) return;
     let cancelled = false;
     fetchPdfData()
       .then((data) => { if (!cancelled) setFankuruAllData(data); })
       .catch((err) => console.warn("ファンくるデータ取得エラー:", err));
     return () => { cancelled = true; };
-  }, []);
+  }, [isAdmin]);
 
   const surveyOnlyStaffAll = useMemo(() => {
-    if (IS_ADMIN_BUILD) return [] as Array<{ name: string; store: string; fankuruCount: number }>;
+    if (isAdmin) return [] as Array<{ name: string; store: string; fankuruCount: number }>;
     const reported = staffListUnsorted;
     const reportedNpsKeys = new Set(reported.map((r) => npsStaffKey(r.name, r.storeNormalized)));
     // 報告書の名前は本名、NPSは呼び名のことがある（例: 岡本院 kanako）。呼び名でも突き合わせる
@@ -427,7 +431,7 @@ export default function StaffList() {
     return Array.from(found.values())
       .filter((e) => !isRetiredStaff(e.name, e.store, ""))
       .sort((a, b) => a.store.localeCompare(b.store, "ja") || a.name.localeCompare(b.name, "ja"));
-  }, [staffListUnsorted, filteredNps, fankuruAllData, filterMonthsResult, npsFuzzyLinks]);
+  }, [isAdmin, staffListUnsorted, filteredNps, fankuruAllData, filterMonthsResult, npsFuzzyLinks]);
 
   const surveyOnlyStaff = useMemo(() => {
     return surveyOnlyStaffAll.filter((e) => {
@@ -544,7 +548,7 @@ export default function StaffList() {
         </div>
 
         <div className="flex items-center gap-3">
-          {IS_ADMIN_BUILD && (
+          {isAdmin && (
             <Link href="/">
               <span className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 transition-colors cursor-pointer">
                 <Building2 className="w-4 h-4" />
@@ -590,7 +594,7 @@ export default function StaffList() {
       {/* Mobile Sort Controls */}
       <div className="md:hidden mb-4">
         <div className="flex items-center gap-1.5 flex-wrap">
-          {SORT_FIELDS_SHOWN.map((field) => (
+          {sortFieldsShown.map((field) => (
             <button
               key={field}
               onClick={() => handleSort(field)}
@@ -652,7 +656,7 @@ export default function StaffList() {
           <div className={`hidden md:grid ${DESKTOP_GRID_COLS} gap-3 items-center px-5 py-2 text-[10px] text-muted-foreground font-medium uppercase tracking-wider border-b border-border/40 mb-2 sticky top-[4rem] bg-[#FAF8F5] z-20 backdrop-blur-sm shadow-sm`}>
             <span>氏名</span>
             {/* 総合点・総売上：数字は全員に見せるが、スタッフ向けでは押しても並び替わらない見た目にする */}
-            {ALLOW_SALES_RANKING ? (
+            {allowSalesRanking ? (
               <span
                 className="flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors select-none justify-center"
                 onClick={() => handleSort("compositeScore")}
@@ -662,7 +666,7 @@ export default function StaffList() {
             ) : (
               <span className="flex items-center justify-center select-none">総合点</span>
             )}
-            {ALLOW_SALES_RANKING ? (
+            {allowSalesRanking ? (
               <span
                 className="flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors select-none"
                 onClick={() => handleSort("totalSales")}
@@ -705,7 +709,7 @@ export default function StaffList() {
             <span />
           </div>
 
-          {!IS_ADMIN_BUILD && (
+          {!isAdmin && (
             <div className={`md:hidden grid ${STAFF_MOBILE_GRID_COLS} gap-2 items-center px-3 pb-1.5 mb-1 text-[11px] text-muted-foreground border-b border-border/60 whitespace-nowrap`}>
               <span>氏名・売上</span>
               <span className="text-right">稼働率</span>
@@ -731,7 +735,7 @@ export default function StaffList() {
                   transition={{ delay: 0.02 * i }}
                 >
                   <Card
-                    className={`border-border/50 shadow-sm hover:shadow-md hover:border-primary/30 transition-all cursor-pointer group ${IS_ADMIN_BUILD ? "" : "py-0 gap-0"}`}
+                    className={`border-border/50 shadow-sm hover:shadow-md hover:border-primary/30 transition-all cursor-pointer group ${isAdmin ? "" : "py-0 gap-0"}`}
                     onClick={() => handleStaffClick(staff.name, staff.storeNormalized)}
                   >
                     <CardContent className="p-0">
@@ -739,7 +743,7 @@ export default function StaffList() {
                       <div className={`hidden md:grid ${DESKTOP_GRID_COLS} gap-3 items-center px-5 py-3`}>
                         {/* 氏名 */}
                         <div className="flex items-center gap-3">
-                          {IS_ADMIN_BUILD && (
+                          {isAdmin && (
                             <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                               <span className="text-primary font-bold text-sm">{shownName.charAt(0)}</span>
                             </div>
@@ -758,7 +762,7 @@ export default function StaffList() {
                           const scoreKey = `${staff.name}__${staff.storeNormalized}`;
                           const scoreResult = compositeScoreMap.get(scoreKey);
                           if (!scoreResult) return <div className="text-center"><span className="text-xs text-muted-foreground">—</span></div>;
-                          if (!IS_ADMIN_BUILD) {
+                          if (!isAdmin) {
                             return (
                               <div className="text-center">
                                 <span className="font-mono-data text-sm font-bold text-foreground whitespace-nowrap">{scoreResult.total}点</span>
@@ -795,27 +799,27 @@ export default function StaffList() {
                         <div className="text-right">
                           <div className="flex flex-col items-end gap-0.5">
                             <span className={`font-mono-data text-sm font-bold whitespace-nowrap ${
-                              !IS_ADMIN_BUILD ? staffNextResClass(staff.nextReservationRate) :
+                              !isAdmin ? staffNextResClass(staff.nextReservationRate) :
                               staff.nextReservationRate >= 85 ? "text-[#2D9C8F]" :
                               staff.nextReservationRate >= 70 ? "text-[#E5B85C]" :
                               "text-[#C75C5C]"
                             }`}>
                               {staff.nextReservationRate}%
                             </span>
-                            {IS_ADMIN_BUILD && staff.nextReservationRate >= 85 && (
+                            {isAdmin && staff.nextReservationRate >= 85 && (
                               <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-1.5 py-0.5 shadow-sm">
                                 <Trophy className="w-2.5 h-2.5 text-amber-500" />
                                 エクセレント！
                                 <Sparkles className="w-2.5 h-2.5 text-amber-400" />
                               </span>
                             )}
-                            {IS_ADMIN_BUILD && staff.nextReservationRate >= 70 && staff.nextReservationRate <= 84 && (
+                            {isAdmin && staff.nextReservationRate >= 70 && staff.nextReservationRate <= 84 && (
                               <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-[#E5B85C] bg-amber-50/60 border border-amber-200/60 rounded-full px-1.5 py-0.5">
                                 <CircleCheck className="w-2.5 h-2.5 text-[#E5B85C]" />
                                 適正
                               </span>
                             )}
-                            {IS_ADMIN_BUILD && staff.nextReservationRate <= 69 && (
+                            {isAdmin && staff.nextReservationRate <= 69 && (
                               <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5">
                                 <AlertTriangle className="w-2.5 h-2.5" />
                                 要改善
@@ -831,23 +835,23 @@ export default function StaffList() {
                         <div className="text-right">
                           {utilRate !== null ? (
                             <div className="flex flex-col items-end gap-0.5">
-                              <span className={`font-mono-data text-sm font-bold whitespace-nowrap ${IS_ADMIN_BUILD ? getUtilizationColor(utilRate) : staffUtilClass(utilRate)}`}>
+                              <span className={`font-mono-data text-sm font-bold whitespace-nowrap ${isAdmin ? getUtilizationColor(utilRate) : staffUtilClass(utilRate)}`}>
                                 {utilRate}%
                               </span>
-                              {IS_ADMIN_BUILD && utilRate >= 95 && (
+                              {isAdmin && utilRate >= 95 && (
                                 <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-full px-1.5 py-0.5 shadow-sm">
                                   <Trophy className="w-2.5 h-2.5 text-amber-500" />
                                   エクセレント！
                                   <Sparkles className="w-2.5 h-2.5 text-amber-400" />
                                 </span>
                               )}
-                              {IS_ADMIN_BUILD && utilRate >= 90 && utilRate < 95 && (
+                              {isAdmin && utilRate >= 90 && utilRate < 95 && (
                                 <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-[#E5B85C] bg-amber-50/60 border border-amber-200/60 rounded-full px-1.5 py-0.5">
                                   <CircleCheck className="w-2.5 h-2.5 text-[#E5B85C]" />
                                   適正
                                 </span>
                               )}
-                              {IS_ADMIN_BUILD && utilRate <= 89 && (
+                              {isAdmin && utilRate <= 89 && (
                                 <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5">
                                   <AlertTriangle className="w-2.5 h-2.5" />
                                   要改善
@@ -865,7 +869,7 @@ export default function StaffList() {
                       </div>
 
                       {/* Mobile Layout（スタッフ向け）: 1行リスト。氏名・店舗・点数・売上を左に、数字3つを右に並べ、どれも改行させない */}
-                      {!IS_ADMIN_BUILD && (() => {
+                      {!isAdmin && (() => {
                         const scoreResult = compositeScoreMap.get(`${staff.name}__${staff.storeNormalized}`);
                         const hasNps = !!npsInfo && npsInfo.totalResponses > 0;
                         return (
@@ -896,7 +900,7 @@ export default function StaffList() {
                       })()}
 
                       {/* Mobile Layout（管理者向け） */}
-                      <div className={`${IS_ADMIN_BUILD ? "md:hidden" : "hidden"} px-3 py-2`}>
+                      <div className={`${isAdmin ? "md:hidden" : "hidden"} px-3 py-2`}>
                         <div className="flex items-start gap-2">
                           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
                             <span className="text-primary font-bold text-xs">{shownName.charAt(0)}</span>

@@ -21,7 +21,7 @@ import type { PeriodSelection } from "@/components/PeriodSelector";
 import { Badge } from "@/components/ui/badge";
 import ScoreDetailModal from "@/components/ScoreDetailModal";
 import DashboardLayout from "@/components/DashboardLayout";
-import { IS_ADMIN_BUILD } from "@/lib/appRole";
+import { useIsEffectiveAdmin } from "@/contexts/ViewRole";
 import { useNpsData, calculateStoreStats, filterByMonth, getAvailableMonths } from "@/hooks/useNpsData";
 import type { NpsRecord, StoreStats } from "@/hooks/useNpsData";
 import { getNpsClass, NPS_INDUSTRY_AVERAGE } from "@/lib/npsClass";
@@ -237,6 +237,7 @@ function ReviewCard({ record, index }: { record: NpsRecord; index: number }) {
 }
 
 export default function SurveyDetail() {
+  const isAdmin = useIsEffectiveAdmin();
   const params = useParams<{ storeId: string }>();
   const storeId = decodeURIComponent(params.storeId || "");
   const { npsAliasMap, isNewStore } = useStores();
@@ -268,7 +269,7 @@ export default function SurveyDetail() {
     return Array.from(set).sort().reverse();
   }, [allNpsMonths, fankuruMonths, monthlyMonths]);
 
-  const [periodSelection, setPeriodSelection] = useState<PeriodSelection>(getDefaultPeriodSelection());
+  const [periodSelection, setPeriodSelection] = useState<PeriodSelection>(getDefaultPeriodSelection(isAdmin));
   const [selectedScore, setSelectedScore] = useState<number | null>(null);
   const [selectedPdf, setSelectedPdf] = useState<FankuruPdf | null>(null);
   const [showAllReviews, setShowAllReviews] = useState(false);
@@ -807,7 +808,7 @@ export default function SurveyDetail() {
       )}
 
       {/* 店舗詳細リンク */}
-      {!loading && IS_ADMIN_BUILD && (
+      {!loading && isAdmin && (
         <div className="flex justify-center pt-2 pb-4">
           <Link
             href={`/store/${encodeURIComponent(storeId)}`}

@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SETTINGS_TAB, shouldShowSettingsTab, visibleMainTabs } from "@/lib/navItems";
 import { IS_ADMIN_BUILD } from "@/lib/appRole";
+import { useIsEffectiveAdmin } from "@/contexts/ViewRole";
+import { RoleViewSwitch } from "@/components/RoleViewSwitch";
 import monetLogo from "@/assets/monet-logo.png";
 
 const MONET_LOGO = monetLogo;
@@ -53,8 +55,8 @@ export default function DashboardLayout({
   healthPanel = "issuesOnly",
 }: DashboardLayoutProps) {
   const [location, setLocation] = useLocation();
-  // 広告・設定タブは管理者向けビルドにしか無い（スタッフ向けバンドルには存在しない）
-  const isAdmin = IS_ADMIN_BUILD;
+  // 管理者ビルドでは切替の状態。スタッフ向けビルドは常に false（広告タブはバンドルにも無い）
+  const isAdmin = useIsEffectiveAdmin();
   const showHomeCrumb = isAdmin;
   const shownCrumbs = isAdmin ? breadcrumbs : breadcrumbs.filter(c => c.label !== "ホーム");
   const tabs = visibleMainTabs(isAdmin);
@@ -71,6 +73,14 @@ export default function DashboardLayout({
     <div className="min-h-screen bg-background">
       {/* Top Navigation */}
       <header className="sticky top-0 z-50 border-b border-border/60 bg-white/85 backdrop-blur-md">
+        {/* 管理者ビルドだけ。スタッフ向けビルドでは IS_ADMIN_BUILD が false で消える */}
+        {IS_ADMIN_BUILD && (
+          <div className="border-b border-border/50 bg-white">
+            <div className="container flex items-center justify-center py-1.5 sm:justify-end">
+              <RoleViewSwitch />
+            </div>
+          </div>
+        )}
         <div className="container flex items-center justify-between h-16">
           <Link href="/">
             <div className="flex min-h-[44px] shrink-0 items-center gap-3 group cursor-pointer">

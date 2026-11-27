@@ -6,6 +6,7 @@
  *   集計値のみ・PIIなし・モネ7院合算（ヨルモネ除外）。
  */
 import { useState, useMemo } from "react";
+import { useIsEffectiveAdmin } from "@/contexts/ViewRole";
 import { motion } from "framer-motion";
 import { ClipboardList, Users, Info, Loader2 } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -59,9 +60,10 @@ function QuestionCard({ q, index }: { q: CounselingQuestion; index: number }) {
 }
 
 export default function Counseling() {
+  const isAdmin = useIsEffectiveAdmin();
   const { rows, availableMonths, loading, error } = useCounselingData();
   const [selection, setSelection] = useState<PeriodSelection>(
-    getDefaultPeriodSelection()
+    getDefaultPeriodSelection(isAdmin)
   );
 
   const filterMonths = useMemo(

@@ -37,7 +37,7 @@ import { calculateUtilizationRate, getUtilizationColor } from "@/lib/utilization
 import { calculateCompositeScore } from "@/lib/compositeScore";
 import type { CompositeScoreResult } from "@/lib/compositeScore";
 import { generateStaffAdvice } from "@/lib/staffAdvice";
-import { IS_ADMIN_BUILD } from "@/lib/appRole";
+import { useIsEffectiveAdmin } from "@/contexts/ViewRole";
 import StaffSimpleSummary from "@/components/StaffSimpleSummary";
 import { reservationStreakMonthsAt } from "@/lib/nextReservationBoost";
 import type { StaffAdvice } from "@/lib/staffAdvice";
@@ -262,6 +262,7 @@ function GroupHeading({ children }: { children: string }) {
 
 // ===== Main Component =====
 export default function StaffDetail() {
+  const isAdmin = useIsEffectiveAdmin();
   const params = useParams<{ storeId: string; staffId: string }>();
   const staffName = decodeURIComponent(params.staffId || "");
   const storeParam = decodeURIComponent(params.storeId || "");
@@ -292,7 +293,7 @@ export default function StaffDetail() {
   // （2026-10-03 林さん指示。一覧 StaffList の npsInfoFor と同じ考え方）
   // 本名・ニックネームのどちらにも一致しないNPS名も、同じ店舗で候補がちょうど1人なら自動でつなぐ（lib/npsFuzzyLink.ts）
   const staffNpsAll = useMemo(() => {
-    if (IS_ADMIN_BUILD) return filterNpsRecordsForStaff(records, staffName, staffStore);
+    if (isAdmin) return filterNpsRecordsForStaff(records, staffName, staffStore);
     const nickname = resolveStaffDisplayName(staffName, staffStore);
     const links = buildNpsFuzzyLinks(
       records.map((r) => ({ name: r.staff || "", store: r.storeShort || "" })),
@@ -305,7 +306,7 @@ export default function StaffDetail() {
         (nickname !== staffName && isNpsRecordOfStaff(r, nickname, staffStore)) ||
         links.get(npsStaffKey(r.staff || "", r.storeShort || "")) === myKey
     );
-  }, [records, staffName, staffStore, rawData]);
+  }, [isAdmin, records, staffName, staffStore, rawData]);
 
   // 月の管理
   const npsMonths = useMemo(() => getAvailableMonths(staffNpsAll), [staffNpsAll]);
@@ -330,7 +331,7 @@ export default function StaffDetail() {
   // スタッフ一覧の「月末報告書 未提出」欄から来たときは ?month=YYYY-MM の月で開く（2026-10-05）
   const [periodSelection, setPeriodSelection] = useState<PeriodSelection>(() => {
     const m = new URLSearchParams(window.location.search).get("month");
-    return m && /^\d{4}-\d{2}$/.test(m) ? { mode: "specific_month", month: m } : getDefaultPeriodSelection();
+    return m && /^\d{4}-\d{2}$/.test(m) ? { mode: "specific_month", month: m } : getDefaultPeriodSelection(isAdmin);
   });
   const [selectedScore, setSelectedScore] = useState<number | null>(null);
   const [selectedPdf, setSelectedPdf] = useState<FankuruPdf | null>(null);
@@ -539,7 +540,7 @@ export default function StaffDetail() {
   // 口コミ・NPS・ファンくるの件数（月末報告書の有無に関わらず出す）。
   // 管理者は個人売上の下、スタッフ向けは【顧客満足度】の最後に出す（2026-10-02 林さん指示）
   const feedbackCountsCard = (
-          <Card className={`border-border/50 shadow-sm ${IS_ADMIN_BUILD ? "mt-4" : "mb-8"}`}>
+          <Card className={`border-border/50 shadow-sm ${isAdmin ? "mt-4" : "mb-8"}`}>
             <CardContent className="p-5">
               <div className="mb-3">
                 <span className="text-[10px] font-medium text-sage/80 bg-sage/5 border border-sage/20 rounded px-1.5 py-0.5">
@@ -579,7 +580,7 @@ export default function StaffDetail() {
         <section className="mb-8 pt-6 border-t-2 border-primary/20">
           <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
             <DollarSign className="w-5 h-5 text-primary" />
-            {IS_ADMIN_BUILD ? "個人売上" : "売上詳細"}
+            {isAdmin ? "個人売上" : "売上詳細"}
             {!isAllPeriod && (
               <span className="text-xs font-normal text-muted-foreground">— {getPeriodLabel(periodSelection)}</span>
             )}
@@ -669,7 +670,7 @@ export default function StaffDetail() {
             </Card>
           )}
 
-          {IS_ADMIN_BUILD && feedbackCountsCard}
+          {isAdmin && feedbackCountsCard}
         </section>
     </>
   );
@@ -685,8 +686,8 @@ export default function StaffDetail() {
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8">
         <div>
           <div className="flex items-center gap-4 mb-2">
-            <div className={`w-14 h-14 rounded-xl ${IS_ADMIN_BUILD ? "bg-primary/10" : "bg-muted"} flex items-center justify-center shrink-0`}>
-              <span className={`${IS_ADMIN_BUILD ? "text-primary" : "text-foreground"} font-bold text-2xl`}>{shownName.charAt(0)}</span>
+            <div className={`w-14 h-14 rounded-xl ${isAdmin ? "bg-primary/10" : "bg-muted"} flex items-center justify-center shrink-0`}>
+              <span className={`${isAdmin ? "text-primary" : "text-foreground"} font-bold text-2xl`}>{shownName.charAt(0)}</span>
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
@@ -726,7 +727,7 @@ export default function StaffDetail() {
             <ClipboardCheck className="w-4 h-4 text-muted-foreground" />
             <span className="text-xs text-muted-foreground">月末報告書</span>
             {hasSubmitted ? (
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${IS_ADMIN_BUILD ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-muted text-muted-foreground border border-border"}`}>
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${isAdmin ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-muted text-muted-foreground border border-border"}`}>
                 <CheckCircle2 className="w-3 h-3" />
                 {getPeriodLabel(periodSelection)} 回答済み
               </span>
@@ -741,8 +742,8 @@ export default function StaffDetail() {
       })()}
 
       {/* ===== スタッフ向け: 3指標＋よかった点・改善点（管理者ページは従来どおり） ===== */}
-      {!IS_ADMIN_BUILD && !loading && <GroupHeading>重要指標</GroupHeading>}
-      {!IS_ADMIN_BUILD && !loading && (
+      {!isAdmin && !loading && <GroupHeading>重要指標</GroupHeading>}
+      {!isAdmin && !loading && (
         <StaffSimpleSummary
           nextReservationRate={staffReport ? nextResRate : null}
           reservationStreakMonths={reservationStreakMonths}
@@ -754,7 +755,7 @@ export default function StaffDetail() {
         />
       )}
 
-      {IS_ADMIN_BUILD && (<>
+      {isAdmin && (<>
       {/* ===== 総合点スコア ===== */}
       {compositeScore && !loading && (
         <section className="mb-6 pt-6 border-t-2 border-primary/20">
@@ -1056,14 +1057,14 @@ export default function StaffDetail() {
       {salesSection}
       </>)}
 
-      {IS_ADMIN_BUILD && (<>
+      {isAdmin && (<>
       {/* ===== 2. 個別アドバイス ===== */}
       {staffNpsStats && (
         <AdviceSection stats={staffNpsStats} records={staffNpsRecords} />
       )}
       </>)}
 
-      {!IS_ADMIN_BUILD && <GroupHeading>顧客満足度</GroupHeading>}
+      {!isAdmin && <GroupHeading>顧客満足度</GroupHeading>}
 
       {/* ===== 3. ファンくるデータ ===== */}
       <section className="mb-8 pt-6 border-t-2 border-sage/20">
@@ -1398,10 +1399,10 @@ export default function StaffDetail() {
         )}
       </section>
 
-      {!IS_ADMIN_BUILD && feedbackCountsCard}
+      {!isAdmin && feedbackCountsCard}
 
-      {!IS_ADMIN_BUILD && <GroupHeading>個人売上</GroupHeading>}
-      {!IS_ADMIN_BUILD && salesSection}
+      {!isAdmin && <GroupHeading>個人売上</GroupHeading>}
+      {!isAdmin && salesSection}
 
       {/* Score Detail Modal */}
       {selectedScore !== null && (
