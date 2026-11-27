@@ -2,9 +2,51 @@
 import type { TaskLogEntry } from "@/lib/taskSummary";
 
 /** この写しを作った時刻。画面の判定はこの時刻を「いま」として行う */
-export const TASK_LOG_SYNCED_AT = "2026-11-26T21:51:03.266Z";
+export const TASK_LOG_SYNCED_AT = "2026-11-27T05:17:14.583Z";
 
 export const TASK_LOG: TaskLogEntry[] = [
+  {
+    "at": "2026-11-27T13:30:00.000+09:00",
+    "task": "口コミ返信",
+    "result": "成功",
+    "count": null,
+    "reason": ""
+  },
+  {
+    "at": "2026-11-27T13:30:00.000+09:00",
+    "task": "ブログ公開",
+    "result": "エラー",
+    "count": null,
+    "reason": "今日の記事が公開されていない"
+  },
+  {
+    "at": "2026-11-27T13:30:00.000+09:00",
+    "task": "L Message集計",
+    "result": "成功",
+    "count": 24,
+    "reason": ""
+  },
+  {
+    "at": "2026-11-27T12:48:00.000+09:00",
+    "task": "HPBブログ 予約登録",
+    "result": "成功",
+    "count": 22,
+    "reason": ""
+  },
+  {
+    "at": "2026-11-27T12:39:00.000+09:00",
+    "task": "HPBブログ 予約登録",
+    "result": "エラー",
+    "count": 0,
+    "reason": "予約済0／失敗0（対象22本） — 異常終了(コード1): 自動ログインできない（画像認証などの可能性）"
+  },
+  {
+    "at": "2026-11-27T07:40:00.000+09:00",
+    "task": "サロンボード取得",
+    "result": "成功",
+    "count": 14,
+    "reason": ""
+  },
   {
     "at": "2026-11-27T06:00:00.000+09:00",
     "task": "HPBブログ 原稿づくり",
