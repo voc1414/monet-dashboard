@@ -48,22 +48,14 @@ export default function AdminLayout({ children, breadcrumbs = [], title }: Admin
       {/* Top Header */}
       <header className="sticky top-0 z-50 border-b border-border/60 bg-white/85 backdrop-blur-md">
         {IS_ADMIN_BUILD && (
-          <div className="border-b border-border/50 bg-white">
-            <div className="container flex items-center justify-center py-1.5 sm:justify-end">
-              <RoleViewSwitch />
-            </div>
-          </div>
-        )}
-        <div className="container flex items-center justify-between h-16">
-          <div className="flex items-center gap-4">
-            {/* Mobile Menu Toggle */}
+          <div className="container flex items-center gap-2 sm:gap-3 min-h-16 py-1.5">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground"
+              className="lg:hidden p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground shrink-0"
+              aria-label={mobileMenuOpen ? "メニューを閉じる" : "メニューを開く"}
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
-
             <Link href="/admin">
               <div className="flex items-center gap-3 group cursor-pointer">
                 <img
@@ -82,10 +74,23 @@ export default function AdminLayout({ children, breadcrumbs = [], title }: Admin
                 </div>
               </div>
             </Link>
+            <RoleViewSwitch />
+            <div className="ml-auto lg:hidden">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleLogout}
+                disabled={loading}
+                className="text-muted-foreground hover:text-destructive px-2"
+              >
+                <LogOut className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
-
+        )}
+        <div className="container hidden lg:flex items-center justify-between h-14 border-t border-border/40">
           {/* Desktop Nav（管理者は主タブ全部＋広告＋設定が並ぶ） */}
-          <nav className="hidden lg:flex items-center gap-1">
+          <nav className="flex min-w-0 items-center gap-1">
             {MAIN_TABS.map((tab) => (
               <Link key={tab.href} href={tab.href}>
                 {/* xl 未満は短いラベル（タブが増えると1行に収まらない・2026-09-01） */}

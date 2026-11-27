@@ -22,13 +22,13 @@ function RoleViewSwitchControl() {
     <div
       role="group"
       aria-label="表示の切替"
-      className="inline-flex w-full max-w-[280px] items-stretch rounded-full border border-border bg-muted/70 p-0.5 text-sm font-semibold sm:w-auto"
+      className="inline-flex shrink-0 items-stretch rounded-full border border-border bg-muted/70 p-0.5 text-xs font-semibold sm:text-sm"
     >
       <button
         type="button"
         aria-pressed={shown === "admin"}
         onClick={() => setRole("admin")}
-        className={`min-h-[44px] flex-1 rounded-full px-4 transition-colors sm:flex-none ${
+        className={`inline-flex min-h-[44px] items-center rounded-full px-2.5 transition-colors sm:px-3.5 ${
           shown === "admin"
             ? "bg-white text-foreground shadow-sm"
             : "text-muted-foreground hover:text-foreground"
@@ -40,7 +40,7 @@ function RoleViewSwitchControl() {
         type="button"
         aria-pressed={shown === "staff"}
         onClick={() => setRole("staff")}
-        className={`min-h-[44px] flex-1 rounded-full px-4 transition-colors sm:flex-none ${
+        className={`inline-flex min-h-[44px] items-center rounded-full px-2.5 transition-colors sm:px-3.5 ${
           shown === "staff"
             ? "bg-white text-foreground shadow-sm"
             : "text-muted-foreground hover:text-foreground"
