@@ -98,9 +98,14 @@ export default function NextReservationBoost() {
               <CalendarCheck className="w-5 h-5 text-primary" />
               次回予約強化
             </h1>
-            <p className="mt-1 text-xs text-muted-foreground">
-              次回予約率 ＝ 次回予約取得数 ÷（新規客数＋再来顧客数）。{BOOST_THRESHOLD}%以下＝強化対象
-            </p>
+            <details className="group mt-1">
+              <summary className="flex min-h-[44px] cursor-pointer list-none items-center gap-1 text-xs font-medium text-muted-foreground [&::-webkit-details-marker]:hidden">
+                率の定義
+              </summary>
+              <p className="pb-2 text-xs text-muted-foreground">
+                次回予約率 ＝ 次回予約取得数 ÷（新規客数＋再来顧客数）。{BOOST_THRESHOLD}%以下＝強化対象
+              </p>
+            </details>
           </div>
           <label className="flex items-center gap-2 text-xs text-muted-foreground">
             対象月

@@ -662,9 +662,14 @@ export default function Ads() {
               ))}
           </div>
 
-          <div className="mt-6 rounded-xl border border-border/40 bg-muted/30 p-4 text-xs text-muted-foreground">
+          <details className="group mt-6 rounded-xl border border-border/40 bg-muted/30 px-4 text-xs text-muted-foreground">
+            <summary className="flex min-h-[44px] cursor-pointer list-none items-center gap-1 font-medium [&::-webkit-details-marker]:hidden">
+              数字の定義
+            </summary>
+            <p className="pb-4 [word-break:auto-phrase] [text-wrap:pretty]">
             出典: Meta広告データ（SyncWith）＋ L Message 流入タグ。CPL警告しきい値=集客¥350超・求人¥3,000超、CTR=集客3%未満・求人2%未満で赤表示。LINE登録数は流入タグ友だちの期間内増分。「新規（新規来店数）」はサロンボード実績。日次データ(daily_new)があれば選択期間に厳密一致で合算、未反映の間は月次(該当月計)にフォールバック（KPIの注記に出所と範囲を表示）。HPB費用=月額¥55,000×選択期間のうちその店が掲載している月数（開店前で未掲載の店は0）。CPA=(集客広告費+HPB費用)÷新規来店数、ROAS=新規売上÷(集客広告費+HPB費用)。CPL（リード単価）は広告費のみ。集計値のみで個人情報は含みません。
-          </div>
+            </p>
+          </details>
         </motion.div>
       )}
     </DashboardLayout>

@@ -307,6 +307,57 @@ export function syncIsStale(syncedAt: Date, now: Date): boolean {
   return now.getTime() - syncedAt.getTime() > SYNC_STALE_HOURS * 60 * MIN;
 }
 
+export interface TaskHeadline {
+  lamp: "yellow" | "red";
+  text: string;
+  sub: string[];
+}
+
+const FAIL_IN_LABEL = /エラー|停止/;
+const SOFT_LATE = /遅れ|未公開/;
+
+/**
+ * 自動タスクページ先頭の帯。
+ * 赤（取り込み停止・3日以上）と黄（2日以上）だけ帯を出す。
+ * 直すことがないとき、および1日以内の遅れ・失敗・要確認だけのときは帯自体を出さない（null）。
+ * 中身は各行のランプと文言に残す（2026-11-27 林さん。緑の帯は文言を変えるのではなく消す）。
+ */
+export function headlineForTasks(status: TaskStatus[], stale: boolean): TaskHeadline | null {
+  const red = status.filter((s) => s.lamp === "red").length;
+  const yellow = status.filter((s) => s.lamp === "yellow").length;
+  const failed = status.filter(
+    (s) => FAIL_IN_LABEL.test(s.label) || (s.lateDays === undefined && !s.waiting && FAIL_IN_LABEL.test(s.latest?.result ?? "")),
+  ).length;
+  const lateSoft = status.filter((s) => s.lamp === "green" && s.lateDays !== undefined && SOFT_LATE.test(s.label)).length;
+  const check = status.filter((s) => s.lamp === "green" && s.lateDays === undefined && /要確認/.test(s.label)).length;
+  const issues = [
+    red && `3日以上の遅れ ${red}本`,
+    yellow && `2日以上の遅れ ${yellow}本`,
+    failed && `失敗あり ${failed}本`,
+    lateSoft && `1日以内の遅れ ${lateSoft}本`,
+    check && `要確認 ${check}本`,
+  ].filter((x): x is string => Boolean(x));
+  const total = status.filter(
+    (s) =>
+      s.lamp === "red" ||
+      s.lamp === "yellow" ||
+      s.lateDays !== undefined ||
+      FAIL_IN_LABEL.test(s.label) ||
+      /要確認/.test(s.label) ||
+      (!s.waiting && FAIL_IN_LABEL.test(s.latest?.result ?? "")),
+  ).length;
+  if (stale) {
+    return {
+      lamp: "red",
+      text: "取り込みが止まっています",
+      sub: [`この画面は${SYNC_STALE_HOURS}時間以上更新されていません`, ...issues],
+    };
+  }
+  if (red) return { lamp: "red", text: `直すことがあります（${total}本）`, sub: issues };
+  if (yellow) return { lamp: "yellow", text: `確認することがあります（${total}本）`, sub: issues };
+  return null;
+}
+
 /** 「11/26(木) 20:03」形式（日本時間） */
 export function formatJstShort(iso?: string): string {
   if (!iso) return "—";
