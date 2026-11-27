@@ -73,15 +73,71 @@ export default function DashboardLayout({
     <div className="min-h-screen bg-background">
       {/* Top Navigation */}
       <header className="sticky top-0 z-50 border-b border-border/60 bg-white/85 backdrop-blur-md">
-        {/* 管理者ビルドだけ。スタッフ向けビルドでは IS_ADMIN_BUILD が false で消える */}
+        {/*
+          管理者ビルドだけ、ロゴをタブの1段上に上げ、その右に表示切替を置く。
+          スタッフ向けビルドは下の1段（ロゴ＋タブ）のまま。切替は出さない。
+        */}
         {IS_ADMIN_BUILD && (
-          <div className="border-b border-border/50 bg-white">
-            <div className="container flex items-center justify-center py-1.5 sm:justify-end">
-              <RoleViewSwitch />
+          <div className="container flex items-center gap-2 sm:gap-3 min-h-16 py-1.5">
+            <Link href="/">
+              <div className="flex min-h-[44px] shrink-0 items-center gap-2 sm:gap-3 group cursor-pointer">
+                <img
+                  src={MONET_LOGO}
+                  alt="monet"
+                  className="h-9 w-auto object-contain"
+                />
+                <div className="flex flex-col">
+                  <span className="text-base font-bold text-foreground leading-tight">
+                    monet
+                  </span>
+                  <span className="text-[10px] text-muted-foreground leading-tight tracking-wider">
+                    DASHBOARD
+                  </span>
+                </div>
+              </div>
+            </Link>
+            <RoleViewSwitch />
+            {/* 狭い画面では更新・メニューをこの段の右端へ。タブ段は lg 未満では出さない */}
+            <div className="ml-auto flex items-center gap-1 lg:hidden">
+              {onRefresh && (
+                <button
+                  onClick={onRefresh}
+                  disabled={loading}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground disabled:opacity-50"
+                  title="データを更新"
+                >
+                  <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+                </button>
+              )}
+              {!isAdmin && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className="p-2 rounded-lg hover:bg-accent transition-colors text-foreground"
+                      aria-label="ページを選ぶ"
+                    >
+                      <Menu className="w-5 h-5" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    {tabs.map((tab) => (
+                      <DropdownMenuItem
+                        key={tab.href}
+                        onSelect={() => setLocation(tab.href)}
+                        className={`gap-2 py-2.5 text-sm ${tab.isActive(location) ? "font-bold text-primary" : ""}`}
+                      >
+                        <tab.icon className="w-4 h-4 shrink-0" />
+                        {tab.label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
           </div>
         )}
-        <div className="container flex items-center justify-between h-16">
+        <div className={`container items-center justify-between ${IS_ADMIN_BUILD ? "hidden h-14 border-t border-border/40 lg:flex" : "flex h-16"}`}>
+          {!IS_ADMIN_BUILD && (
           <Link href="/">
             <div className="flex min-h-[44px] shrink-0 items-center gap-3 group cursor-pointer">
               <img
@@ -99,16 +155,17 @@ export default function DashboardLayout({
               </div>
             </div>
           </Link>
+          )}
 
           {/*
             上部タブは lg（1024px）以上だけ。md（768px）では管理者の7タブが
             ロゴに重なるため、lg 未満は下部ナビに任せる。
             lg〜xl 未満はまだ幅が足りないので短いラベル・狭い gap にする
             （1024px でフルラベルにするとロゴとの隙間が 0 になる・2026-09-01 実測）。
-            管理者の9タブは xl（1280px）でもフルラベルだとロゴに重なる（2026-11-26 林さん指摘・実測）ので、
-            タブが8本以上のときはフルラベルを 2xl（1536px）からにする。ロゴは縮ませない。
+            管理者のタブが8本以上のときはフルラベルを 2xl（1536px）からにする。
+            管理者ビルドではロゴは上の段にあり、この段はタブだけ。
           */}
-          <nav className="hidden lg:flex min-w-0 items-center gap-3 lg:mx-4 xl:gap-6">
+          <nav className={`hidden lg:flex min-w-0 items-center gap-3 xl:gap-6 ${IS_ADMIN_BUILD ? "" : "lg:mx-4"}`}>
             {tabs.map((tab) => (
               <Link key={tab.href} href={tab.href}>
                 <span
