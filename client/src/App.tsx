@@ -19,6 +19,7 @@ import SurveyDetail from "./pages/SurveyDetail";
 import StaffDetail from "./pages/StaffDetail";
 import Counseling from "./pages/Counseling";
 import Ads from "./pages/Ads";
+import AdsDiagnosis from "./pages/AdsDiagnosis";
 import GoogleMap from "./pages/GoogleMap";
 import AutoTasks from "./pages/AutoTasks";
 import NextReservationBoost from "./pages/NextReservationBoost";
@@ -56,6 +57,7 @@ const EmploymentGate = IS_ADMIN_BUILD ? gate(EmploymentRanking) : () => null;
 const NextReservationGate = IS_ADMIN_BUILD ? gate(NextReservationBoost) : () => null;
 const NextReservationPersonGate = IS_ADMIN_BUILD ? gate(NextReservationBoostPerson) : () => null;
 const AdsGate = IS_ADMIN_BUILD ? gate(Ads) : () => null;
+const DiagnosisGate = IS_ADMIN_BUILD ? gate(AdsDiagnosis) : () => null;
 const GoogleMapGate = IS_ADMIN_BUILD ? gate(GoogleMap) : () => null;
 const AutoTasksGate = IS_ADMIN_BUILD ? gate(AutoTasks) : () => null;
 const AdminLoginGate = IS_ADMIN_BUILD ? gate(AdminLogin) : () => null;
@@ -107,6 +109,7 @@ function Router() {
         {IS_ADMIN_BUILD && <Route path="/next-reservation" component={NextReservationGate} />}
         {IS_ADMIN_BUILD && <Route path="/next-reservation/:store/:name" component={NextReservationPersonGate} />}
         {IS_ADMIN_BUILD && <Route path="/ads" component={AdsGate} />}
+        {IS_ADMIN_BUILD && <Route path="/diagnosis" component={DiagnosisGate} />}
         {IS_ADMIN_BUILD && <Route path="/google-map" component={GoogleMapGate} />}
         {IS_ADMIN_BUILD && <Route path="/auto-tasks" component={AutoTasksGate} />}
         {IS_ADMIN_BUILD && <Route path="/admin/login" component={AdminLoginGate} />}

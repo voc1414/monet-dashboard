@@ -12,6 +12,7 @@ import {
   BarChart3,
   CalendarCheck,
   ClipboardList,
+  ClipboardCheck,
   Home,
   Megaphone,
   MessageSquareText,
@@ -96,6 +97,15 @@ export const MAIN_TABS: NavItem[] = [
     // 広告費・CPA は店舗スタッフに見せない（2026-08-31 林さん指示）
     adminOnly: true,
     isActive: (l) => l.startsWith("/ads"),
+  },
+  {
+    href: "/diagnosis",
+    label: "店舗診断",
+    shortLabel: "診断",
+    icon: ClipboardCheck,
+    // 集客広告の院ごとの判定。広告費を含むので管理者だけ
+    adminOnly: true,
+    isActive: (l) => l.startsWith("/diagnosis"),
   },
   {
     href: "/auto-tasks",

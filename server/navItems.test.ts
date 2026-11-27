@@ -24,6 +24,7 @@ describe("画面の仕分け（スタッフ向け／管理者向け）", () => {
     // 店舗一覧はスタッフに見せない（2026-10-02 林さん指示）
     expect(staffTabs.map((t) => t.href)).toEqual(["/staff", "/survey", "/counseling"]);
     expect(staffTabs.some((t) => t.href === "/ads")).toBe(false);
+    expect(staffTabs.some((t) => t.href === "/diagnosis")).toBe(false);
     expect(staffTabs.some((t) => t.href === "/employment")).toBe(false);
     expect(staffTabs.some((t) => t.href === "/next-reservation")).toBe(false);
     expect(staffTabs.some((t) => t.href === "/google-map")).toBe(false);
@@ -40,6 +41,7 @@ describe("画面の仕分け（スタッフ向け／管理者向け）", () => {
       "/employment",
       "/next-reservation",
       "/ads",
+      "/diagnosis",
       "/auto-tasks",
     ]);
   });
@@ -97,6 +99,7 @@ describe("画面の仕分け（スタッフ向け／管理者向け）", () => {
     const adminOnlyRoutes = [
       "/employment",
       "/ads",
+      "/diagnosis",
       "/google-map",
       "/auto-tasks",
       "/admin/login",

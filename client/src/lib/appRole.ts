@@ -47,6 +47,7 @@ export function isAdminOnlyLocation(location: string): boolean {
     "/employment",
     "/next-reservation",
     "/ads",
+    "/diagnosis",
     "/google-map",
     "/auto-tasks",
     "/admin",
