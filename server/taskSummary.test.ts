@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { TASKS, formatJstShort, gbpRuns, headlineForTasks, scheduledTimes, summarizeTasks, syncIsStale, type TaskDef, type TaskLogEntry, type TaskStatus } from "../client/src/lib/taskSummary";
 import type { GbpEntry } from "../client/src/lib/gbpSummary";
@@ -197,6 +199,13 @@ describe("自動タスク先頭の帯", () => {
       text: "確認することがあります（1本）",
       sub: ["2日以上の遅れ 1本"],
     });
+  });
+
+  it("記録をまだ書いていない欄は画面から消している", () => {
+    const src = readFileSync(path.resolve(import.meta.dirname, "../client/src/pages/AutoTasks.tsx"), "utf8");
+    expect(src).not.toContain("記録をまだ書いていない");
+    expect(src).not.toContain("OTHER_TASKS");
+    expect(src).toContain('data-testid="tasks-recent"');
   });
 
   it("取り込みが止まっていれば赤のまま", () => {
