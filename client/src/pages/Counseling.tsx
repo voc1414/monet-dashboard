@@ -138,14 +138,17 @@ export default function Counseling() {
             ))}
           </div>
 
-          <div className="mt-6 flex items-start gap-2 rounded-xl border border-border/40 bg-muted/30 p-4 text-xs text-muted-foreground">
-            <Info className="w-4 h-4 shrink-0 mt-0.5" />
-            <div>
+          <details className="group mt-6 rounded-xl border border-border/40 bg-muted/30 px-4 text-xs text-muted-foreground">
+            <summary className="flex min-h-[44px] cursor-pointer list-none items-center gap-1 font-medium [&::-webkit-details-marker]:hidden">
+              <Info className="w-3.5 h-3.5 shrink-0" />
+              集計の注記
+            </summary>
+            <p className="pb-4 [word-break:auto-phrase] [text-wrap:pretty]">
               出典: サロンブレイン カウンセリングシート分析。モネ全7院（福岡姪浜 /
               高槻 / 堀江院2nd / 福島 / 堀江 / 土橋 / 広島）の合算で、ヨルモネは含みません。
               複数月を選んだ場合は件数を合算して比率を再計算します。複数回答の設問は回答延べ数に対する比率です。集計値のみで、個人情報・自由記述の本文は含みません。
-            </div>
-          </div>
+            </p>
+          </details>
         </>
       )}
     </DashboardLayout>

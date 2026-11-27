@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { TASKS, formatJstShort, gbpRuns, headlineForTasks, scheduledTimes, summarizeTasks, syncIsStale, type TaskDef, type TaskLogEntry, type TaskStatus } from "../client/src/lib/taskSummary";
 import type { GbpEntry } from "../client/src/lib/gbpSummary";
@@ -166,21 +168,17 @@ function row(over: Partial<TaskStatus> & Pick<TaskStatus, "lamp" | "label">): Ta
 }
 
 describe("自動タスク先頭の帯", () => {
-  const clear = { lamp: "green" as const, text: "直すことはありません", sub: ["遅れているタスクはありません"] };
-
-  it("問題が無ければ直すことはありません", () => {
-    expect(headlineForTasks([row({ lamp: "green", label: "成功" })], false)).toEqual(clear);
+  it("直すことがなければ帯自体を出さない", () => {
+    expect(headlineForTasks([row({ lamp: "green", label: "成功" })], false)).toBeNull();
   });
 
-  it("1日以内の遅れ・失敗・要確認だけでは帯を分けず、直すことはありませんにする", () => {
+  it("1日以内の遅れ・失敗・要確認だけでも帯を出さない", () => {
     const soft = [
       row({ lamp: "green", label: "1日遅れ（11/26(木) 21:30 から）", lateDays: 1 }),
       row({ lamp: "green", label: "エラー（11/27(金) 07:30 の分）", lateDays: 0, latest: { at: "2026-11-27T07:40:00+09:00", task: "サンプル", result: "エラー", count: null, reason: "落ちた" } }),
       row({ lamp: "green", label: "要確認" }),
     ];
-    const h = headlineForTasks(soft, false);
-    expect(h).toEqual(clear);
-    expect(h.text).not.toContain("気になる");
+    expect(headlineForTasks(soft, false)).toBeNull();
   });
 
   it("赤と黄の帯は本数と内訳を残す", () => {
@@ -201,6 +199,13 @@ describe("自動タスク先頭の帯", () => {
       text: "確認することがあります（1本）",
       sub: ["2日以上の遅れ 1本"],
     });
+  });
+
+  it("記録をまだ書いていない欄は画面から消している", () => {
+    const src = readFileSync(path.resolve(import.meta.dirname, "../client/src/pages/AutoTasks.tsx"), "utf8");
+    expect(src).not.toContain("記録をまだ書いていない");
+    expect(src).not.toContain("OTHER_TASKS");
+    expect(src).toContain('data-testid="tasks-recent"');
   });
 
   it("取り込みが止まっていれば赤のまま", () => {

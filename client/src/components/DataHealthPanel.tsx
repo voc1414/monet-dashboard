@@ -8,7 +8,7 @@
  * どれも画面上は普通に見えるので気づけない。ここで機械的に検出する。
  */
 import { useMemo, useState } from "react";
-import { ChevronDown, CircleCheck, AlertTriangle } from "lucide-react";
+import { ChevronDown, AlertTriangle } from "lucide-react";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { useSalonBoardStylistData, stylistKey } from "@/hooks/useSalonBoardStylistData";
 import { useNpsData } from "@/hooks/useNpsData";
@@ -39,13 +39,12 @@ function monthsAgo(ym: string, base: string): number {
 interface DataHealthPanelProps {
   /**
    * 問題が1件も無いときはパネルごと消す。
-   * トップ（Home）では「点検して問題なし」と分かること自体に意味があるので false（既定）。
-   * 他のページでは常時1行出ると邪魔なので true を渡す。
+   * 緑の「問題ありません」帯は出さない（2026-11-27）。引数に関わらず、直すことが無ければ描かない。
    */
   hideWhenOk?: boolean;
 }
 
-export default function DataHealthPanel({ hideWhenOk = false }: DataHealthPanelProps = {}) {
+export default function DataHealthPanel({ hideWhenOk: _hideWhenOk = false }: DataHealthPanelProps = {}) {
   const [open, setOpen] = useState(false);
   // 参考情報は「異常ではないもの」しか入らない。既定では畳んでおく
   // （毎日10件近く並ぶと、本当に直すものが出たときに埋もれる）。
@@ -175,21 +174,18 @@ export default function DataHealthPanel({ hideWhenOk = false }: DataHealthPanelP
   const referenceCount = npsNotes.length + notes.length + columnNotes.length;
 
   // フックは上で必ず呼び終えているので、ここで早期 return してもフックの順序は崩れない。
-  if (ok && hideWhenOk) return null;
+  // 直すことが無い緑帯は出さない。警告があるときだけ残す。
+  if (ok) return null;
 
   return (
-    <div className={`rounded-2xl border shadow-sm mb-6 ${ok ? "border-emerald-200 bg-emerald-50/50" : "border-amber-300 bg-amber-50/60"}`}>
+    <div className="rounded-2xl border shadow-sm mb-6 border-amber-300 bg-amber-50/60">
       <button
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center gap-3 px-4 py-3 text-left"
       >
-        {ok ? (
-          <CircleCheck className="w-5 h-5 text-emerald-600 shrink-0" />
-        ) : (
-          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
-        )}
+        <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
         <span className="font-semibold text-sm text-foreground">
-          {ok ? "データ点検：問題ありません" : `データ点検：確認したいことが ${issues.length} 件あります`}
+          {`データ点検：確認したいことが ${issues.length} 件あります`}
         </span>
         <ChevronDown className={`w-4 h-4 ml-auto text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
