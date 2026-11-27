@@ -7,7 +7,8 @@
  */
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Megaphone, Loader2, AlertTriangle } from "lucide-react";
+import { Megaphone, Loader2, AlertTriangle, Calendar } from "lucide-react";
+import { Select as UiSelect, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   LineChart,
   Line,
@@ -19,7 +20,7 @@ import {
   Legend,
 } from "recharts";
 import DashboardLayout from "@/components/DashboardLayout";
-import { useAdsData, getDashboardData, normalizeRegion, findMissingDates } from "@/hooks/useAdsData";
+import { useAdsData, getDashboardData, normalizeRegion, missingDatesInSpan, ADS_PERIOD_OPTIONS, DEFAULT_ADS_PERIOD } from "@/hooks/useAdsData";
 import type { Bucket, StoreRow, RegionRow, NamedRow } from "@/hooks/useAdsData";
 import { useSalonBoardStylistData, normalizeSalonBoardStore } from "@/hooks/useSalonBoardStylistData";
 import { useSalonBoardDailyNew } from "@/hooks/useSalonBoardDailyNew";
@@ -357,7 +358,7 @@ export default function Ads() {
   const { data: sbData } = useSalonBoardStylistData();
   const { data: dailyNew } = useSalonBoardDailyNew();
   const { data: newSalesData } = useStoreNewSales();
-  const [period, setPeriod] = useState("last-month");
+  const [period, setPeriod] = useState(DEFAULT_ADS_PERIOD);
   const [type, setType] = useState<"all" | "shukyaku" | "kyujin">("all");
   const [kubun, setKubun] = useState<"all" | "chokuei" | "fc">("all");
   const [region, setRegion] = useState("all");
@@ -367,7 +368,7 @@ export default function Ads() {
   const D = useMemo(() => (raw ? getDashboardData(raw, period) : null), [raw, period]);
 
   const reset = () => {
-    setPeriod("last-month");
+    setPeriod(DEFAULT_ADS_PERIOD);
     setType("all");
     setKubun("all");
     setRegion("all");
@@ -499,17 +500,9 @@ export default function Ads() {
   // 選択期間のうち「シートに最初の日〜最新日」の範囲で、1行も無い日を挙げる（monet / lmessage 別）。
   const missingDates = useMemo(() => {
     if (!raw || !D) return { monet: [] as string[], lmessage: [] as string[] };
-    const calc = (dates: string[]) => {
-      if (!dates.length) return [] as string[];
-      let min = dates[0], max = dates[0];
-      for (const d of dates) { if (d < min) min = d; if (d > max) max = d; }
-      const since = D.period.since > min ? D.period.since : min;
-      const until = D.period.until < max ? D.period.until : max;
-      return findMissingDates(dates, since, until);
-    };
     return {
-      monet: calc(raw.monet.map((r) => r.date).filter(Boolean)),
-      lmessage: calc(raw.lmessage.map((r) => r.date).filter(Boolean)),
+      monet: missingDatesInSpan(raw.monet.map((r) => r.date), D.period.since, D.period.until),
+      lmessage: missingDatesInSpan(raw.lmessage.map((r) => r.date), D.period.since, D.period.until),
     };
   }, [raw, D]);
   const fmtMissing = (ds: string[]) =>
@@ -529,7 +522,8 @@ export default function Ads() {
 
   return (
     <DashboardLayout breadcrumbs={[{ label: "広告（Meta）" }]}>
-      <div className="mb-5">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
         <div className="flex items-center gap-2 mb-1">
           <Megaphone className="w-5 h-5 text-primary" />
           <h1 className="text-xl font-bold text-foreground">monet Meta広告 ダッシュボード</h1>
@@ -558,25 +552,24 @@ export default function Ads() {
             </span>
           )}
         </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Calendar className="w-4 h-4 text-muted-foreground" aria-hidden />
+          <UiSelect value={period} onValueChange={setPeriod}>
+            <SelectTrigger className="w-[140px] bg-white text-sm" aria-label="期間">
+              <SelectValue placeholder="期間" />
+            </SelectTrigger>
+            <SelectContent>
+              {ADS_PERIOD_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </UiSelect>
+        </div>
       </div>
 
       {/* フィルタ */}
       <div className="flex flex-wrap items-center gap-3 mb-6">
-        <Select
-          label="期間"
-          value={period}
-          onChange={setPeriod}
-          options={[
-            { value: "7", label: "過去7日" },
-            { value: "30", label: "過去30日" },
-            { value: "90", label: "過去3ヶ月" },
-            { value: "180", label: "過去6ヶ月" },
-            { value: "this-month", label: "今月" },
-            { value: "last-month", label: "先月" },
-            { value: "this-year", label: "今年" },
-            { value: "last-year", label: "前年" },
-          ]}
-        />
         <Select label="種別" value={type} onChange={(v) => setType(v as typeof type)} options={[{ value: "all", label: "両方表示" }, { value: "shukyaku", label: "集客のみ" }, { value: "kyujin", label: "求人のみ" }]} />
         <Select label="区分" value={kubun} onChange={(v) => setKubun(v as typeof kubun)} options={[{ value: "all", label: "両方表示" }, { value: "chokuei", label: "直営のみ" }, { value: "fc", label: "FCのみ" }]} />
         <Select
@@ -667,7 +660,7 @@ export default function Ads() {
               数字の定義
             </summary>
             <p className="pb-4 [word-break:auto-phrase] [text-wrap:pretty]">
-            出典: Meta広告データ（SyncWith）＋ L Message 流入タグ。CPL警告しきい値=集客¥350超・求人¥3,000超、CTR=集客3%未満・求人2%未満で赤表示。LINE登録数は流入タグ友だちの期間内増分。「新規（新規来店数）」はサロンボード実績。日次データ(daily_new)があれば選択期間に厳密一致で合算、未反映の間は月次(該当月計)にフォールバック（KPIの注記に出所と範囲を表示）。HPB費用=月額¥55,000×選択期間のうちその店が掲載している月数（開店前で未掲載の店は0）。CPA=(集客広告費+HPB費用)÷新規来店数、ROAS=新規売上÷(集客広告費+HPB費用)。CPL（リード単価）は広告費のみ。集計値のみで個人情報は含みません。
+            出典: Meta広告データ（SyncWith）＋ L Message 流入タグ。過去7日・過去30日・過去3ヶ月・過去6ヶ月は昨日まで（当日はまだ増える途中のため含めない）。今月は当月1日から今日まで。CPL警告しきい値=集客¥350超・求人¥3,000超、CTR=集客3%未満・求人2%未満で赤表示。LINE登録数は流入タグ友だちの期間内増分。「新規（新規来店数）」はサロンボード実績。日次データ(daily_new)があれば選択期間に厳密一致で合算、未反映の間は月次(該当月計)にフォールバック（KPIの注記に出所と範囲を表示）。HPB費用=月額¥55,000×選択期間のうちその店が掲載している月数（開店前で未掲載の店は0）。CPA=(集客広告費+HPB費用)÷新規来店数、ROAS=新規売上÷(集客広告費+HPB費用)。CPL（リード単価）は広告費のみ。集計値のみで個人情報は含みません。
             </p>
           </details>
         </motion.div>

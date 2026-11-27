@@ -181,8 +181,29 @@ function fmt(d: Date): string {
 function dayDiff(a: Date, b: Date): number {
   return Math.round((a.getTime() - b.getTime()) / 86400000) + 1;
 }
-export function resolvePeriod(period: string) {
-  const today = new Date();
+function shiftDays(d: Date, days: number): Date {
+  const next = new Date(d.getTime());
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+/** 広告画面を開いたときの期間。過去30日（昨日まで）。 */
+export const DEFAULT_ADS_PERIOD = "30";
+
+/** 期間セレクタの選択肢。画面とテストで同じ並びを使う。 */
+export const ADS_PERIOD_OPTIONS: { value: string; label: string }[] = [
+  { value: "7", label: "過去7日" },
+  { value: "30", label: "過去30日" },
+  { value: "90", label: "過去3ヶ月" },
+  { value: "180", label: "過去6ヶ月" },
+  { value: "this-month", label: "今月" },
+  { value: "last-month", label: "先月" },
+  { value: "this-year", label: "今年" },
+  { value: "last-year", label: "前年" },
+];
+
+export function resolvePeriod(period: string, now: Date = new Date()) {
+  const today = new Date(now.getTime());
   today.setHours(0, 0, 0, 0);
   const y = today.getFullYear();
   const m = today.getMonth();
@@ -231,14 +252,12 @@ export function resolvePeriod(period: string) {
     value = "last-year";
     days = 365;
   } else {
+    // 日数指定（過去7日・過去30日など）は昨日まで。当日はまだ増える途中なので含めない。
     days = parseInt(period, 10) || 30;
-    since = new Date(today);
-    since.setDate(since.getDate() - days + 1);
-    until = today;
-    prevSince = new Date(today);
-    prevSince.setDate(prevSince.getDate() - days * 2 + 1);
-    prevUntil = new Date(today);
-    prevUntil.setDate(prevUntil.getDate() - days);
+    until = shiftDays(today, -1);
+    since = shiftDays(until, -(days - 1));
+    prevUntil = shiftDays(since, -1);
+    prevSince = shiftDays(prevUntil, -(days - 1));
     label = "過去" + days + "日";
     value = String(days);
   }
@@ -360,8 +379,8 @@ function getLmessageData(rows: LmsgRow[], since: string, until: string) {
 }
 
 // ===== メイン集計（webapp.gs getDashboardData を移植）=====
-export function getDashboardData(raw: RawAds, period: string): DashboardData {
-  const p = resolvePeriod(period);
+export function getDashboardData(raw: RawAds, period: string, now: Date = new Date()): DashboardData {
+  const p = resolvePeriod(period, now);
   const adsetMetaMap = raw.adsetMeta;
 
   const aggMeta = (adsetSet: Set<string>): AdsetMeta => {
@@ -595,6 +614,24 @@ export function fillRegionAndStore(
 }
 
 /** since〜until（YYYY-MM-DD）のうち、dates に1件も無い日を返す */
+/**
+ * 選択期間と、シートに日付がある範囲の重なりで、1行も無い日を返す。
+ * 期間を変えると LINE登録・広告の抜け表示もその範囲だけになる。
+ */
+export function missingDatesInSpan(dates: Iterable<string>, periodSince: string, periodUntil: string): string[] {
+  const present = Array.from(dates).filter(Boolean);
+  if (!present.length || !periodSince || !periodUntil) return [];
+  let min = present[0];
+  let max = present[0];
+  for (const d of present) {
+    if (d < min) min = d;
+    if (d > max) max = d;
+  }
+  const since = periodSince > min ? periodSince : min;
+  const until = periodUntil < max ? periodUntil : max;
+  return findMissingDates(present, since, until);
+}
+
 export function findMissingDates(dates: Iterable<string>, since: string, until: string): string[] {
   if (!since || !until || since > until) return [];
   const have = new Set(dates);
