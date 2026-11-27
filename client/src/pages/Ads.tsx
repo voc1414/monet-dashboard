@@ -19,7 +19,7 @@ import {
   Legend,
 } from "recharts";
 import DashboardLayout from "@/components/DashboardLayout";
-import { useAdsData, getDashboardData, normalizeRegion } from "@/hooks/useAdsData";
+import { useAdsData, getDashboardData, normalizeRegion, findMissingDates } from "@/hooks/useAdsData";
 import type { Bucket, StoreRow, RegionRow, NamedRow } from "@/hooks/useAdsData";
 import { useSalonBoardStylistData, normalizeSalonBoardStore } from "@/hooks/useSalonBoardStylistData";
 import { useSalonBoardDailyNew } from "@/hooks/useSalonBoardDailyNew";
@@ -495,6 +495,26 @@ export default function Ads() {
     return Math.floor((Date.now() - t) / 86400000);
   }, [latestDataDate]);
 
+  // 途中の日付の抜け: 最新日付だけ見ても、途中の日（例 2026-11-19）が丸ごと消えていると気づけない。
+  // 選択期間のうち「シートに最初の日〜最新日」の範囲で、1行も無い日を挙げる（monet / lmessage 別）。
+  const missingDates = useMemo(() => {
+    if (!raw || !D) return { monet: [] as string[], lmessage: [] as string[] };
+    const calc = (dates: string[]) => {
+      if (!dates.length) return [] as string[];
+      let min = dates[0], max = dates[0];
+      for (const d of dates) { if (d < min) min = d; if (d > max) max = d; }
+      const since = D.period.since > min ? D.period.since : min;
+      const until = D.period.until < max ? D.period.until : max;
+      return findMissingDates(dates, since, until);
+    };
+    return {
+      monet: calc(raw.monet.map((r) => r.date).filter(Boolean)),
+      lmessage: calc(raw.lmessage.map((r) => r.date).filter(Boolean)),
+    };
+  }, [raw, D]);
+  const fmtMissing = (ds: string[]) =>
+    ds.slice(0, 10).map((d) => d.slice(5).replace("-", "/")).join("・") + (ds.length > 10 ? ` ほか${ds.length - 10}日` : "");
+
   const showShukyaku = type === "all" || type === "shukyaku";
   const showKyujin = type === "all" || type === "kyujin";
 
@@ -523,6 +543,18 @@ export default function Ads() {
             <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5">
               <AlertTriangle className="w-3 h-3" />
               同期が{dataLagDays}日分遅れています（SyncWith要確認）
+            </span>
+          )}
+          {missingDates.monet.length > 0 && (
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5">
+              <AlertTriangle className="w-3 h-3" />
+              広告データが抜けている日: {fmtMissing(missingDates.monet)}（この日の消化額・リードは0扱い）
+            </span>
+          )}
+          {missingDates.lmessage.length > 0 && (
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+              <AlertTriangle className="w-3 h-3" />
+              LINE登録データが抜けている日: {fmtMissing(missingDates.lmessage)}
             </span>
           )}
         </p>

@@ -12,6 +12,7 @@
  */
 import { useEffect, useState } from "react";
 import { singleStoreAreas, masterRegionBases } from "@/lib/storeNameFromMaster";
+import { STORE_MASTER } from "@/data/storeMaster";
 
 const SPREADSHEET_ID = "1z5JU-Onf6wiqydFUeYYoQ0czXByyZbqH4JODWkYh6Ts";
 
@@ -257,10 +258,21 @@ export function resolvePeriod(period: string) {
 }
 
 // ===== ヘルパ（webapp.gs を移植）=====
-function getCampaignType(name: string): "集客" | "求人" | "" {
+// キャンペーン名の形式は 2026-10-07 に変わった（SyncWith 経由で届く名前）。
+//   旧: {種別}/モネ/{地域}/{目的}/{区分}      例: 集客/モネ/大阪/リード/直営
+//   新: モネ/{地域}エリア/{種別}/{区分}[/...]  例: モネ/大阪エリア/集客/直営
+// 以前は先頭が「集客」「求人」の名前しか数えておらず、10/7 以降の行が全部集計から落ちていた。
+// 先頭一致（旧形式）を優先し、無ければ「/」区切りのどこかに「集客」「求人」ちょうどの区切りがあるかで判定する。
+// ※ シートの「区分」列は 直営/FC で、集客/求人 の区別には使えない。
+export function getCampaignType(name: string): "集客" | "求人" | "" {
   if (!name) return "";
   if (name.indexOf("集客") === 0) return "集客";
   if (name.indexOf("求人") === 0) return "求人";
+  const segs = name.split("/").map((t) => t.trim());
+  const hasShukyaku = segs.includes("集客");
+  const hasKyujin = segs.includes("求人");
+  if (hasShukyaku && !hasKyujin) return "集客";
+  if (hasKyujin && !hasShukyaku) return "求人";
   return "";
 }
 // 「大阪」のようにエリア接尾辞なしで来た場合に補うための既知エリア。
@@ -526,11 +538,35 @@ export function getDashboardData(raw: RawAds, period: string): DashboardData {
 // 集客も店舗欄が未設定のまま配信が始まる）。そのままだと店舗別一覧に立たず、
 // 消化額がどの店舗行にも入らない。キャンペーン名から補う。
 //
-// キャンペーン名の形式: {種別}/モネ/{地域}/{目的}/{区分}  例: 集客/モネ/岡山/リード/FC
+// キャンペーン名の形式:
+//   旧: {種別}/モネ/{地域}/{目的}/{区分}  例: 集客/モネ/岡山/リード/FC
+//   新: モネ/{地域}エリア/{種別}/{区分}   例: モネ/大阪エリア/集客/直営（2026-10-07〜）
 export function regionFromCampaign(camp: string): string | null {
-  const t = (camp || "").split("/");
-  const base = (t[2] || "").trim();
+  const t = (camp || "").split("/").map((x) => x.trim());
+  const withArea = t.find((x) => /^.+エリア$/.test(x));
+  if (withArea) return withArea;
+  if (t[0] !== "集客" && t[0] !== "求人") return null;
+  const base = t[2] || "";
   return base ? `${base}エリア` : null;
+}
+
+// 広告セット名から店舗を読む（例: 「モネ/大阪エリア/堀江院2nd/集客/直営」→ 堀江2nd院）。
+// 店舗欄が空で届く行（10/7 以降の堀江院2nd など）を店舗別一覧に立てるために使う。
+// 「院」と空白を外した形で、既知の店舗名（シートの店舗欄に出てくる表記 → 店舗マスタの順）と
+// 区切りが完全一致したときだけ採用する（部分一致だと「堀江院2nd」が「堀江院」に吸われる）。
+const storeKey = (s: string) => (s || "").replace(/[\s　]/g, "").replace(/院/g, "");
+export function storeFromAdset(adset: string, knownStores: string[]): string | null {
+  const byKey = new Map<string, string>();
+  for (const n of knownStores) {
+    const k = storeKey(n);
+    if (k.length >= 2 && !byKey.has(k)) byKey.set(k, n);
+  }
+  const segs = (adset || "").split("/").map((x) => x.replace(/^.*―\s*/, "").trim());
+  for (const seg of segs) {
+    const hit = byKey.get(storeKey(seg));
+    if (hit) return hit;
+  }
+  return null;
 }
 
 // 1エリア＝1店舗のエリアだけ、地域から店舗を特定できる。
@@ -538,25 +574,58 @@ export function regionFromCampaign(camp: string): string | null {
 // Notion の店舗一覧から自動で決まる（そのエリアに新店を登録すれば自動で補完対象から外れる）。
 const SINGLE_STORE_AREA: Record<string, string> = singleStoreAreas();
 
-/** 空の地域・店舗をキャンペーン名から補う。値が入っていれば必ずそちらを優先する。 */
+/**
+ * 空の地域・店舗を補う。値が入っていれば必ずそちらを優先する。
+ * 店舗: 店舗欄 → 広告セット名の店舗名（knownStores と一致したときだけ）→ 1エリア1店舗のエリア
+ */
 export function fillRegionAndStore(
   camp: string,
   rawRegion: string,
-  rawTenpo: string
+  rawTenpo: string,
+  adset = "",
+  knownStores: string[] = []
 ): { region: string; tenpo: string } {
-  const region = (rawRegion || "").trim() || regionFromCampaign(camp) || "";
-  const tenpo = (rawTenpo || "").trim() || SINGLE_STORE_AREA[region] || "";
+  const region = (rawRegion || "").trim() || regionFromCampaign(camp) || regionFromCampaign(adset) || "";
+  const tenpo =
+    (rawTenpo || "").trim() ||
+    storeFromAdset(adset, knownStores) ||
+    SINGLE_STORE_AREA[region] ||
+    "";
   return { region, tenpo };
 }
 
+/** since〜until（YYYY-MM-DD）のうち、dates に1件も無い日を返す */
+export function findMissingDates(dates: Iterable<string>, since: string, until: string): string[] {
+  if (!since || !until || since > until) return [];
+  const have = new Set(dates);
+  const out: string[] = [];
+  const p = since.split("-").map(Number);
+  const d = new Date(p[0], p[1] - 1, p[2]);
+  for (let i = 0; i < 4000; i++) {
+    const s = fmt(d);
+    if (s > until) break;
+    if (!have.has(s)) out.push(s);
+    d.setDate(d.getDate() + 1);
+  }
+  return out;
+}
+
 // ===== raw データ構築 =====
-function buildRaw(monetCsv: string[][], lmsgCsv: string[][], metaCsv: string[][]): RawAds {
+export function buildRaw(monetCsv: string[][], lmsgCsv: string[][], metaCsv: string[][]): RawAds {
   // monet: ヘッダ名でマッピング
   const mh = monetCsv[0] || [];
   const idx = (n: string) => mh.indexOf(n);
   const cDate = idx("日付"), cKubun = idx("区分"), cRegion = idx("地域"), cTenpo = idx("店舗"),
     cCamp = idx("キャンペーン名"), cAdset = idx("広告セット名"), cSpend = idx("消化額"),
     cLead = idx("リード数"), cFreq = idx("フリークエンシー"), cImpr = idx("インプレッション"), cClick = idx("クリック");
+  // 広告セット名から店舗を読むときの照合先。シートの店舗欄の表記（例「堀江2nd院」）を優先し、
+  // 過去行と同じ店舗行にまとまるようにする。足りない分は店舗マスタの表記で補う。
+  const sheetStores = new Set<string>();
+  for (let i = 1; i < monetCsv.length; i++) {
+    const t = ((monetCsv[i] || [])[cTenpo] || "").trim();
+    if (t) sheetStores.add(t);
+  }
+  const knownStores = [...Array.from(sheetStores), ...STORE_MASTER.map((s) => s.name)];
   const monet: MonetRow[] = [];
   for (let i = 1; i < monetCsv.length; i++) {
     const r = monetCsv[i];
@@ -564,14 +633,15 @@ function buildRaw(monetCsv: string[][], lmsgCsv: string[][], metaCsv: string[][]
     const date = toYmd(r[cDate]);
     if (!date) continue;
     const camp = (r[cCamp] || "").trim();
-    const { region, tenpo } = fillRegionAndStore(camp, r[cRegion] || "", r[cTenpo] || "");
+    const adset = (r[cAdset] || "").trim();
+    const { region, tenpo } = fillRegionAndStore(camp, r[cRegion] || "", r[cTenpo] || "", adset, knownStores);
     monet.push({
       date,
       kubun: (r[cKubun] || "").trim(),
       region,
       tenpo,
       camp,
-      adset: (r[cAdset] || "").trim(),
+      adset,
       spend: num(r[cSpend]),
       lead: num(r[cLead]),
       freq: num(r[cFreq]),
