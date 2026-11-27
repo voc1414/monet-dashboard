@@ -217,10 +217,9 @@ export default function Home() {
     });
   };
 
-  // データ点検（「今日直すことがあるか」を先に一言）は DashboardLayout が描画する。
-  // トップだけは問題が無いときも「問題ありません」と出す。
+  // データ点検は DashboardLayout が出す。直すことが無いときの緑帯は出さない。
   return (
-    <DashboardLayout lastUpdated={lastUpdated} onRefresh={refresh} loading={loading} healthPanel="always">
+    <DashboardLayout lastUpdated={lastUpdated} onRefresh={refresh} loading={loading}>
       {/* Hero Section */}
       <div className="relative rounded-2xl overflow-hidden mb-8">
         <div className="absolute inset-0">

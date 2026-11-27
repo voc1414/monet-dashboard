@@ -313,15 +313,7 @@ function UnmatchedSuggestPanel({
   const [dupSelections, setDupSelections] = useState<Record<string, string>>({});
 
   if (unmatched.length === 0 && duplicateSuspects.length === 0) {
-    return (
-      <Card className="border-emerald-200/60 bg-emerald-50/40">
-        <CardContent className="p-3">
-          <p className="text-xs text-emerald-700">
-            ✓ 未マッチのスタッフ名・表記ゆれの疑いはありません（NPS・ファンくる・月末報告書とも整合しています）
-          </p>
-        </CardContent>
-      </Card>
-    );
+    return null;
   }
 
   return (

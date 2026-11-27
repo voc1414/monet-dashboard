@@ -166,21 +166,17 @@ function row(over: Partial<TaskStatus> & Pick<TaskStatus, "lamp" | "label">): Ta
 }
 
 describe("自動タスク先頭の帯", () => {
-  const clear = { lamp: "green" as const, text: "直すことはありません", sub: ["遅れているタスクはありません"] };
-
-  it("問題が無ければ直すことはありません", () => {
-    expect(headlineForTasks([row({ lamp: "green", label: "成功" })], false)).toEqual(clear);
+  it("直すことがなければ帯自体を出さない", () => {
+    expect(headlineForTasks([row({ lamp: "green", label: "成功" })], false)).toBeNull();
   });
 
-  it("1日以内の遅れ・失敗・要確認だけでは帯を分けず、直すことはありませんにする", () => {
+  it("1日以内の遅れ・失敗・要確認だけでも帯を出さない", () => {
     const soft = [
       row({ lamp: "green", label: "1日遅れ（11/26(木) 21:30 から）", lateDays: 1 }),
       row({ lamp: "green", label: "エラー（11/27(金) 07:30 の分）", lateDays: 0, latest: { at: "2026-11-27T07:40:00+09:00", task: "サンプル", result: "エラー", count: null, reason: "落ちた" } }),
       row({ lamp: "green", label: "要確認" }),
     ];
-    const h = headlineForTasks(soft, false);
-    expect(h).toEqual(clear);
-    expect(h.text).not.toContain("気になる");
+    expect(headlineForTasks(soft, false)).toBeNull();
   });
 
   it("赤と黄の帯は本数と内訳を残す", () => {

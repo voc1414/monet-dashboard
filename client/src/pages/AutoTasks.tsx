@@ -112,9 +112,10 @@ export default function AutoTasks() {
           </p>
         </div>
 
+        {headline && (
         <section
           className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border p-4 shadow-sm ${
-            headline.lamp === "green" ? "border-emerald-200 bg-emerald-50" : headline.lamp === "yellow" ? "border-amber-200 bg-amber-50" : "border-red-200 bg-red-50"
+            headline.lamp === "yellow" ? "border-amber-200 bg-amber-50" : "border-red-200 bg-red-50"
           }`}
           data-testid="tasks-headline"
         >
@@ -131,6 +132,7 @@ export default function AutoTasks() {
             <span className="tabular-nums whitespace-nowrap">{formatJstShort(TASK_LOG_SYNCED_AT)} 時点</span>
           </div>
         </section>
+        )}
 
         <section className="rounded-2xl border border-border/60 bg-white/70 p-4 shadow-sm">
           <h2 className="mb-3 text-sm font-bold text-foreground">動いている自動タスク</h2>

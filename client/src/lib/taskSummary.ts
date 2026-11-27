@@ -308,7 +308,7 @@ export function syncIsStale(syncedAt: Date, now: Date): boolean {
 }
 
 export interface TaskHeadline {
-  lamp: "green" | "yellow" | "red";
+  lamp: "yellow" | "red";
   text: string;
   sub: string[];
 }
@@ -318,11 +318,11 @@ const SOFT_LATE = /遅れ|未公開/;
 
 /**
  * 自動タスクページ先頭の帯。
- * 赤（取り込み停止・3日以上）と黄（2日以上）だけ帯で知らせる。
- * 1日以内の遅れ・失敗・要確認だけのときは帯を分けず、問題なしと同じ「直すことはありません」にする。
- * 中身は各行のランプと文言に残す（2026-11-27 林さん）。
+ * 赤（取り込み停止・3日以上）と黄（2日以上）だけ帯を出す。
+ * 直すことがないとき、および1日以内の遅れ・失敗・要確認だけのときは帯自体を出さない（null）。
+ * 中身は各行のランプと文言に残す（2026-11-27 林さん。緑の帯は文言を変えるのではなく消す）。
  */
-export function headlineForTasks(status: TaskStatus[], stale: boolean): TaskHeadline {
+export function headlineForTasks(status: TaskStatus[], stale: boolean): TaskHeadline | null {
   const red = status.filter((s) => s.lamp === "red").length;
   const yellow = status.filter((s) => s.lamp === "yellow").length;
   const failed = status.filter(
@@ -346,7 +346,6 @@ export function headlineForTasks(status: TaskStatus[], stale: boolean): TaskHead
       /要確認/.test(s.label) ||
       (!s.waiting && FAIL_IN_LABEL.test(s.latest?.result ?? "")),
   ).length;
-  const clear: TaskHeadline = { lamp: "green", text: "直すことはありません", sub: ["遅れているタスクはありません"] };
   if (stale) {
     return {
       lamp: "red",
@@ -356,7 +355,7 @@ export function headlineForTasks(status: TaskStatus[], stale: boolean): TaskHead
   }
   if (red) return { lamp: "red", text: `直すことがあります（${total}本）`, sub: issues };
   if (yellow) return { lamp: "yellow", text: `確認することがあります（${total}本）`, sub: issues };
-  return clear;
+  return null;
 }
 
 /** 「11/26(木) 20:03」形式（日本時間） */

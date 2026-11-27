@@ -51,6 +51,7 @@ export default function GbpDetail() {
   const yellow = status.filter((s) => s.lamp === "yellow").length;
   const soft = status.filter((s) => s.lamp === "green" && s.lateDays !== undefined && !s.problem).length;
   const failed = status.filter((s) => s.lamp === "green" && s.problem).length;
+  const storeSummary = [red && `3日以上の遅れ ${red}院`, yellow && `2日以上の遅れ ${yellow}院`, failed && `失敗 ${failed}院`, soft && `1日以内の遅れ ${soft}院`].filter(Boolean).join(" ／ ");
 
   return (
     <div className="space-y-6">
@@ -60,9 +61,11 @@ export default function GbpDetail() {
     <section className="rounded-2xl border border-border/60 bg-white/70 p-4 shadow-sm">
       <h3 className="mb-3 text-sm font-bold text-foreground">
         院ごとの状況
-        <span className={`block whitespace-nowrap text-xs sm:ml-2 sm:inline-block ${red || failed ? "text-red-600" : yellow || soft ? "text-amber-700" : "text-emerald-600"}`}>
-          {[red && `3日以上の遅れ ${red}院`, yellow && `2日以上の遅れ ${yellow}院`, failed && `失敗 ${failed}院`, soft && `1日以内の遅れ ${soft}院`].filter(Boolean).join(" ／ ") || "遅れている院はありません"}
+        {storeSummary && (
+        <span className={`block whitespace-nowrap text-xs sm:ml-2 sm:inline-block ${red || failed ? "text-red-600" : "text-amber-700"}`}>
+          {storeSummary}
         </span>
+        )}
       </h3>
       <ul className="space-y-2 lg:hidden" data-testid="gbp-status-cards">
         {status.map((s) => (
