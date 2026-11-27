@@ -17,9 +17,9 @@ import {
   OTHER_STATE,
   OTHER_TASKS,
   OTHER_TASKS_CHECKED_ON,
-  SYNC_STALE_HOURS,
   formatJstShort,
   gbpRuns,
+  headlineForTasks,
   summarizeTasks,
   syncIsStale,
   type Lamp,
@@ -89,28 +89,6 @@ export default function AutoTasks() {
     // 初回だけ
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const red = status.filter((s) => s.lamp === "red").length;
-  const yellow = status.filter((s) => s.lamp === "yellow").length;
-  const FAIL = /エラー|停止/;
-  // 失敗：色（遅れの日数）に関係なく、行の一言にエラー・停止と出ているもの。遅れの行と重なることもある
-  const failed = status.filter((s) => FAIL.test(s.label) || (s.lateDays === undefined && !s.waiting && FAIL.test(s.latest?.result ?? ""))).length;
-  // 1日以内の遅れ：緑のまま、行の一言に「遅れ」「未公開」と出ているもの（失敗と同じ行でも数える）
-  const LATE = /遅れ|未公開/;
-  const lateSoft = status.filter((s) => s.lamp === "green" && s.lateDays !== undefined && LATE.test(s.label)).length;
-  // 要確認：行の文言に「要確認」と出ているもの（待ち表示でも「前回は要確認」と出ていれば数える）
-  const check = status.filter((s) => s.lamp === "green" && s.lateDays === undefined && /要確認/.test(s.label)).length;
-  // 帯には一番重いものだけでなく、ある問題を全部並べる
-  const issues = [
-    red && `3日以上の遅れ ${red}本`,
-    yellow && `2日以上の遅れ ${yellow}本`,
-    failed && `失敗あり ${failed}本`,
-    lateSoft && `1日以内の遅れ ${lateSoft}本`,
-    check && `要確認 ${check}本`,
-  ].filter(Boolean) as string[];
-  // 見出しの本数は、問題のあるタスクの数（同じ行を二重に数えない）
-  const total = status.filter(
-    (s) => s.lamp === "red" || s.lamp === "yellow" || s.lateDays !== undefined || FAIL.test(s.label) || /要確認/.test(s.label) || (!s.waiting && FAIL.test(s.latest?.result ?? "")),
-  ).length;
   const recent = useMemo(
     // Googleマップの自動公開前の手動テストは「動いた記録」に並べない
     // 日時の書式が混ざる（GBPは +00:00、タスク記録は +09:00）ので、文字ではなく時刻で並べる
@@ -118,15 +96,8 @@ export default function AutoTasks() {
     [],
   );
 
-  const headline = stale
-    ? { lamp: "red" as Lamp, text: "取り込みが止まっています", sub: [`この画面は${SYNC_STALE_HOURS}時間以上更新されていません`, ...issues] }
-    : red
-      ? { lamp: "red" as Lamp, text: `直すことがあります（${total}本）`, sub: issues }
-      : yellow
-        ? { lamp: "yellow" as Lamp, text: `確認することがあります（${total}本）`, sub: issues }
-        : issues.length
-          ? { lamp: "green" as Lamp, text: `気になることがあります（${total}本）`, sub: issues }
-          : { lamp: "green" as Lamp, text: "直すことはありません", sub: ["遅れているタスクはありません"] };
+  // 1日以内の遅れ・失敗・要確認だけでは帯を出さない（行の色と文言に任せる）
+  const headline = headlineForTasks(status, stale);
 
   return (
     <DashboardLayout breadcrumbs={[{ label: "自動タスク" }]}>
