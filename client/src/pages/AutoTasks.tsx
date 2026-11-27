@@ -11,6 +11,8 @@ import DashboardLayout from "@/components/DashboardLayout";
 import GbpDetail from "@/components/GbpDetail";
 import { Label } from "@/components/StatusLabel";
 import { gbpTaskStatus, isBeforeAuto, summarize as summarizeStores } from "@/lib/gbpSummary";
+import { useAdsData } from "@/hooks/useAdsData";
+import { LINE_DROP_HINT, detectLineRegistrationDrops, formatLineDrop, jstToday } from "@/lib/lineDropWarning";
 import { GBP_HISTORY } from "@/data/gbpHistory";
 import { TASK_LOG, TASK_LOG_SYNCED_AT } from "@/data/taskLog";
 import {
@@ -93,6 +95,11 @@ export default function AutoTasks() {
     [syncedAt, stores],
   );
   const stale = syncIsStale(syncedAt, new Date());
+  const ads = useAdsData();
+  const lineDrops = useMemo(
+    () => (ads.raw ? detectLineRegistrationDrops(ads.raw.monet, ads.raw.lmessage, jstToday()) : []),
+    [ads.raw],
+  );
   // 院ごとの表は初期では閉じる。赤・黄の件数は見出しに残す。#gbp のときは開く
   const [gbpOpen, setGbpOpen] = useState(
     () => typeof window !== "undefined" && window.location.hash === "#gbp",
@@ -160,6 +167,22 @@ export default function AutoTasks() {
             <span className="tabular-nums whitespace-nowrap">{formatJstShort(TASK_LOG_SYNCED_AT)} 時点</span>
           </div>
         </section>
+        )}
+
+        {lineDrops.length > 0 && (
+          <section className="space-y-2" data-testid="line-drop-warnings" aria-label="LINE登録の急落">
+            {lineDrops.map((w) => (
+              <div key={w.store} className="rounded-2xl border border-red-200 bg-red-50 p-4 shadow-sm">
+                <div className="flex min-w-0 items-start gap-2.5">
+                  <span className="mt-1.5"><Dot lamp="red" /></span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-red-700 [word-break:auto-phrase] [text-wrap:pretty]">{formatLineDrop(w)}</p>
+                    <p className="mt-1 text-xs text-red-700 [word-break:auto-phrase]">{LINE_DROP_HINT}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </section>
         )}
 
         <section className="rounded-2xl border border-border/60 bg-white/70 p-4 shadow-sm">
