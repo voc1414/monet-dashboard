@@ -85,6 +85,7 @@ describe("LINE登録の急落", () => {
     const lmessage = [
       line("2026-11-18", "大阪高槻流入", 0),
       line("2026-11-19", "大阪高槻流入", 9),
+      line("2026-11-23", "大阪高槻流入", 9),
       line("2026-11-26", "大阪高槻流入", 9),
     ];
     expect(detectLineRegistrationDrops(monet, lmessage, TODAY)).toEqual([]);
@@ -120,5 +121,25 @@ describe("LINE登録の急落", () => {
     ];
     const flagged = detectLineRegistrationDrops(monet, lmessage, TODAY).map((w) => w.store);
     expect(flagged).toEqual(["堀江2nd院"]);
+  });
+
+  it("端の行が無いときは、登録と同じ起点・終点のリードで登録率を出す", () => {
+    // 直近3日の選択は 11/24〜11/26。起点に使う 11/23 の行が無いので、実際は 11/22 の行から 11/23〜11/26。
+    // 11/23 のリードは選択期間の外だが、登録の差分に入るので数える。11/22 は起点の行なので数えない。
+    const monet = [
+      lead("2026-11-22", "姪浜院", 20),
+      lead("2026-11-23", "姪浜院", 6),
+      lead("2026-11-26", "姪浜院", 1),
+    ];
+    const lmessage = [
+      line("2026-11-22", "福岡姪浜流入", 100),
+      line("2026-11-26", "福岡姪浜流入", 100),
+      line("2026-11-27", "福岡姪浜流入", 103),
+    ];
+    const [w] = detectLineRegistrationDrops(monet, lmessage, TODAY);
+    expect(w.store).toBe("姪浜院");
+    expect(w.zero3).toBe(true);
+    expect(w.regs3).toBe(0);
+    expect(w.leads3).toBe(7);
   });
 });

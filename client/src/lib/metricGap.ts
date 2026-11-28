@@ -154,6 +154,11 @@ export function diagnosisLineUnit(spend: number, line: number, stored: number): 
 export interface StoreMetricInput {
   name: string;
   spend: number;
+  /**
+   * LINE登録単価の分子。省略時は spend。
+   * 端の行が無く LINE の日数が選択期間と違うとき、同じ実期間の消化額を渡す。
+   */
+  lineSpend?: number;
   /** 流入タグが無い店は null。0 は登録増分が 0。 */
   line: number | null;
   /** 日次・月次のどちらにも無い店は null。0 は来店 0。 */
@@ -177,6 +182,7 @@ export function storeMetricTexts(input: StoreMetricInput): {
   gaps: StoreGap[];
 } {
   const spend = formatYen(input.spend);
+  const lineSpend = input.lineSpend ?? input.spend;
   const line =
     input.line == null || !Number.isFinite(input.line)
       ? { text: PENDING_LABEL, note: "流入タグがこの店に紐づいていない" }
@@ -186,10 +192,10 @@ export function storeMetricTexts(input: StoreMetricInput): {
     lineUnit = { text: PENDING_LABEL, note: "流入タグがこの店に紐づいていない" };
   } else if (input.line <= 0) {
     lineUnit = { text: PENDING_LABEL, note: "登録が0のため単価を出せない" };
-  } else if (!Number.isFinite(input.spend) || input.spend <= 0) {
+  } else if (!Number.isFinite(lineSpend) || lineSpend <= 0) {
     lineUnit = { text: PENDING_LABEL, note: "広告費が無いため単価を出せない" };
   } else {
-    lineUnit = formatYen(input.spend / input.line);
+    lineUnit = formatYen(lineSpend / input.line);
   }
   const blank: MetricText = { text: "—", note: null };
   const newVisits =

@@ -5,7 +5,7 @@
  * 当日はまだ増えている途中なので、窓の終わりは「今日の前日」か、シートの最新日がそれより前ならその日。
  * 2026-11-27 の姪浜院は 11/24〜26 がリード11・登録0。当日（11/27）の登録3を入れると警告が消える。
  */
-import { getCampaignType, type LmsgRow, type MonetRow } from "@/hooks/useAdsData";
+import { getCampaignType, resolveLineWindow, type LmsgRow, type MonetRow } from "@/hooks/useAdsData";
 
 /** 広告ページの店舗照合と同じ接頭辞（Ads.tsx の lookupStoreLine） */
 const AREA_PREFIX = /^(大阪|広島|福岡|兵庫|岡山|京都|東京|北海道|帯広|神戸|名古屋|横浜)/;
@@ -95,14 +95,29 @@ function delta(snaps: Series["snaps"], since: string, until: string): number {
   return Math.max(0, end.count - (start ? start.count : 0));
 }
 
-function regsIn(series: Series[], store: string, since: string, until: string): number {
+/**
+ * 登録数と、その差分が実際に使った起点・終点。
+ * 端の行が無いときは countedSince/Until が選択期間とずれる。リードはこの日付で数える。
+ */
+function regsIn(
+  series: Series[],
+  store: string,
+  since: string,
+  until: string,
+): { count: number; countedSince: string; countedUntil: string } {
   const places = [...new Set(series.map((g) => g.place))].filter((p) => store.includes(p));
   places.sort((a, b) => b.length - a.length);
   const best = places[0];
-  if (!best) return 0;
+  if (!best) return { count: 0, countedSince: since, countedUntil: until };
+  const matched = series.filter((g) => g.place === best);
+  const window = resolveLineWindow(
+    matched.flatMap((g) => g.snaps.map((s) => s.date)),
+    since,
+    until,
+  );
   let total = 0;
-  for (const g of series) if (g.place === best) total += delta(g.snaps, since, until);
-  return total;
+  for (const g of matched) total += delta(g.snaps, since, until);
+  return { count: total, countedSince: window.countedSince, countedUntil: window.countedUntil };
 }
 
 function leadsIn(rows: MonetRow[], store: string, since: string, until: string): number {
@@ -143,18 +158,30 @@ export function detectLineRegistrationDrops(monet: MonetRow[], lmessage: LmsgRow
   }
   const out: LineDropWarning[] = [];
   for (const store of stores) {
-    const leads3 = leadsIn(monet, store, since3, end);
     const regs3 = regsIn(series, store, since3, end);
-    const leads7 = leadsIn(monet, store, since7, end);
+    const leads3 = leadsIn(monet, store, regs3.countedSince, regs3.countedUntil);
     const regs7 = regsIn(series, store, since7, end);
-    const leadsPrev21 = leadsIn(monet, store, prevStart, prevEnd);
+    const leads7 = leadsIn(monet, store, regs7.countedSince, regs7.countedUntil);
     const regsPrev21 = regsIn(series, store, prevStart, prevEnd);
-    const rate7 = leads7 > 0 ? regs7 / leads7 : null;
-    const ratePrev21 = leadsPrev21 > 0 ? regsPrev21 / leadsPrev21 : null;
-    const zero3 = leads3 >= 5 && regs3 === 0;
+    const leadsPrev21 = leadsIn(monet, store, regsPrev21.countedSince, regsPrev21.countedUntil);
+    const rate7 = leads7 > 0 ? regs7.count / leads7 : null;
+    const ratePrev21 = leadsPrev21 > 0 ? regsPrev21.count / leadsPrev21 : null;
+    const zero3 = leads3 >= 5 && regs3.count === 0;
     const half7 = leadsPrev21 >= 10 && rate7 != null && ratePrev21 != null && rate7 < ratePrev21 / 2;
     if (!zero3 && !half7) continue;
-    out.push({ store, leads3, regs3, leads7, regs7, leadsPrev21, regsPrev21, rate7, ratePrev21, zero3, half7 });
+    out.push({
+      store,
+      leads3,
+      regs3: regs3.count,
+      leads7,
+      regs7: regs7.count,
+      leadsPrev21,
+      regsPrev21: regsPrev21.count,
+      rate7,
+      ratePrev21,
+      zero3,
+      half7,
+    });
   }
   out.sort((a, b) => a.store.localeCompare(b.store, "ja"));
   return out;

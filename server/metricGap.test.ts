@@ -179,6 +179,16 @@ describe("診断と広告の数値の抜け", () => {
       periodUntil: period.until,
     });
     expect(partial.lineUnit.text).toBe(formatYen(100 / 4).text);
+    const shiftedSpend = storeMetricTexts({
+      name: "堀江院",
+      spend: 700,
+      lineSpend: 800,
+      line: 10,
+      newVisits: 1,
+      periodUntil: period.until,
+    });
+    expect(shiftedSpend.spend.text).toBe("¥700");
+    expect(shiftedSpend.lineUnit.text).toBe(formatYen(800 / 10).text);
     expect(partial.newVisits.text).toBe("7");
     expect(partial.newVisits.note).toBeNull();
     expect(partial.gaps).toEqual([]);
