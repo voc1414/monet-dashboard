@@ -20,7 +20,7 @@ import {
   Legend,
 } from "recharts";
 import DashboardLayout from "@/components/DashboardLayout";
-import { useAdsData, getDashboardData, normalizeRegion, missingDatesInSpan, ADS_PERIOD_OPTIONS, DEFAULT_ADS_PERIOD } from "@/hooks/useAdsData";
+import { useAdsData, getDashboardData, normalizeRegion, missingDatesInSpan, formatLineWindowNote, ADS_PERIOD_OPTIONS, DEFAULT_ADS_PERIOD } from "@/hooks/useAdsData";
 import type { Bucket, StoreRow, RegionRow, NamedRow } from "@/hooks/useAdsData";
 import { useSalonBoardStylistData, normalizeSalonBoardStore } from "@/hooks/useSalonBoardStylistData";
 import { useSalonBoardDailyNew } from "@/hooks/useSalonBoardDailyNew";
@@ -124,12 +124,24 @@ function monthsBetween(since: string, until: string): string[] {
 }
 
 // ===== 小物コンポーネント =====
-function KpiCard({ label, value, sub, subCls }: { label: string; value: string; sub: string; subCls?: string }) {
+function KpiCard({
+  label,
+  value,
+  sub,
+  subCls,
+  subTestId,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  subCls?: string;
+  subTestId?: string;
+}) {
   return (
     <div className="rounded-2xl border border-border/60 bg-white/70 p-4 shadow-sm">
       <div className="text-xs text-muted-foreground mb-1">{label}</div>
       <div className="text-2xl font-bold text-foreground tabular-nums">{value}</div>
-      <div className={`text-[11px] mt-1 ${subCls || "text-muted-foreground"}`}>{sub}</div>
+      <div data-testid={subTestId} className={`text-[11px] mt-1 ${subCls || "text-muted-foreground"}`}>{sub}</div>
     </div>
   );
 }
@@ -189,6 +201,7 @@ function MetricTable({
   newVisitNoteOf,
   periodUntil,
   firstColLabel,
+  lineSpendOf,
 }: {
   typeKey: TypeKey;
   rows: { name: string; kubun?: string; bucket: Bucket }[];
@@ -205,6 +218,8 @@ function MetricTable({
   /** 新規来店が無い店の注記（開店前・春日の11/9など）に使う期間の終了日 */
   periodUntil?: string;
   firstColLabel?: string;
+  /** LINE登録単価の分子。端の行が無いとき、LINEと同じ実期間の消化額 */
+  lineSpendOf?: (name: string) => number;
 }) {
   const showLine = typeKey === "shukyaku" ? !!byStore : !!byRegion;
   const showNew = !!newByStore;
@@ -234,9 +249,11 @@ function MetricTable({
   const totCpl = cpl(tot.spend, tot.lead);
   const totCtr = ctr(tot.click, tot.impr);
   const totHpb = rows.reduce((a, r) => a + hpbOf(r.name), 0); // 店舗ごとに掲載開始月を見て合算
+  const totLineSpend = lineSpendOf ? rows.reduce((sum, r) => sum + lineSpendOf(r.name), 0) : tot.spend;
   const totLineUnit = storeMetricTexts({
     name: "合計",
     spend: tot.spend,
+    lineSpend: lineSpendOf ? totLineSpend : undefined,
     line: tot.line,
     newVisits: 0,
     periodUntil: periodUntil ?? "",
@@ -292,6 +309,7 @@ function MetricTable({
               const metrics = storeMetricTexts({
                 name: r.name,
                 spend: b.spend,
+                lineSpend: lineSpendOf ? lineSpendOf(r.name) : undefined,
                 line: showLine ? line : 0,
                 newVisits: showNew ? newOf(r.name) : 0,
                 periodUntil: periodUntil ?? "",
@@ -516,8 +534,12 @@ export default function Ads() {
     let lineTot = 0;
     for (const k in D.lmessage.byStoreShort) lineTot += D.lmessage.byStoreShort[k];
     for (const k in D.lmessage.byRegion) lineTot += D.lmessage.byRegion[k];
+    // 登録単価の消化額は、LINE登録と同じ実期間（端がずれたときだけ選択期間と違う）
+    let lineSpend = 0;
+    if (type === "all" || type === "shukyaku") lineSpend += D.lineAligned.shukyaku.spend;
+    if (type === "all" || type === "kyujin") lineSpend += D.lineAligned.kyujin.spend;
     return {
-      lead, spend,
+      lead, spend, lineSpend,
       cplV: cpl(spend, lead), cpcV: cpc(spend, click), ctrV: ctr(click, impr), freqV: freqAvg(freqW, impr),
       lineTot,
       leadPoP: prevLead > 0 ? Math.round((lead / prevLead - 1) * 100) : null,
@@ -672,6 +694,10 @@ export default function Ads() {
       lmessage: missingDatesInSpan(raw.lmessage.map((r) => r.date), D.period.since, D.period.until),
     };
   }, [raw, D]);
+  // 合計がずれるのは端（開始前日・終了日）の欠損だけ。途中の欠けは詳しい欄へ。
+  const lineEdges = D?.lmessage.window.missingEdges ?? [];
+  const lineMiddle = missingDates.lmessage.filter((d) => !lineEdges.includes(d));
+  const lineWindowNote = D ? formatLineWindowNote(D.lmessage.window) : null;
   const fmtMissing = (ds: string[]) =>
     ds.slice(0, 10).map((d) => d.slice(5).replace("-", "/")).join("・") + (ds.length > 10 ? ` ほか${ds.length - 10}日` : "");
 
@@ -712,10 +738,10 @@ export default function Ads() {
               広告データが抜けている日: {fmtMissing(missingDates.monet)}（この日の消化額・リードは0扱い）
             </span>
           )}
-          {missingDates.lmessage.length > 0 && (
+          {lineEdges.length > 0 && (
             <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
               <AlertTriangle className="w-3 h-3" />
-              LINE登録データが抜けている日: {fmtMissing(missingDates.lmessage)}
+              LINE登録データが抜けている日: {fmtMissing(lineEdges)}
             </span>
           )}
         </div>
@@ -775,11 +801,17 @@ export default function Ads() {
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
           {/* KPIカード */}
           <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3 mb-6">
-            <KpiCard label="LINE登録数" value={numf(kpi.lineTot)} sub="流入タグ友だち" />
+            <KpiCard
+              label="LINE登録数"
+              value={numf(kpi.lineTot)}
+              sub={lineWindowNote ?? "流入タグ友だち"}
+              subCls={lineWindowNote ? "font-medium text-amber-700" : undefined}
+              subTestId={lineWindowNote ? "line-window-note" : undefined}
+            />
             <KpiCard
               label="LINE登録単価"
-              value={kpi.lineTot > 0 && Number.isFinite(kpi.spend) ? formatYen(kpi.spend / kpi.lineTot).text : PENDING_LABEL}
-              sub={kpi.lineTot > 0 ? "消化額/LINE登録" : "登録が0のため単価を出せない"}
+              value={kpi.lineTot > 0 && Number.isFinite(kpi.lineSpend) ? formatYen(kpi.lineSpend / kpi.lineTot).text : PENDING_LABEL}
+              sub={kpi.lineTot > 0 ? (lineWindowNote ? "同じ日数の消化額/LINE登録" : "消化額/LINE登録") : "登録が0のため単価を出せない"}
             />
             <KpiCard label="リード数" value={numf(kpi.lead)} sub={popLabel(kpi.leadPoP, "lead").text} subCls={popLabel(kpi.leadPoP, "lead").cls} />
             <KpiCard label="消化額" value={formatYen(kpi.spend).text} sub={popLabel(kpi.spendPoP, "spend").text} subCls={popLabel(kpi.spendPoP, "spend").cls} />
@@ -816,13 +848,13 @@ export default function Ads() {
           <div className="space-y-6">
             {showShukyaku &&
               (view === "store" ? (
-                <MetricTable typeKey="shukyaku" rows={storeRows} title="店舗別 一覧（直営・FC統合）" badge="集客" byStore={D.lmessage.byStoreShort} newByStore={newByStore} newSalesByStore={newSalesByStore} hpbCostOf={hpbCostOf} newVisitNoteOf={newVisitNoteOf} periodUntil={D.period.until} />
+                <MetricTable typeKey="shukyaku" rows={storeRows} title="店舗別 一覧（直営・FC統合）" badge="集客" byStore={D.lmessage.byStoreShort} newByStore={newByStore} newSalesByStore={newSalesByStore} hpbCostOf={hpbCostOf} newVisitNoteOf={newVisitNoteOf} periodUntil={D.period.until} lineSpendOf={(name) => D.lineAligned.shukyakuByStore[name]?.spend ?? 0} />
               ) : (
                 <NonStoreTable typeKey="shukyaku" rows={view === "campaign" ? D.byCampaign : D.byAdset} title={view === "campaign" ? "キャンペーン別 一覧" : "広告セット別 一覧"} badge="集客" labelCol={view === "campaign" ? "キャンペーン名" : "広告セット名"} />
               ))}
             {showKyujin &&
               (view === "store" ? (
-                <MetricTable typeKey="kyujin" rows={regionRows} title="エリア別 一覧" badge="求人" byRegion={D.lmessage.byRegion} />
+                <MetricTable typeKey="kyujin" rows={regionRows} title="エリア別 一覧" badge="求人" byRegion={D.lmessage.byRegion} lineSpendOf={(name) => D.lineAligned.kyujinByRegion[name]?.spend ?? 0} />
               ) : (
                 <NonStoreTable typeKey="kyujin" rows={view === "campaign" ? D.byCampaign : D.byAdset} title={view === "campaign" ? "キャンペーン別 一覧" : "広告セット別 一覧"} badge="求人" labelCol={view === "campaign" ? "キャンペーン名" : "広告セット名"} />
               ))}
@@ -833,8 +865,13 @@ export default function Ads() {
               数字の定義
             </summary>
             <p className="pb-4 [word-break:auto-phrase] [text-wrap:pretty]">
-            出典: Meta広告データ（SyncWith）＋ L Message 流入タグ。過去7日・過去30日・過去3ヶ月・過去6ヶ月は昨日まで（当日はまだ増える途中のため含めない）。今月は当月1日から今日まで。CPL警告しきい値=集客¥350超・求人¥3,000超、CTR=集客3%未満・求人2%未満で赤表示。LINE登録数は流入タグ友だちの期間内増分。「新規（新規来店数）」はサロンボード実績。日次データ(daily_new)があれば選択期間に厳密一致で合算、未反映の間は月次(該当月計)にフォールバック（KPIの注記に出所と範囲を表示）。HPB費用=月額¥55,000を、選択期間のうちその店が掲載している月だけ日数按分する（暦の1か月ちょうどなら月額。開店前で未掲載の店は0）。新規売上も同じ日数按分（暦の1か月ちょうどなら月次の金額そのまま）。CPA=(集客広告費+HPB費用)÷新規来店数、ROAS=按分後の新規売上÷(集客広告費+按分後のHPB費用)。CPL（リード単価）は広告費のみ。集計値のみで個人情報は含みません。
+            出典: Meta広告データ（SyncWith）＋ L Message 流入タグ。過去7日・過去30日・過去3ヶ月・過去6ヶ月は昨日まで（当日はまだ増える途中のため含めない）。今月は当月1日から今日まで。CPL警告しきい値=集客¥350超・求人¥3,000超、CTR=集客3%未満・求人2%未満で赤表示。LINE登録数は流入タグ友だちの期間内増分。端の日の行が無いときは、実際に使った行のあいだの日数で数え、登録単価の消化額と登録率のリードもその同じ日数で割る（按分はしない）。途中だけの欠けは合計を変えない。「新規（新規来店数）」はサロンボード実績。日次データ(daily_new)があれば選択期間に厳密一致で合算、未反映の間は月次(該当月計)にフォールバック（KPIの注記に出所と範囲を表示）。HPB費用=月額¥55,000を、選択期間のうちその店が掲載している月だけ日数按分する（暦の1か月ちょうどなら月額。開店前で未掲載の店は0）。新規売上も同じ日数按分（暦の1か月ちょうどなら月次の金額そのまま）。CPA=(集客広告費+HPB費用)÷新規来店数、ROAS=按分後の新規売上÷(集客広告費+按分後のHPB費用)。CPL（リード単価）は広告費のみ。集計値のみで個人情報は含みません。
             </p>
+            {lineMiddle.length > 0 && (
+              <p className="pb-4 [word-break:auto-phrase] [text-wrap:pretty]" data-testid="line-middle-gaps">
+                LINE登録の途中の欠け（{fmtMissing(lineMiddle)}）は合計への影響なし。
+              </p>
+            )}
           </details>
         </motion.div>
       )}

@@ -154,6 +154,45 @@ export interface RegionRow {
   kyujin: Bucket;
   total_spend: number;
 }
+/** LINE登録の差分で実際に使った起点・終点。選択期間の端の行が無いと、日数がずれる。 */
+export interface LineWindow {
+  requestedSince: string;
+  requestedUntil: string;
+  /** 起点に使った行の日付（開始日の前日以前で最新）。無ければ空 */
+  baselineDate: string;
+  /** 終点に使った行の日付（終了日以前で最新）。無ければ空 */
+  endDate: string;
+  /** 差分に含まれる最初の日（起点行の翌日。端がずれていなければ選択期間の開始日） */
+  countedSince: string;
+  /** 差分に含まれる最後の日（終点の行。端がずれていなければ選択期間の終了日） */
+  countedUntil: string;
+  countedDays: number;
+  /** 端の行が無く、数えた日数が選択期間と違う */
+  edgeShifted: boolean;
+  /** 合計の日数をずらした欠損日（開始前日、または終了日） */
+  missingEdges: string[];
+}
+
+export interface LmessageData {
+  byStoreShort: Record<string, number>;
+  byRegion: Record<string, number>;
+  asOf: string;
+  window: LineWindow;
+}
+
+export interface SpendLead {
+  spend: number;
+  lead: number;
+}
+
+/** LINE登録と同じ実期間で足した消化額・リード。按分はしない。 */
+export interface LineAligned {
+  shukyaku: SpendLead;
+  kyujin: SpendLead;
+  shukyakuByStore: Record<string, SpendLead>;
+  kyujinByRegion: Record<string, SpendLead>;
+}
+
 export interface DashboardData {
   period: { days: number; value: string; label: string; since: string; until: string };
   cur: { shukyaku: Bucket; kyujin: Bucket };
@@ -169,7 +208,9 @@ export interface DashboardData {
   series: { labels: string[]; shukyaku: number[]; kyujin: number[] };
   filters: { campaignList: string[]; storeList: string[]; regionList: string[] };
   updatedAt: string;
-  lmessage: { byStoreShort: Record<string, number>; byRegion: Record<string, number>; asOf: string };
+  lmessage: LmessageData;
+  /** LINE登録の差分と同じ日の消化額・リード（端がずれたときは選択期間と違う） */
+  lineAligned: LineAligned;
 }
 
 // ===== 期間プリセット解決（webapp.gs resolvePeriod を移植）=====
@@ -337,10 +378,133 @@ function dayBefore(d: string): string {
   return fmt(dt);
 }
 
-function getLmessageData(rows: LmsgRow[], since: string, until: string) {
+function parseYmd(ymd: string): Date {
+  const p = ymd.split("-").map(Number);
+  return new Date(p[0], p[1] - 1, p[2]);
+}
+
+function addYmd(ymd: string, days: number): string {
+  const dt = parseYmd(ymd);
+  dt.setDate(dt.getDate() + days);
+  return fmt(dt);
+}
+
+function inclusiveDays(since: string, until: string): number {
+  if (!since || !until || since > until) return 0;
+  return dayDiff(parseYmd(until), parseYmd(since));
+}
+
+function eachYmd(from: string, to: string): string[] {
+  if (!from || !to || from > to) return [];
+  const out: string[] = [];
+  const d = parseYmd(from);
+  for (let i = 0; i < 4000; i++) {
+    const s = fmt(d);
+    out.push(s);
+    if (s >= to) break;
+    d.setDate(d.getDate() + 1);
+  }
+  return out;
+}
+
+function latestOnOrBefore(dates: Set<string>, day: string): string {
+  let best = "";
+  for (const d of dates) {
+    if (d <= day && d > best) best = d;
+  }
+  return best;
+}
+
+/**
+ * 選択期間に対して、lmessage の累計差分が実際に使った行の日付を返す。
+ * 端（開始日の前日・終了日）の行が、シートの最初〜最新のあいだで欠けているときだけ日数がずれる。
+ * 最新日より後（まだ届いていない日）と、期間の途中だけの欠けは、端のずれにしない。
+ */
+export function resolveLineWindow(dates: Iterable<string>, since: string, until: string): LineWindow {
+  const present = new Set<string>();
+  let min = "";
+  let max = "";
+  for (const raw of dates) {
+    const d = raw || "";
+    if (!d) continue;
+    present.add(d);
+    if (!min || d < min) min = d;
+    if (!max || d > max) max = d;
+  }
+  const requestedDays = inclusiveDays(since, until);
+  const base: LineWindow = {
+    requestedSince: since,
+    requestedUntil: until,
+    baselineDate: "",
+    endDate: "",
+    countedSince: since,
+    countedUntil: until,
+    countedDays: requestedDays,
+    edgeShifted: false,
+    missingEdges: [],
+  };
+  if (!min || !since || !until) return base;
+
+  const expectedBaseline = dayBefore(since);
+  const baselineDate = latestOnOrBefore(present, expectedBaseline);
+  const endDate = latestOnOrBefore(present, until);
+  const inSpan = (d: string) => d >= min && d <= max;
+  const startHole = inSpan(expectedBaseline) && !present.has(expectedBaseline);
+  const endHole = inSpan(until) && !present.has(until);
+  const missingEdges: string[] = [];
+  if (startHole) {
+    const from = baselineDate ? addYmd(baselineDate, 1) : expectedBaseline;
+    for (const d of eachYmd(from, expectedBaseline)) {
+      if (!present.has(d)) missingEdges.push(d);
+    }
+  }
+  if (endHole) {
+    const from = endDate ? addYmd(endDate, 1) : until;
+    for (const d of eachYmd(from, until)) {
+      if (!present.has(d) && !missingEdges.includes(d)) missingEdges.push(d);
+    }
+  }
+  const countedSince = startHole && baselineDate ? addYmd(baselineDate, 1) : since;
+  const countedUntil = endHole && endDate ? endDate : until;
+  return {
+    requestedSince: since,
+    requestedUntil: until,
+    baselineDate,
+    endDate,
+    countedSince,
+    countedUntil,
+    countedDays: inclusiveDays(countedSince, countedUntil),
+    edgeShifted: missingEdges.length > 0,
+    missingEdges,
+  };
+}
+
+/** 端がずれたとき、LINE登録数のそばに出す短い注記。ずれていなければ null。 */
+export function formatLineWindowNote(window: LineWindow): string | null {
+  if (!window.edgeShifted || window.missingEdges.length === 0 || !window.countedSince || !window.countedUntil) {
+    return null;
+  }
+  const md = (ymd: string) => {
+    const p = ymd.split("-");
+    return `${Number(p[1])}/${Number(p[2])}`;
+  };
+  return `${window.missingEdges.map(md).join("・")}の行なし。LINE登録は${md(window.countedSince)}〜${md(window.countedUntil)}の${window.countedDays}日分で計算`;
+}
+
+/** 区分が集客でも、タグ名が _ で始まる試験用タグ（例 _ping2）は集計しない。 */
+export function isTestLineTag(tagName: string): boolean {
+  return (tagName || "").startsWith("_");
+}
+
+export function getLmessageData(rows: LmsgRow[], since: string, until: string): LmessageData {
   const sinceDay = since || "1900-01-01";
   const untilDay = until || "2099-12-31";
   const beforeSince = dayBefore(sinceDay);
+  const window = resolveLineWindow(
+    rows.map((r) => r.date),
+    sinceDay,
+    untilDay,
+  );
   const startMap: Record<string, LmsgRow> = {};
   const endMap: Record<string, LmsgRow> = {};
   for (const r of rows) {
@@ -364,7 +528,9 @@ function getLmessageData(rows: LmsgRow[], since: string, until: string) {
     const displayCount = delta > 0 ? delta : 0;
     const tag = end.tagName || "";
     const shortName = tag.replace(/流入$/, "");
+    if (end.date > maxDate) maxDate = end.date;
     if (end.category === "集客") {
+      if (isTestLineTag(tag)) continue;
       byStoreShort[shortName] = (byStoreShort[shortName] || 0) + displayCount;
     } else if (end.category === "求人") {
       const pref = tagToPref(shortName);
@@ -373,9 +539,44 @@ function getLmessageData(rows: LmsgRow[], since: string, until: string) {
         byRegion[k2] = (byRegion[k2] || 0) + displayCount;
       }
     }
-    if (end.date > maxDate) maxDate = end.date;
   }
-  return { byStoreShort, byRegion, asOf: maxDate };
+  return { byStoreShort, byRegion, asOf: maxDate, window };
+}
+
+/** since〜until の消化額・リード。LINE登録の実期間に合わせるときに使う。空の since は下限なし。 */
+export function campaignTotalsInRange(rows: MonetRow[], since: string, until: string): LineAligned {
+  const shukyaku: SpendLead = { spend: 0, lead: 0 };
+  const kyujin: SpendLead = { spend: 0, lead: 0 };
+  const shukyakuByStore: Record<string, SpendLead> = {};
+  const kyujinByRegion: Record<string, SpendLead> = {};
+  for (const row of rows) {
+    const date = row.date;
+    if (!date) continue;
+    if (since && date < since) continue;
+    if (until && date > until) continue;
+    const campType = getCampaignType(row.camp || "");
+    if (campType === "集客") {
+      shukyaku.lead += row.lead;
+      shukyaku.spend += row.spend;
+      if (row.tenpo) {
+        const b = shukyakuByStore[row.tenpo] ?? { spend: 0, lead: 0 };
+        b.lead += row.lead;
+        b.spend += row.spend;
+        shukyakuByStore[row.tenpo] = b;
+      }
+    } else if (campType === "求人") {
+      kyujin.lead += row.lead;
+      kyujin.spend += row.spend;
+      const normReg = normalizeRegion(row.region || "");
+      if (normReg) {
+        const b = kyujinByRegion[normReg] ?? { spend: 0, lead: 0 };
+        b.lead += row.lead;
+        b.spend += row.spend;
+        kyujinByRegion[normReg] = b;
+      }
+    }
+  }
+  return { shukyaku, kyujin, shukyakuByStore, kyujinByRegion };
 }
 
 // ===== メイン集計（webapp.gs getDashboardData を移植）=====
@@ -534,6 +735,7 @@ export function getDashboardData(raw: RawAds, period: string, now: Date = new Da
     )
   ).sort();
 
+  const lmessage = getLmessageData(raw.lmessage, p.sinceStr, p.untilStr);
   return {
     period: { days: p.days, value: p.value, label: p.label, since: p.sinceStr, until: p.untilStr },
     cur,
@@ -548,7 +750,8 @@ export function getDashboardData(raw: RawAds, period: string, now: Date = new Da
     updatedAt:
       `${fmt(new Date())} ` +
       `${String(new Date().getHours()).padStart(2, "0")}:${String(new Date().getMinutes()).padStart(2, "0")}`,
-    lmessage: getLmessageData(raw.lmessage, p.sinceStr, p.untilStr),
+    lmessage,
+    lineAligned: campaignTotalsInRange(raw.monet, lmessage.window.countedSince, lmessage.window.countedUntil),
   };
 }
 
