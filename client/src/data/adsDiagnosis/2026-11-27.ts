@@ -38,7 +38,7 @@ export interface DiagnosisStore {
   slotsColor: number | null;
   slotsNote: string | null;
   newVisits: number | null;
-  /** LPの95%到達率（%）。未登録は null */
+  /** LPの95%到達率（%）。取れていないときは null */
   lpReachPct: number | null;
   lpNote: string;
 }
@@ -95,7 +95,6 @@ export const ADS_DIAGNOSIS_20261127: AdsDiagnosisSnapshot = {
     "福島の差し替えルール（最初の7日を基準に15%下がったら差し替え）は提案で、未承認",
   ],
   missing: [
-    "堀江2ndのLP（Clarity未登録）",
     "動画ごとの数字",
   ],
   stores: [
@@ -136,8 +135,10 @@ export const ADS_DIAGNOSIS_20261127: AdsDiagnosisSnapshot = {
       slotsColor: 0,
       slotsNote: null,
       newVisits: 6,
-      lpReachPct: null,
-      lpNote: "データなし（Clarity未登録）",
+      // Clarity「モネ集客総合」(pgw6k4q5ch)。2026-11-28 21:34〜21:50 JST、スマホ・過去30日。
+      // 閲覧URLは https://monet-gokan.com/lp/horie2nd/ （クエリ付きを含む）。95%地点まで 112人 / 468PV。
+      lpReachPct: 23.93,
+      lpNote: "Clarity『モネ集客総合』スマホ過去30日・2026-11-28 21:40頃取得（他院は11/27取得）",
     },
     {
       name: "楽々園",
