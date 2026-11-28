@@ -2,7 +2,8 @@
  * 集客広告 店舗診断のスナップショット（2026-11-27）。
  * 次回は同じ形のファイルを足し、index.ts の CURRENT を差し替える。
  * 「–」だった数字は sheets_summary / hpb_slots / b_funnel / meta_adsets から入れた。
- * 無いものは null（画面では「データなし」）。確認中の項目はここには混ぜない。
+ * 無いものは null。画面は metricGap が見る（日次の行があれば合計、無ければ「確認中」）。
+ * 確認中の項目は判定と合計に混ぜない。
  */
 
 export type DiagnosisGrade = "A" | "B" | "C";
@@ -93,8 +94,6 @@ export const ADS_DIAGNOSIS_20261127: AdsDiagnosisSnapshot = {
   ],
   missing: [
     "堀江2ndのLP（Clarity未登録）",
-    "春日・本通の新規来店",
-    "本通の空き枠（ホットペッパー未掲載）",
     "動画ごとの数字",
   ],
   stores: [

@@ -27,6 +27,15 @@ import { useSalonBoardDailyNew } from "@/hooks/useSalonBoardDailyNew";
 import { useStoreNewSales } from "@/hooks/useStoreNewSales";
 import { hpbStartMonth, proratedMonthlyAmounts, proratedMonthlyFee } from "@/lib/storeOpening";
 import { newVisitCoverage, type NewVisitCoverage } from "@/lib/newVisitCoverage";
+import { CURRENT_ADS_DIAGNOSIS } from "@/data/adsDiagnosis";
+import {
+  ADS_SLOTS_PENDING_NOTE,
+  diagnosisSlots,
+  formatCount,
+  formatYen,
+  PENDING_LABEL,
+  storeMetricTexts,
+} from "@/lib/metricGap";
 
 // ===== 表示ヘルパ（webapp.gs と同じ式）=====
 const yen = (n: number) => "¥" + Math.round(n).toLocaleString();
@@ -156,6 +165,15 @@ function Select({
 const NB = (v: number) => (v > 0 ? numf(v) : "—");
 const YB = (v: number) => (v > 0 ? yen(v) : "—");
 
+function PendingCell({ text, note }: { text: string; note: string | null }) {
+  if (text !== PENDING_LABEL) return <>{text}</>;
+  return (
+    <span title={note ?? undefined} aria-label={note ? `${PENDING_LABEL}。${note}` : PENDING_LABEL}>
+      {PENDING_LABEL}
+    </span>
+  );
+}
+
 // 店舗別/エリア別テーブル（集客=店舗別+LINE列 / 求人=エリア別）
 function MetricTable({
   typeKey,
@@ -168,6 +186,7 @@ function MetricTable({
   newSalesByStore,
   hpbCostOf,
   newVisitNoteOf,
+  periodUntil,
   firstColLabel,
 }: {
   typeKey: TypeKey;
@@ -182,6 +201,8 @@ function MetricTable({
   hpbCostOf?: (storeName: string) => number;
   /** その店の新規来店が選択期間の全日ぶん無いとき、注意文。全日そろっている店は null */
   newVisitNoteOf?: (storeName: string) => string | null;
+  /** 新規来店が無い店の注記（開店前・春日の11/9など）に使う期間の終了日 */
+  periodUntil?: string;
   firstColLabel?: string;
 }) {
   const showLine = typeKey === "shukyaku" ? !!byStore : !!byRegion;
@@ -212,6 +233,14 @@ function MetricTable({
   const totCpl = cpl(tot.spend, tot.lead);
   const totCtr = ctr(tot.click, tot.impr);
   const totHpb = rows.reduce((a, r) => a + hpbOf(r.name), 0); // 店舗ごとに掲載開始月を見て合算
+  const totLineUnit = storeMetricTexts({
+    name: "合計",
+    spend: tot.spend,
+    line: tot.line,
+    newVisits: 0,
+    periodUntil: periodUntil ?? "",
+  }).lineUnit;
+  const newVisitsKnown = rows.some((row) => newOf(row.name) != null);
 
   const firstCol = firstColLabel || (typeKey === "shukyaku" ? "店舗" : "エリア");
   return (
@@ -255,7 +284,13 @@ function MetricTable({
               const line = showLine
                 ? (typeKey === "shukyaku" ? lookupStoreLine(r.name, byStore!) : lookupRegionLine(r.name, byRegion!))
                 : null;
-              const tanka = line && line > 0 && b.spend > 0 ? Math.round(b.spend / line) : null;
+              const metrics = storeMetricTexts({
+                name: r.name,
+                spend: b.spend,
+                line: showLine ? line : 0,
+                newVisits: showNew ? newOf(r.name) : 0,
+                periodUntil: periodUntil ?? "",
+              });
               return (
                 <tr key={r.name} className="border-b border-border/30">
                   <td className="text-left px-3 py-2 font-medium text-foreground">
@@ -271,22 +306,24 @@ function MetricTable({
                     {r.name}
                   </td>
                   <td className="text-right px-3 py-2 tabular-nums">{b.dailyBudget && b.dailyBudget > 0 ? yen(b.dailyBudget) : "—"}</td>
-                  <td className="text-right px-3 py-2 tabular-nums">{YB(b.spend)}</td>
+                  <td className="text-right px-3 py-2 tabular-nums">{metrics.spend.text === PENDING_LABEL ? <PendingCell text={metrics.spend.text} note={metrics.spend.note} /> : metrics.spend.text}</td>
                   {showHpb && (
                     <td className="text-right px-3 py-2 tabular-nums">{yen(hpbOf(r.name))}</td>
                   )}
-                  {showLine && <td className="text-right px-3 py-2 tabular-nums">{line != null ? numf(line) : "—"}</td>}
-                  {showLine && <td className="text-right px-3 py-2 tabular-nums">{tanka != null ? yen(tanka) : "—"}</td>}
+                  {showLine && <td className="text-right px-3 py-2 tabular-nums"><PendingCell text={metrics.line.text} note={metrics.line.note} /></td>}
+                  {showLine && <td className="text-right px-3 py-2 tabular-nums"><PendingCell text={metrics.lineUnit.text} note={metrics.lineUnit.note} /></td>}
                   <td className="text-right px-3 py-2 tabular-nums">{NB(b.lead)}</td>
                   {showNew && (
                     <td className="text-right px-3 py-2 tabular-nums font-medium text-foreground">
                       {(() => {
-                        const nv = newOf(r.name);
                         const note = newVisitNoteOf?.(r.name) ?? null;
+                        const shown = metrics.newVisits.text === PENDING_LABEL
+                          ? <PendingCell text={metrics.newVisits.text} note={metrics.newVisits.note} />
+                          : metrics.newVisits.text;
                         return (
                           <span className="inline-flex items-center justify-end gap-1">
-                            {nv != null ? numf(nv) : "—"}
-                            {note && (
+                            {shown}
+                            {note && metrics.newVisits.text !== PENDING_LABEL && (
                               <span className="text-amber-600" title={note} aria-label={note}>
                                 <AlertTriangle className="w-3 h-3" aria-hidden />
                               </span>
@@ -340,12 +377,20 @@ function MetricTable({
               <tr className="border-t-2 border-border/60 font-bold bg-muted/30">
                 <td className="text-left px-3 py-2">合計</td>
                 <td className="text-right px-3 py-2 tabular-nums">{tot.dailyBudget > 0 ? yen(tot.dailyBudget) : "—"}</td>
-                <td className="text-right px-3 py-2 tabular-nums">{YB(tot.spend)}</td>
+                <td className="text-right px-3 py-2 tabular-nums">{formatYen(tot.spend).text}</td>
                 {showHpb && <td className="text-right px-3 py-2 tabular-nums">{yen(totHpb)}</td>}
-                {showLine && <td className="text-right px-3 py-2 tabular-nums">{numf(tot.line)}</td>}
-                {showLine && <td className="text-right px-3 py-2 tabular-nums">{tot.line > 0 && tot.spend > 0 ? yen(Math.round(tot.spend / tot.line)) : "—"}</td>}
+                {showLine && <td className="text-right px-3 py-2 tabular-nums">{formatCount(tot.line).text}</td>}
+                {showLine && (
+                  <td className="text-right px-3 py-2 tabular-nums">
+                    <PendingCell text={totLineUnit.text} note={totLineUnit.note} />
+                  </td>
+                )}
                 <td className="text-right px-3 py-2 tabular-nums">{NB(tot.lead)}</td>
-                {showNew && <td className="text-right px-3 py-2 tabular-nums">{numf(tot.newc)}</td>}
+                {showNew && (
+                  <td className="text-right px-3 py-2 tabular-nums">
+                    {newVisitsKnown ? formatCount(tot.newc).text : PENDING_LABEL}
+                  </td>
+                )}
                 {showCpaRoas && <td className="text-right px-3 py-2 tabular-nums">{tot.newc > 0 && tot.spend + totHpb > 0 ? yen(Math.round((tot.spend + totHpb) / tot.newc)) : "—"}</td>}
                 {showCpaRoas && <td className="text-right px-3 py-2 tabular-nums">{tot.spend + totHpb > 0 ? `${Math.round((tot.newSales / (tot.spend + totHpb)) * 100)}%` : "—"}</td>}
                 <td className="text-right px-3 py-2 tabular-nums">{totCpl > 0 ? yen(totCpl) : "—"}</td>
@@ -358,6 +403,38 @@ function MetricTable({
         </table>
       </div>
     </div>
+  );
+}
+
+function AdsPendingNote({ gaps }: { gaps: string[] }) {
+  const slots = CURRENT_ADS_DIAGNOSIS.stores.map((store) => {
+    const shown = diagnosisSlots(store);
+    const body = shown.text === PENDING_LABEL ? `${PENDING_LABEL}（${shown.note ?? "数値が無い"}）` : shown.text;
+    return `${store.name}：${body}`;
+  });
+  return (
+    <details className="group mt-2" data-testid="ads-pending">
+      <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded border border-border bg-muted/40 px-1.5 py-0.5 text-xs font-semibold text-muted-foreground [&::-webkit-details-marker]:hidden">
+        <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90" aria-hidden />
+        確認中・空き枠
+      </summary>
+      <div className="mt-1 max-w-full space-y-2 pl-4 text-xs text-foreground/80 [word-break:auto-phrase] [text-wrap:pretty]">
+        <p>空き枠：{PENDING_LABEL}（{ADS_SLOTS_PENDING_NOTE}）</p>
+        {gaps.length > 0 && (
+          <ul className="space-y-0.5">
+            {gaps.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        )}
+        <p>診断画面の空き枠（{CURRENT_ADS_DIAGNOSIS.periodSlots}の固定値）</p>
+        <ul className="space-y-0.5">
+          {slots.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      </div>
+    </details>
   );
 }
 
@@ -454,10 +531,10 @@ export default function Ads() {
 
   // 新規来店数（サロンボード）。日次タブ daily_new があれば選択期間に「厳密一致」で合算（推奨）。
   // 未生成の間は月次 stylist_flat にフォールバック（選択期間に重なる月を合算＝該当月計）。
-  const { newByStore, totalNew, newLabel, usingDaily } = useMemo(() => {
+  const { newByStore, totalNew, newLabel, usingDaily, newVisitKnown } = useMemo(() => {
     const map: Record<string, number> = {};
     let total = 0;
-    if (!D) return { newByStore: map, totalNew: 0, newLabel: "サロンボード", usingDaily: false };
+    if (!D) return { newByStore: map, totalNew: 0, newLabel: "サロンボード", usingDaily: false, newVisitKnown: false };
     const since = D.period.since;
     const until = D.period.until;
     // 日次（厳密）優先
@@ -471,13 +548,15 @@ export default function Ads() {
       }
     }
     if (dailyHit) {
-      return { newByStore: map, totalNew: total, newLabel: `サロンボード ${since}〜${until}`, usingDaily: true };
+      return { newByStore: map, totalNew: total, newLabel: `サロンボード ${since}〜${until}`, usingDaily: true, newVisitKnown: true };
     }
     // フォールバック: 月次（該当月計）
     const months = monthsBetween(since, until);
     const monthSet = new Set(months);
+    let monthlyHit = false;
     for (const d of sbData) {
       if (!monthSet.has(d.yearMonth)) continue;
+      monthlyHit = true;
       const key = canonicalStore(d.storeName);
       map[key] = (map[key] || 0) + d.newCustomers;
       total += d.newCustomers;
@@ -488,7 +567,7 @@ export default function Ads() {
         : months.length > 1
         ? `サロンボード ${months[0]}〜${months[months.length - 1]}計（月次）`
         : "サロンボード";
-    return { newByStore: map, totalNew: total, newLabel: label, usingDaily: false };
+    return { newByStore: map, totalNew: total, newLabel: label, usingDaily: false, newVisitKnown: monthlyHit };
   }, [D, dailyNew, sbData]);
 
   // 日次で足しているときだけ、店ごとに「期間の何日分しか無いか」を出す。
@@ -505,6 +584,21 @@ export default function Ads() {
     const by = new Map(visitGaps.map((g) => [canonicalStore(g.store), g.message]));
     return (name: string) => by.get(canonicalStore(name)) ?? null;
   }, [visitGaps]);
+
+  const storeGapLines = useMemo(() => {
+    if (!D) return [] as string[];
+    return storeRows.flatMap((row) => {
+      const line = lookupStoreLine(row.name, D.lmessage.byStoreShort);
+      const visits = newByStore[canonicalStore(row.name)];
+      return storeMetricTexts({
+        name: row.name,
+        spend: row.bucket.spend,
+        line,
+        newVisits: visits ?? null,
+        periodUntil: D.period.until,
+      }).gaps.map((gap) => `${gap.store}の${gap.metric}：${PENDING_LABEL}（${gap.note}）`);
+    });
+  }, [D, storeRows, newByStore]);
 
   // 新規売上（サロンボード明細 store_newsales）を店舗別・月別に集め、HPB費用と同じ日数按分で合計する（ROASの分子）。
   // 暦の1か月を選んだときは月次の金額そのまま。月をまたぐ「過去30日」は、各月の値をその月に入る日数で割る。
@@ -610,6 +704,7 @@ export default function Ads() {
           )}
         </div>
         <NewVisitCoverageNote gaps={visitGaps} />
+        <AdsPendingNote gaps={storeGapLines} />
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Calendar className="w-4 h-4 text-muted-foreground" aria-hidden />
@@ -665,17 +760,21 @@ export default function Ads() {
           {/* KPIカード */}
           <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3 mb-6">
             <KpiCard label="LINE登録数" value={numf(kpi.lineTot)} sub="流入タグ友だち" />
-            <KpiCard label="LINE登録単価" value={kpi.lineTot > 0 ? yen(kpi.spend / kpi.lineTot) : "—"} sub="消化額/LINE登録" />
+            <KpiCard
+              label="LINE登録単価"
+              value={kpi.lineTot > 0 && Number.isFinite(kpi.spend) ? formatYen(kpi.spend / kpi.lineTot).text : PENDING_LABEL}
+              sub={kpi.lineTot > 0 ? "消化額/LINE登録" : "登録が0のため単価を出せない"}
+            />
             <KpiCard label="リード数" value={numf(kpi.lead)} sub={popLabel(kpi.leadPoP, "lead").text} subCls={popLabel(kpi.leadPoP, "lead").cls} />
-            <KpiCard label="消化額" value={yen(kpi.spend)} sub={popLabel(kpi.spendPoP, "spend").text} subCls={popLabel(kpi.spendPoP, "spend").cls} />
+            <KpiCard label="消化額" value={formatYen(kpi.spend).text} sub={popLabel(kpi.spendPoP, "spend").text} subCls={popLabel(kpi.spendPoP, "spend").cls} />
             <KpiCard label="CPL（リード単価）" value={kpi.cplV > 0 ? yen(kpi.cplV) : "—"} sub="消化額/リード" />
             <KpiCard label="CPC（クリック単価）" value={kpi.cpcV > 0 ? yen(kpi.cpcV) : "—"} sub="消化額/クリック" />
             <KpiCard label="CTR（リンククリック率）" value={kpi.ctrV > 0 ? pct(kpi.ctrV) : "—"} sub="クリック/インプ" />
             <KpiCard label="フリークエンシー（1日平均）" value={kpi.freqV > 0 ? fr(kpi.freqV) : "—"} sub="日ごとの値の平均。期間全体の値ではない" />
             <KpiCard
               label="新規来店数"
-              value={totalNew > 0 ? numf(totalNew) : "—"}
-              sub={newLabel}
+              value={newVisitKnown ? formatCount(totalNew).text : PENDING_LABEL}
+              sub={newVisitKnown ? newLabel : "この期間の日次も月次も無い"}
             />
           </div>
 
@@ -701,7 +800,7 @@ export default function Ads() {
           <div className="space-y-6">
             {showShukyaku &&
               (view === "store" ? (
-                <MetricTable typeKey="shukyaku" rows={storeRows} title="店舗別 一覧（直営・FC統合）" badge="集客" byStore={D.lmessage.byStoreShort} newByStore={newByStore} newSalesByStore={newSalesByStore} hpbCostOf={hpbCostOf} newVisitNoteOf={newVisitNoteOf} />
+                <MetricTable typeKey="shukyaku" rows={storeRows} title="店舗別 一覧（直営・FC統合）" badge="集客" byStore={D.lmessage.byStoreShort} newByStore={newByStore} newSalesByStore={newSalesByStore} hpbCostOf={hpbCostOf} newVisitNoteOf={newVisitNoteOf} periodUntil={D.period.until} />
               ) : (
                 <NonStoreTable typeKey="shukyaku" rows={view === "campaign" ? D.byCampaign : D.byAdset} title={view === "campaign" ? "キャンペーン別 一覧" : "広告セット別 一覧"} badge="集客" labelCol={view === "campaign" ? "キャンペーン名" : "広告セット名"} />
               ))}

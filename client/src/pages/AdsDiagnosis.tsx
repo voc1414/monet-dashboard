@@ -13,6 +13,17 @@ import {
   type DiagnosisGrade,
   type DiagnosisStore,
 } from "@/data/adsDiagnosis";
+import { DIAGNOSIS_VISIT_ROWS } from "@/data/adsDiagnosis/visitRows";
+import {
+  diagnosisLineUnit,
+  diagnosisNewVisits,
+  diagnosisPendingLines,
+  diagnosisSlots,
+  formatCount,
+  formatYen,
+  parseYmdRange,
+  PENDING_LABEL,
+} from "@/lib/metricGap";
 
 const GRADE_LABEL: Record<DiagnosisGrade, string> = {
   A: "A 枠不足",
@@ -64,18 +75,29 @@ function Metric({
   );
 }
 
+function withNote(source: string, note: string | null): string {
+  return note ? `${note} · ${source}` : source;
+}
+
 function StoreRow({ store }: { store: DiagnosisStore }) {
   const [open, setOpen] = useState(false);
   const d = CURRENT_ADS_DIAGNOSIS;
+  const period = parseYmdRange(d.periodAds);
   const src = (id: string) => {
     const s = d.sources.find((x) => x.id === id);
     return s ? `${s.label} · ${s.fetchedAt}` : "";
   };
-  const slots =
-    store.slotsNote ??
-    (store.slotsCut == null
-      ? "データなし"
-      : `カット ${store.slotsCut}枠 ／ カット＋カラー ${store.slotsColor ?? "データなし"}枠`);
+  const slots = diagnosisSlots(store);
+  const visits = diagnosisNewVisits({
+    storeName: store.name,
+    snapshot: store.newVisits,
+    rows: DIAGNOSIS_VISIT_ROWS,
+    since: period?.since ?? "",
+    until: period?.until ?? "",
+  });
+  const spend = formatYen(store.spendYen);
+  const line = formatCount(store.lineReg);
+  const unit = diagnosisLineUnit(store.spendYen, store.lineReg, store.costPerRegYen);
   return (
     <li className={`rounded-2xl border bg-white shadow-sm ${GRADE_ROW[store.grade]} ${store.grade === "C" ? "opacity-80" : ""}`}>
       <button
@@ -95,7 +117,7 @@ function StoreRow({ store }: { store: DiagnosisStore }) {
       </button>
       {open && (
         <div className="grid grid-cols-2 gap-x-4 border-t border-border/40 px-4 pb-2 sm:grid-cols-3">
-          <Metric label="登録単価" value={yen(store.costPerRegYen)} source={src("meta") + " ÷ " + "Lメッセージ"} />
+          <Metric label="登録単価" value={unit.text} source={withNote(src("meta") + " ÷ " + "Lメッセージ", unit.note)} />
           <Metric
             label="登録率"
             value={store.regRateNote ? `${store.regRateNote}（30日 ${pctOrNone(store.regRatePct)}）` : pctOrNone(store.regRatePct)}
@@ -103,12 +125,12 @@ function StoreRow({ store }: { store: DiagnosisStore }) {
           />
           <Metric label="CTR" value={pctOrNone(store.ctrPct)} source={src("meta")} />
           <Metric label="CPM" value={yen(store.cpmYen)} source={src("meta")} />
-          <Metric label="空き枠（2週間）" value={slots} source={src("slots")} />
+          <Metric label="空き枠（2週間）" value={slots.text} source={withNote(src("slots"), slots.note)} />
           <Metric label="LP 95%到達" value={store.lpReachPct == null ? store.lpNote : `${store.lpReachPct}% ${store.lpNote}`} source={src("lp")} />
-          <Metric label="広告費" value={yen(store.spendYen)} source={src("meta")} />
+          <Metric label="広告費" value={spend.text} source={withNote(src("meta"), spend.note)} />
           <Metric label="リード" value={numOrNone(store.leads)} source={src("meta")} />
-          <Metric label="LINE登録" value={numOrNone(store.lineReg)} source={src("line")} />
-          <Metric label="新規来店" value={numOrNone(store.newVisits)} source={src("visits")} />
+          <Metric label="LINE登録" value={line.text} source={withNote(src("line"), line.note)} />
+          <Metric label="新規来店" value={visits.text} source={withNote(src("visits"), visits.note)} />
         </div>
       )}
     </li>
@@ -129,6 +151,7 @@ function Fold({ title, children }: { title: string; children: React.ReactNode })
 
 export default function AdsDiagnosis() {
   const d = CURRENT_ADS_DIAGNOSIS;
+  const period = parseYmdRange(d.periodAds);
   const stores = storesInGradeOrder(d.stores);
   const counts = { A: 0, B: 0, C: 0 };
   for (const s of stores) counts[s.grade] += 1;
@@ -187,6 +210,16 @@ export default function AdsDiagnosis() {
         <Fold title="確認中（判定と合計には入れていない）">
           <ul className="space-y-1">
             {d.pending.map((item) => (
+              <li key={item}>・{item}</li>
+            ))}
+          </ul>
+        </Fold>
+        <Fold title="数値の確認中">
+          <ul className="space-y-1" data-testid="diagnosis-metric-pending">
+            {(period
+              ? diagnosisPendingLines(d.stores, DIAGNOSIS_VISIT_ROWS, period.since, period.until, d.totals.spendYen)
+              : [`期間を読めないため数値は${PENDING_LABEL}`]
+            ).map((item) => (
               <li key={item}>・{item}</li>
             ))}
           </ul>
