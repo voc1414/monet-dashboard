@@ -2,7 +2,10 @@
  * 集客広告 店舗診断のスナップショット（2026-11-27）。
  * 次回は同じ形のファイルを足し、index.ts の CURRENT を差し替える。
  * 「–」だった数字は sheets_summary / hpb_slots / b_funnel / meta_adsets から入れた。
- * 無いものは null（画面では「データなし」）。確認中の項目はここには混ぜない。
+ * 広告費の院別は metaAdsets.ts の集客行の合計（全店合計と一致する）。
+ * b_funnel の院別はこれより合計17円少なく、未配賦の広告セットではない。
+ * 新規来店の null は、画面が広告ページと同じ日次を読んで埋める。
+ * 確認中の項目は判定と合計に混ぜない。
  */
 
 export type DiagnosisGrade = "A" | "B" | "C";
@@ -93,8 +96,6 @@ export const ADS_DIAGNOSIS_20261127: AdsDiagnosisSnapshot = {
   ],
   missing: [
     "堀江2ndのLP（Clarity未登録）",
-    "春日・本通の新規来店",
-    "本通の空き枠（ホットペッパー未掲載）",
     "動画ごとの数字",
   ],
   stores: [
@@ -163,7 +164,7 @@ export const ADS_DIAGNOSIS_20261127: AdsDiagnosisSnapshot = {
       grade: "B",
       action: "広告動画の差し替え。CPMが基準の1.52倍（差の43%）",
       history: null,
-      spendYen: 90205,
+      spendYen: 90206,
       leads: 284,
       lineReg: 94,
       regRatePct: 33.1,
@@ -183,7 +184,7 @@ export const ADS_DIAGNOSIS_20261127: AdsDiagnosisSnapshot = {
       grade: "B",
       action: "LPを見直す（登録率26.9%で最低）",
       history: null,
-      spendYen: 45083,
+      spendYen: 45086,
       leads: 234,
       lineReg: 63,
       regRatePct: 26.9,
@@ -203,7 +204,7 @@ export const ADS_DIAGNOSIS_20261127: AdsDiagnosisSnapshot = {
       grade: "B",
       action: "LINE追加の流れを確認する（登録率 前半41.1%→後半21.9%）。¥635・カット6枠であと1枠でA",
       history: "11/17 A → 11/20 C → 11/23 A → 今回B",
-      spendYen: 51426,
+      spendYen: 51427,
       leads: 246,
       lineReg: 81,
       regRatePct: 32.9,
@@ -223,7 +224,7 @@ export const ADS_DIAGNOSIS_20261127: AdsDiagnosisSnapshot = {
       grade: "B",
       action: "LPを見直す。リード÷クリック10.6%で全店最低",
       history: null,
-      spendYen: 45052,
+      spendYen: 45061,
       leads: 175,
       lineReg: 62,
       regRatePct: 35.4,
@@ -243,7 +244,7 @@ export const ADS_DIAGNOSIS_20261127: AdsDiagnosisSnapshot = {
       grade: "C",
       action: "問題なし",
       history: null,
-      spendYen: 79873,
+      spendYen: 79875,
       leads: 648,
       lineReg: 242,
       regRatePct: 37.3,
@@ -303,7 +304,7 @@ export const ADS_DIAGNOSIS_20261127: AdsDiagnosisSnapshot = {
       grade: "C",
       action: "問題なし",
       history: null,
-      spendYen: 41077,
+      spendYen: 41078,
       leads: 246,
       lineReg: 92,
       regRatePct: 37.4,

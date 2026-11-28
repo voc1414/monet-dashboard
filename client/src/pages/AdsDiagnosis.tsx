@@ -13,6 +13,20 @@ import {
   type DiagnosisGrade,
   type DiagnosisStore,
 } from "@/data/adsDiagnosis";
+import { useSalonBoardDailyNew } from "@/hooks/useSalonBoardDailyNew";
+import {
+  beforeOpening,
+  BEFORE_OPENING_LABEL,
+  diagnosisLineUnit,
+  diagnosisNewVisits,
+  diagnosisPendingLines,
+  diagnosisSlots,
+  formatCount,
+  formatYen,
+  parseYmdRange,
+  PENDING_LABEL,
+  type VisitRow,
+} from "@/lib/metricGap";
 
 const GRADE_LABEL: Record<DiagnosisGrade, string> = {
   A: "A 枠不足",
@@ -64,28 +78,53 @@ function Metric({
   );
 }
 
-function StoreRow({ store }: { store: DiagnosisStore }) {
+function withNote(source: string, note: string | null): string {
+  return note ? `${note} · ${source}` : source;
+}
+
+function StoreRow({
+  store,
+  visitRows,
+  visitLoading,
+  early,
+}: {
+  store: DiagnosisStore;
+  visitRows: VisitRow[];
+  visitLoading: boolean;
+  early: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const d = CURRENT_ADS_DIAGNOSIS;
+  const period = parseYmdRange(d.periodAds);
   const src = (id: string) => {
     const s = d.sources.find((x) => x.id === id);
     return s ? `${s.label} · ${s.fetchedAt}` : "";
   };
-  const slots =
-    store.slotsNote ??
-    (store.slotsCut == null
-      ? "データなし"
-      : `カット ${store.slotsCut}枠 ／ カット＋カラー ${store.slotsColor ?? "データなし"}枠`);
+  const slots = diagnosisSlots(store);
+  const visits = visitLoading
+    ? { text: "…", note: null }
+    : diagnosisNewVisits({
+        storeName: store.name,
+        snapshot: store.newVisits,
+        rows: visitRows,
+        since: period?.since ?? "",
+        until: period?.until ?? "",
+      });
+  const slotsShown = early && slots.text === PENDING_LABEL ? { text: "—", note: null } : slots;
+  const visitsShown = early && visits.text === PENDING_LABEL ? { text: "—", note: null } : visits;
+  const spend = formatYen(store.spendYen);
+  const line = formatCount(store.lineReg);
+  const unit = diagnosisLineUnit(store.spendYen, store.lineReg, store.costPerRegYen);
   return (
-    <li className={`rounded-2xl border bg-white shadow-sm ${GRADE_ROW[store.grade]} ${store.grade === "C" ? "opacity-80" : ""}`}>
+    <li className={`rounded-2xl border bg-white shadow-sm ${early ? "border-border/40" : GRADE_ROW[store.grade]} ${early || store.grade === "C" ? "opacity-60" : ""}`}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="flex w-full min-h-[56px] items-start gap-3 px-4 py-3 text-left"
         aria-expanded={open}
       >
-        <span className={`mt-0.5 inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-bold ${GRADE_PILL[store.grade]}`}>
-          {GRADE_LABEL[store.grade]}
+        <span className={`mt-0.5 inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-bold ${early ? "bg-muted text-muted-foreground" : GRADE_PILL[store.grade]}`}>
+          {early ? BEFORE_OPENING_LABEL : GRADE_LABEL[store.grade]}
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-bold text-foreground">{store.name}</span>
@@ -95,7 +134,7 @@ function StoreRow({ store }: { store: DiagnosisStore }) {
       </button>
       {open && (
         <div className="grid grid-cols-2 gap-x-4 border-t border-border/40 px-4 pb-2 sm:grid-cols-3">
-          <Metric label="登録単価" value={yen(store.costPerRegYen)} source={src("meta") + " ÷ " + "Lメッセージ"} />
+          <Metric label="登録単価" value={unit.text} source={withNote(src("meta") + " ÷ " + "Lメッセージ", unit.note)} />
           <Metric
             label="登録率"
             value={store.regRateNote ? `${store.regRateNote}（30日 ${pctOrNone(store.regRatePct)}）` : pctOrNone(store.regRatePct)}
@@ -103,12 +142,12 @@ function StoreRow({ store }: { store: DiagnosisStore }) {
           />
           <Metric label="CTR" value={pctOrNone(store.ctrPct)} source={src("meta")} />
           <Metric label="CPM" value={yen(store.cpmYen)} source={src("meta")} />
-          <Metric label="空き枠（2週間）" value={slots} source={src("slots")} />
+          <Metric label="空き枠（2週間）" value={slotsShown.text} source={withNote(src("slots"), slotsShown.note)} />
           <Metric label="LP 95%到達" value={store.lpReachPct == null ? store.lpNote : `${store.lpReachPct}% ${store.lpNote}`} source={src("lp")} />
-          <Metric label="広告費" value={yen(store.spendYen)} source={src("meta")} />
+          <Metric label="広告費" value={spend.text} source={withNote(src("meta"), spend.note)} />
           <Metric label="リード" value={numOrNone(store.leads)} source={src("meta")} />
-          <Metric label="LINE登録" value={numOrNone(store.lineReg)} source={src("line")} />
-          <Metric label="新規来店" value={numOrNone(store.newVisits)} source={src("visits")} />
+          <Metric label="LINE登録" value={line.text} source={withNote(src("line"), line.note)} />
+          <Metric label="新規来店" value={visitsShown.text} source={withNote(src("visits"), visitsShown.note)} />
         </div>
       )}
     </li>
@@ -129,9 +168,21 @@ function Fold({ title, children }: { title: string; children: React.ReactNode })
 
 export default function AdsDiagnosis() {
   const d = CURRENT_ADS_DIAGNOSIS;
-  const stores = storesInGradeOrder(d.stores);
+  const period = parseYmdRange(d.periodAds);
+  const { data: dailyNew, loading: visitLoading } = useSalonBoardDailyNew();
+  const visitRows: VisitRow[] = dailyNew.map((row) => ({
+    store: row.store,
+    date: row.date,
+    newCount: row.newCount,
+  }));
+  const until = period?.until ?? "";
+  const operating = storesInGradeOrder(d.stores.filter((store) => !beforeOpening(store.name, until)));
+  const early = d.stores.filter((store) => beforeOpening(store.name, until));
   const counts = { A: 0, B: 0, C: 0 };
-  for (const s of stores) counts[s.grade] += 1;
+  for (const s of operating) counts[s.grade] += 1;
+  const pendingLines = period
+    ? diagnosisPendingLines(d.stores, visitRows, period.since, period.until, d.totals.spendYen, !visitLoading)
+    : [`期間を読めないため数値は${PENDING_LABEL}`];
 
   return (
     <DashboardLayout breadcrumbs={[{ label: "店舗診断" }]}>
@@ -168,12 +219,18 @@ export default function AdsDiagnosis() {
               <dd className="text-base font-bold tabular-nums">{d.totals.regRatePct}%</dd>
             </div>
           </dl>
-          <p className="mt-2 text-[11px] text-muted-foreground">A {counts.A} ／ B {counts.B} ／ C {counts.C}</p>
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            A {counts.A} ／ B {counts.B} ／ C {counts.C}
+            {early.length > 0 ? ` ／ ${BEFORE_OPENING_LABEL} ${early.length}` : ""}
+          </p>
         </section>
 
         <ul className="space-y-2" data-testid="diagnosis-stores">
-          {stores.map((store) => (
-            <StoreRow key={store.name} store={store} />
+          {operating.map((store) => (
+            <StoreRow key={store.name} store={store} visitRows={visitRows} visitLoading={visitLoading} early={false} />
+          ))}
+          {early.map((store) => (
+            <StoreRow key={store.name} store={store} visitRows={visitRows} visitLoading={visitLoading} early />
           ))}
         </ul>
 
@@ -191,6 +248,15 @@ export default function AdsDiagnosis() {
             ))}
           </ul>
         </Fold>
+        {pendingLines.length > 0 && (
+          <Fold title="数値の確認中">
+            <ul className="space-y-1" data-testid="diagnosis-metric-pending">
+              {pendingLines.map((item) => (
+                <li key={item}>・{item}</li>
+              ))}
+            </ul>
+          </Fold>
+        )}
         <Fold title="データなし">
           <ul className="space-y-1">
             {d.missing.map((item) => (
@@ -200,7 +266,7 @@ export default function AdsDiagnosis() {
         </Fold>
         <Fold title="前回からの判定の変化">
           <ul className="space-y-1">
-            {stores.filter((s) => s.history).map((s) => (
+            {d.stores.filter((s) => s.history).map((s) => (
               <li key={s.name}>・{s.name}：{s.history}</li>
             ))}
             <li>・それ以外の院は、前回（11/20）の区分と同じ</li>
