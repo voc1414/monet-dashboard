@@ -19,6 +19,7 @@ import {
   formatJstShort,
   gbpRuns,
   headlineForTasks,
+  statusDot,
   summarizeTasks,
   syncIsStale,
   type Lamp,
@@ -47,7 +48,7 @@ function Reason({ text }: { text: string }) {
 
 const RANK: Record<Lamp, number> = { gray: 0, green: 1, yellow: 2, red: 3 };
 
-/** 文字の色：ランプは遅れの日数で決まる（2日で黄・3日で赤）。緑のままでも遅れ・失敗・要確認は文字で知らせる */
+/** 文字の色：ランプは遅れの日数で決まる（2日で黄・3日で赤）。直近がエラーで点だけ黄でも、ランプが緑のあいだ文字は赤のまま */
 function tone(s: TaskStatus): string {
   if (s.lamp !== "green") return LAMP[s.lamp].text;
   const r = s.latest?.result;
@@ -197,7 +198,7 @@ export default function AutoTasks() {
             {status.map((s) => (
               <li key={s.def.name} className={`rounded-xl border border-border/40 p-3 ${LAMP[s.lamp].row}`}>
                 <div className="flex flex-wrap items-center gap-x-2">
-                  <Dot lamp={s.lamp} />
+                  <Dot lamp={statusDot(s)} />
                   <span className="font-bold whitespace-nowrap">{s.def.name}</span>
                   <span className={`ml-auto text-xs font-medium whitespace-nowrap ${tone(s)}`}>
                     {s.label.length > 6 ? "" : s.label}
@@ -230,7 +231,7 @@ export default function AutoTasks() {
                   <tr key={s.def.name} className={`border-t border-border/40 align-top ${LAMP[s.lamp].row}`}>
                     <td className="py-2 pr-3">
                       <div className="flex items-center gap-2 font-medium whitespace-nowrap">
-                        <Dot lamp={s.lamp} />
+                        <Dot lamp={statusDot(s)} />
                         {s.def.name}
                       </div>
                       <div className="pl-[18px] text-[11px] text-muted-foreground">{s.def.where}</div>

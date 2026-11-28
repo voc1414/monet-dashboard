@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { hpbStartMonth, openedByMonth, proratedMonthlyFee } from "@/lib/storeOpening";
+import { hpbStartMonth, openedByMonth, proratedMonthlyAmounts, proratedMonthlyFee } from "@/lib/storeOpening";
 
 const key = (n: string) => n.replace(/院/g, "").replace(/[\s　]/g, "");
 const TABLE = { "下伊福院": "2026-08", "岡本院": "2026-09" };
@@ -50,5 +50,30 @@ describe("HPB掲載費の日数按分（提案）", () => {
   it("開始月より前は計上しない", () => {
     expect(proratedMonthlyFee(55000, "2026-10-29", "2026-11-27", "2026-11")).toBe(49500);
     expect(proratedMonthlyFee(55000, "2026-10-29", "2026-11-27", "2026-12")).toBe(0);
+  });
+});
+
+describe("新規売上も同じ日数按分（ROASの分子）", () => {
+  // 堀江院の過去30日（10/29〜11/27 = 10月3/31・11月27/30）。広告費は日次の合計なので按分しない。
+  // 掲載費の月額は ¥55,000。月数で足すとこの期間は2か月分の ¥110,000 になる。
+  const horie = { "2026-10": 554250, "2026-11": 577000 };
+  const since = "2026-10-29";
+  const until = "2026-11-27";
+  const adSpend = 44872;
+
+  it("30日跨ぎは各月を日数按分し、堀江院のROASまで一致する", () => {
+    const sales = proratedMonthlyAmounts(horie, since, until);
+    const hpb = proratedMonthlyFee(55000, since, until, "");
+    expect(sales).toBe(572937);
+    expect(hpb).toBe(54823);
+    expect(55000 * 2).toBe(110000);
+    expect(Math.round((sales / (adSpend + hpb)) * 100)).toBe(575);
+  });
+
+  it("暦の1か月ちょうど、および月をまるごと重ねた期間は月次の合計のまま", () => {
+    expect(proratedMonthlyAmounts(horie, "2026-10-01", "2026-10-31")).toBe(554250);
+    expect(proratedMonthlyAmounts(horie, "2026-11-01", "2026-11-30")).toBe(577000);
+    expect(proratedMonthlyFee(55000, "2026-10-01", "2026-10-31", "")).toBe(55000);
+    expect(proratedMonthlyAmounts(horie, "2026-10-01", "2026-11-30")).toBe(554250 + 577000);
   });
 });

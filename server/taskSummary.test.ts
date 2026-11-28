@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { TASKS, formatJstShort, gbpRuns, headlineForTasks, scheduledTimes, summarizeTasks, syncIsStale, type TaskDef, type TaskLogEntry, type TaskStatus } from "../client/src/lib/taskSummary";
+import { TASKS, formatJstShort, gbpRuns, headlineForTasks, scheduledTimes, statusDot, summarizeTasks, syncIsStale, type TaskDef, type TaskLogEntry, type TaskStatus } from "../client/src/lib/taskSummary";
 import type { GbpEntry } from "../client/src/lib/gbpSummary";
 
 const daily: TaskDef = {
@@ -146,6 +146,34 @@ describe("自動タスク 総合", () => {
     expect(s.label).toContain("エラー");
     expect(s.label).not.toContain("待っています");
   });
+  it("直近がエラーなら遅れが1日以内でも状態の点は黄。ランプは緑のままなので文字の赤と帯は変わらない", () => {
+    const sameDay = summarizeTasks([log("2026-11-27T07:40:00+09:00", "エラー")], [], new Date("2026-11-27T08:41:00+09:00"), [daily])[0];
+    expect(sameDay.lamp).toBe("green");
+    expect(sameDay.lateDays).toBe(0);
+    expect(sameDay.latest?.result).toBe("エラー");
+    expect(statusDot(sameDay)).toBe("yellow");
+    expect(headlineForTasks([sameDay], false)).toBeNull();
+
+    const withinGrace = summarizeTasks([log("2026-11-27T07:40:00+09:00", "エラー")], [], new Date("2026-11-27T08:00:00+09:00"), [daily])[0];
+    expect(withinGrace.lamp).toBe("green");
+    expect(statusDot(withinGrace)).toBe("yellow");
+
+    const oneDay = summarizeTasks([log("2026-11-27T07:40:00+09:00", "エラー")], [], new Date("2026-11-28T08:41:00+09:00"), [daily])[0];
+    expect(oneDay.lateDays).toBe(1);
+    expect(oneDay.lamp).toBe("green");
+    expect(statusDot(oneDay)).toBe("yellow");
+
+    const stopped = summarizeTasks([log("2026-11-27T07:40:00+09:00", "停止")], [], new Date("2026-11-27T08:41:00+09:00"), [daily])[0];
+    expect(stopped.lamp).toBe("green");
+    expect(statusDot(stopped)).toBe("green");
+
+    const okLate = summarizeTasks([log("2026-11-27T07:39:00+09:00", "成功")], [], new Date("2026-11-28T08:31:00+09:00"), [daily])[0];
+    expect(statusDot(okLate)).toBe("green");
+
+    const red = summarizeTasks([log("2026-11-27T07:40:00+09:00", "エラー")], [], new Date("2026-11-30T08:41:00+09:00"), [daily])[0];
+    expect(red.lamp).toBe("red");
+    expect(statusDot(red)).toBe("red");
+  });
   it("日時の書き方が混ざっても（+09:00 と UTC）時刻の順で最新を選ぶ", () => {
     const hpb = TASKS.find((t) => t.name === "HPBブログ 予約登録")!;
     // 20:10 にエラー（+09:00）、23:50 に再試行して成功（UTC で 14:50Z）
@@ -206,6 +234,8 @@ describe("自動タスク先頭の帯", () => {
     expect(src).not.toContain("記録をまだ書いていない");
     expect(src).not.toContain("OTHER_TASKS");
     expect(src).toContain('data-testid="tasks-recent"');
+    expect(src).toContain("statusDot");
+    expect(src).toContain("text-red-700");
   });
 
   it("取り込みが止まっていれば赤のまま", () => {

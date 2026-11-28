@@ -43,17 +43,17 @@ export function openedByMonth(storeName: string, ym: string): boolean {
 }
 
 /**
- * HPB掲載費を選択期間の日数で按分して返す（2026-11-28 点検の提案・林さんの了承待ち）。
- * 月額 × (その月のうち期間に入っている日数 ÷ その月の日数) を、掲載している月だけ足す。
- * 暦の1か月をまるごと選んだときは今までどおり月額ちょうどになる。
- * 「過去30日（10/29〜11/27）」のように月をまたぐと、今までは2か月分（¥110,000）を足していた。
- * start: "" = すべての月を計上、"YYYY-MM" = その月から計上
+ * since〜until の各月を、その月の日数と期間に入っている日数つきで渡す。
+ * HPB掲載費と新規売上は同じ割合で按分する（ここを共有してずれないようにする）。
  */
-export function proratedMonthlyFee(fee: number, since: string, until: string, start: string): number {
-  if (!since || !until || since > until) return 0;
+function forEachMonthOverlap(
+  since: string,
+  until: string,
+  visit: (ym: string, daysInMonth: number, daysSelected: number) => void,
+): void {
+  if (!since || !until || since > until) return;
   const [sy, sm, sd] = since.split("-").map(Number);
   const [uy, um, ud] = until.split("-").map(Number);
-  let total = 0;
   let y = sy;
   let m = sm;
   for (let i = 0; i < 400 && (y < uy || (y === uy && m <= um)); i++) {
@@ -61,12 +61,39 @@ export function proratedMonthlyFee(fee: number, since: string, until: string, st
     const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
     const from = y === sy && m === sm ? sd : 1;
     const to = y === uy && m === um ? ud : days;
-    if (!start || ym >= start) total += (fee * (to - from + 1)) / days;
+    visit(ym, days, to - from + 1);
     m++;
     if (m > 12) {
       m = 1;
       y++;
     }
   }
+}
+
+/**
+ * HPB掲載費を選択期間の日数で按分して返す。
+ * 月額 × (その月のうち期間に入っている日数 ÷ その月の日数) を、掲載している月だけ足す。
+ * 暦の1か月をまるごと選んだときは月額ちょうどになる。
+ * 「過去30日（10/29〜11/27）」のように月をまたぐと、今までは2か月分（¥110,000）を足していた。
+ * start: "" = すべての月を計上、"YYYY-MM" = その月から計上
+ */
+export function proratedMonthlyFee(fee: number, since: string, until: string, start: string): number {
+  let total = 0;
+  forEachMonthOverlap(since, until, (ym, days, selected) => {
+    if (!start || ym >= start) total += (fee * selected) / days;
+  });
+  return Math.round(total);
+}
+
+/**
+ * 月ごとの金額（新規売上など）を、HPB掲載費と同じ日数の割合で按分して合計する。
+ * 暦の1か月をまるごと選んだときは、その月の金額ちょうどになる。
+ */
+export function proratedMonthlyAmounts(byMonth: Record<string, number>, since: string, until: string): number {
+  let total = 0;
+  forEachMonthOverlap(since, until, (ym, days, selected) => {
+    const amount = byMonth[ym] ?? 0;
+    if (amount) total += (amount * selected) / days;
+  });
   return Math.round(total);
 }

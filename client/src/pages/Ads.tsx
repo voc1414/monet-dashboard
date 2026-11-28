@@ -25,7 +25,7 @@ import type { Bucket, StoreRow, RegionRow, NamedRow } from "@/hooks/useAdsData";
 import { useSalonBoardStylistData, normalizeSalonBoardStore } from "@/hooks/useSalonBoardStylistData";
 import { useSalonBoardDailyNew } from "@/hooks/useSalonBoardDailyNew";
 import { useStoreNewSales } from "@/hooks/useStoreNewSales";
-import { hpbStartMonth, proratedMonthlyFee } from "@/lib/storeOpening";
+import { hpbStartMonth, proratedMonthlyAmounts, proratedMonthlyFee } from "@/lib/storeOpening";
 
 // ===== 表示ヘルパ（webapp.gs と同じ式）=====
 const yen = (n: number) => "¥" + Math.round(n).toLocaleString();
@@ -457,15 +457,21 @@ export default function Ads() {
     return { newByStore: map, totalNew: total, newLabel: label };
   }, [D, dailyNew, sbData]);
 
-  // 新規売上（サロンボード明細 store_newsales）を選択期間で店舗別に合算（ROAS用の分子）
+  // 新規売上（サロンボード明細 store_newsales）を店舗別・月別に集め、HPB費用と同じ日数按分で合計する（ROASの分子）。
+  // 暦の1か月を選んだときは月次の金額そのまま。月をまたぐ「過去30日」は、各月の値をその月に入る日数で割る。
   const newSalesByStore = useMemo(() => {
     const map: Record<string, number> = {};
     if (!D) return map;
-    const monthSet = new Set(monthsBetween(D.period.since, D.period.until));
+    const byKey = new Map<string, Record<string, number>>();
     for (const r of newSalesData) {
-      if (!monthSet.has(r.yearMonth)) continue;
       const key = canonicalStore(r.storeName);
-      map[key] = (map[key] || 0) + r.newSales;
+      const months = byKey.get(key) ?? {};
+      months[r.yearMonth] = (months[r.yearMonth] || 0) + r.newSales;
+      byKey.set(key, months);
+    }
+    for (const [key, months] of byKey) {
+      const v = proratedMonthlyAmounts(months, D.period.since, D.period.until);
+      if (v > 0) map[key] = v;
     }
     return map;
   }, [D, newSalesData]);
@@ -662,7 +668,7 @@ export default function Ads() {
               数字の定義
             </summary>
             <p className="pb-4 [word-break:auto-phrase] [text-wrap:pretty]">
-            出典: Meta広告データ（SyncWith）＋ L Message 流入タグ。過去7日・過去30日・過去3ヶ月・過去6ヶ月は昨日まで（当日はまだ増える途中のため含めない）。今月は当月1日から今日まで。CPL警告しきい値=集客¥350超・求人¥3,000超、CTR=集客3%未満・求人2%未満で赤表示。LINE登録数は流入タグ友だちの期間内増分。「新規（新規来店数）」はサロンボード実績。日次データ(daily_new)があれば選択期間に厳密一致で合算、未反映の間は月次(該当月計)にフォールバック（KPIの注記に出所と範囲を表示）。HPB費用=月額¥55,000×選択期間のうちその店が掲載している月数（開店前で未掲載の店は0）。CPA=(集客広告費+HPB費用)÷新規来店数、ROAS=新規売上÷(集客広告費+HPB費用)。CPL（リード単価）は広告費のみ。集計値のみで個人情報は含みません。
+            出典: Meta広告データ（SyncWith）＋ L Message 流入タグ。過去7日・過去30日・過去3ヶ月・過去6ヶ月は昨日まで（当日はまだ増える途中のため含めない）。今月は当月1日から今日まで。CPL警告しきい値=集客¥350超・求人¥3,000超、CTR=集客3%未満・求人2%未満で赤表示。LINE登録数は流入タグ友だちの期間内増分。「新規（新規来店数）」はサロンボード実績。日次データ(daily_new)があれば選択期間に厳密一致で合算、未反映の間は月次(該当月計)にフォールバック（KPIの注記に出所と範囲を表示）。HPB費用=月額¥55,000を、選択期間のうちその店が掲載している月だけ日数按分する（暦の1か月ちょうどなら月額。開店前で未掲載の店は0）。新規売上も同じ日数按分（暦の1か月ちょうどなら月次の金額そのまま）。CPA=(集客広告費+HPB費用)÷新規来店数、ROAS=按分後の新規売上÷(集客広告費+按分後のHPB費用)。CPL（リード単価）は広告費のみ。集計値のみで個人情報は含みません。
             </p>
           </details>
         </motion.div>
