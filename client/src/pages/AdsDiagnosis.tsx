@@ -8,6 +8,7 @@ import { ChevronRight } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
 import {
   CURRENT_ADS_DIAGNOSIS,
+  snapshotFixedLabel,
   storesInGradeOrder,
   type DiagnosisGrade,
   type DiagnosisStore,
@@ -137,9 +138,10 @@ export default function AdsDiagnosis() {
       <div className="space-y-4">
         <div>
           <h1 className="text-xl font-bold text-foreground">集客広告 店舗診断</h1>
-          <p className="mt-1 text-xs text-muted-foreground">
-            広告 {d.periodAds} ／ 空き枠 {d.periodSlots}
+          <p className="mt-1 text-sm font-semibold text-foreground" data-testid="diagnosis-fixed-label">
+            {snapshotFixedLabel(d)}
           </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">空き枠 {d.periodSlots}</p>
         </div>
 
         <section className="rounded-2xl border border-border/60 bg-white p-4 shadow-sm" data-testid="diagnosis-totals">
