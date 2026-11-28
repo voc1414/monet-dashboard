@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { CURRENT_ADS_DIAGNOSIS, storesInGradeOrder } from "../client/src/data/adsDiagnosis";
-import { DIAGNOSIS_VISIT_ROWS } from "../client/src/data/adsDiagnosis/visitRows";
+import { shukyakuSpendByStore } from "../client/src/data/adsDiagnosis/metaAdsets";
 import { STORE_MASTER } from "../client/src/data/storeMaster";
 import {
+  beforeOpening,
   diagnosisNewVisits,
   diagnosisPendingLines,
   diagnosisSlots,
@@ -24,12 +25,11 @@ describe("診断と広告の数値の抜け", () => {
     expect(kasuga.newVisits).toBeNull();
     expect(kasuga.grade).toBe("C");
     expect(kasuga.action).toBe("問題なし");
-    expect(DIAGNOSIS_VISIT_ROWS).toEqual([]);
 
     const empty = diagnosisNewVisits({
       storeName: "春日",
       snapshot: kasuga.newVisits,
-      rows: DIAGNOSIS_VISIT_ROWS,
+      rows: [],
       since: period.since,
       until: period.until,
     });
@@ -42,6 +42,7 @@ describe("診断と広告の数値の抜け", () => {
       { store: "春日院", date: "2026-11-26", newCount: 4 },
       { store: "春日院", date: "2026-11-27", newCount: 100 },
       { store: "堀江院", date: "2026-11-09", newCount: 50 },
+      { store: "monet 白髪染めと髪質改善のサロン 春日院【モネ】", date: "2026-11-10", newCount: 1 },
     ];
     const filled = diagnosisNewVisits({
       storeName: "春日",
@@ -51,7 +52,7 @@ describe("診断と広告の数値の抜け", () => {
       until: period.until,
     });
     const expected = sumVisitsInRange(rows, "春日", period.since, period.until)!;
-    expect(expected.total).toBe(2 + 3 + 4);
+    expect(expected.total).toBe(2 + 3 + 4 + 1);
     expect(expected.first).toBe("2026-11-09");
     expect(filled.text).toBe(String(expected.total));
     expect(filled.note).toBe(KASUGA_PARTIAL_NOTE);
@@ -83,41 +84,60 @@ describe("診断と広告の数値の抜け", () => {
     expect(honSlots.note).toContain("未掲載");
   });
 
-  it("本通の新規来店は開店日前なので確認中。判定は変えない", () => {
+  it("本通・高崎・芦屋は開店前。春日は営業中。判定の記録は変えない", () => {
+    expect(beforeOpening("本通", period.until)).toBe(true);
+    expect(beforeOpening("本通院", period.until)).toBe(true);
+    expect(beforeOpening("高崎院", period.until)).toBe(true);
+    expect(beforeOpening("芦屋", period.until)).toBe(true);
+    expect(beforeOpening("春日", period.until)).toBe(false);
+    expect(beforeOpening("堀江院", period.until)).toBe(false);
     const hon = CURRENT_ADS_DIAGNOSIS.stores.find((s) => s.name === "本通")!;
+    expect(hon.grade).toBe("C");
+    expect(hon.newVisits).toBeNull();
     const master = STORE_MASTER.find((s) => s.name === "本通院")!;
     expect(master.openedOn! > period.until).toBe(true);
-    const shown = diagnosisNewVisits({
-      storeName: "本通",
-      snapshot: hon.newVisits,
-      rows: [],
-      since: period.since,
-      until: period.until,
-    });
-    expect(hon.newVisits).toBeNull();
-    expect(hon.grade).toBe("C");
-    expect(shown.text).toBe(PENDING_LABEL);
-    expect(shown.note).toContain(master.openedOn);
   });
 
-  it("確認中の一覧は抜けだけ。広告費の端数は合計を書き換えない", () => {
-    const lines = diagnosisPendingLines(
+  it("営業中の確認中は春日の日次が無いときだけ。広告費は広告セットの合計と一致する", () => {
+    const withoutRows = diagnosisPendingLines(
       CURRENT_ADS_DIAGNOSIS.stores,
-      DIAGNOSIS_VISIT_ROWS,
+      [],
       period.since,
       period.until,
       CURRENT_ADS_DIAGNOSIS.totals.spendYen,
     );
-    expect(lines.some((line) => line.startsWith("春日の新規来店") && line.includes(KASUGA_PENDING_NOTE))).toBe(true);
-    expect(lines.some((line) => line.startsWith("本通の新規来店") && line.includes("開店前"))).toBe(true);
-    expect(lines.some((line) => line.startsWith("本通の空き枠") && line.includes("未掲載"))).toBe(true);
-    expect(lines.some((line) => line.includes("堀江の新規来店"))).toBe(false);
-    expect(lines.some((line) => line.includes("堀江2ndの空き枠"))).toBe(false);
+    expect(withoutRows.some((line) => line.startsWith("春日の新規来店") && line.includes(KASUGA_PENDING_NOTE))).toBe(true);
+    expect(withoutRows.some((line) => line.includes("本通"))).toBe(false);
+    expect(withoutRows.some((line) => line.includes("ずれる"))).toBe(false);
 
+    const withRows = diagnosisPendingLines(
+      CURRENT_ADS_DIAGNOSIS.stores,
+      [{ store: "春日院", date: "2026-11-09", newCount: 2 }],
+      period.since,
+      period.until,
+      CURRENT_ADS_DIAGNOSIS.totals.spendYen,
+    );
+    expect(withRows).toEqual([]);
+
+    const meta = shukyakuSpendByStore();
+    expect(meta.unassigned).toBe(0);
+    expect(meta.total).toBe(CURRENT_ADS_DIAGNOSIS.totals.spendYen);
+    const funnel: Record<string, number> = {
+      福島: 90205,
+      高槻: 45083,
+      春日: 79873,
+      姪浜: 51426,
+      土橋: 45052,
+      下伊福: 41077,
+    };
+    let roundedOff = 0;
+    for (const store of CURRENT_ADS_DIAGNOSIS.stores) {
+      expect(store.spendYen).toBe(meta.byStore[store.name]);
+      if (funnel[store.name] != null) roundedOff += store.spendYen - funnel[store.name];
+    }
+    expect(roundedOff).toBe(17);
     const storeSum = CURRENT_ADS_DIAGNOSIS.stores.reduce((sum, store) => sum + store.spendYen, 0);
-    expect(storeSum).not.toBe(CURRENT_ADS_DIAGNOSIS.totals.spendYen);
-    expect(lines.some((line) => line.includes(formatYen(storeSum).text) && line.includes(formatYen(CURRENT_ADS_DIAGNOSIS.totals.spendYen).text))).toBe(true);
-    expect(CURRENT_ADS_DIAGNOSIS.totals.spendYen).toBe(587529);
+    expect(storeSum).toBe(meta.total);
     expect(storesInGradeOrder(CURRENT_ADS_DIAGNOSIS.stores).map((s) => s.grade).join("")).toBe("AAABBBBCCCC");
     for (const store of CURRENT_ADS_DIAGNOSIS.stores) {
       expect(store.action).not.toContain(PENDING_LABEL);
@@ -165,12 +185,28 @@ describe("診断と広告の数値の抜け", () => {
 
     const unopened = storeMetricTexts({
       name: "本通院",
-      spend: 10,
-      line: 2,
+      spend: 54376,
+      line: 185,
       newVisits: null,
       periodUntil: period.until,
+      beforeOpening: true,
     });
-    expect(unopened.newVisits.text).toBe(PENDING_LABEL);
-    expect(unopened.newVisits.note).toContain("開店前");
+    expect(unopened.spend.text).toBe("¥54,376");
+    expect(unopened.line.text).toBe("185");
+    expect(unopened.newVisits.text).toBe("—");
+    expect(unopened.gaps).toEqual([]);
+
+    const undecided = storeMetricTexts({
+      name: "高崎院",
+      spend: 0,
+      line: null,
+      newVisits: null,
+      periodUntil: period.until,
+      beforeOpening: true,
+    });
+    expect(undecided.spend.text).toBe("¥0");
+    expect(undecided.line.text).toBe("—");
+    expect(undecided.newVisits.text).toBe("—");
+    expect(undecided.gaps).toEqual([]);
   });
 });

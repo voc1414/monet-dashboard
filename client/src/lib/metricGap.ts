@@ -4,6 +4,7 @@
  * 判定（A/B/C）はここでは扱わない。
  */
 import { STORE_MASTER } from "@/data/storeMaster";
+import { storeNameFromMaster } from "@/lib/storeNameFromMaster";
 
 export const PENDING_LABEL = "確認中";
 
@@ -22,8 +23,12 @@ export interface VisitRow {
   newCount: number;
 }
 
+export const BEFORE_OPENING_LABEL = "開店前";
+
+/** サロンボードの長い店名も、診断の短い店名も、同じキーに畳む。 */
 export function storeKey(name: string): string {
-  return (name || "").replace(/院/g, "").replace(/[\s　]/g, "");
+  const folded = storeNameFromMaster(name) || name || "";
+  return folded.replace(/院/g, "").replace(/[\s　]/g, "");
 }
 
 function monthDay(ymd: string): string {
@@ -74,6 +79,15 @@ export function sumVisitsInRange(
 function masterOf(storeName: string) {
   const key = storeKey(storeName);
   return STORE_MASTER.find((s) => storeKey(s.name) === key) ?? null;
+}
+
+/** 開店日が期間の終わりより後、または未定。asOf が空なら判定しない。 */
+export function beforeOpening(name: string, asOf: string): boolean {
+  if (!asOf) return false;
+  const master = masterOf(name);
+  if (!master) return false;
+  if (!master.openedOn) return true;
+  return master.openedOn > asOf;
 }
 
 function missingVisitNote(storeName: string, until: string, where: "snapshot" | "live"): string {
@@ -145,6 +159,8 @@ export interface StoreMetricInput {
   /** 日次・月次のどちらにも無い店は null。0 は来店 0。 */
   newVisits: number | null;
   periodUntil: string;
+  /** 開店前の店は、無い新規来店・LINEを確認中にしない */
+  beforeOpening?: boolean;
 }
 
 export interface StoreGap {
@@ -175,23 +191,27 @@ export function storeMetricTexts(input: StoreMetricInput): {
   } else {
     lineUnit = formatYen(input.spend / input.line);
   }
+  const blank: MetricText = { text: "—", note: null };
   const newVisits =
     input.newVisits != null && Number.isFinite(input.newVisits)
       ? formatCount(input.newVisits)
-      : { text: PENDING_LABEL, note: missingVisitNote(input.name, input.periodUntil, "live") };
+      : input.beforeOpening
+        ? blank
+        : { text: PENDING_LABEL, note: missingVisitNote(input.name, input.periodUntil, "live") };
+  const lineShown = input.beforeOpening && line.text === PENDING_LABEL ? blank : line;
+  const unitShown = input.beforeOpening && lineUnit.text === PENDING_LABEL ? blank : lineUnit;
   const gaps: StoreGap[] = [];
   const push = (metric: StoreGap["metric"], value: MetricText) => {
-    if (value.text === PENDING_LABEL && value.note) gaps.push({ store: input.name, metric, note: value.note });
+    if (!input.beforeOpening && value.text === PENDING_LABEL && value.note) {
+      gaps.push({ store: input.name, metric, note: value.note });
+    }
   };
   push("広告費", spend);
-  push("LINE登録", line);
-  push("LINE登録単価", lineUnit);
+  push("LINE登録", lineShown);
+  push("LINE登録単価", unitShown);
   push("新規来店", newVisits);
-  return { spend, line, lineUnit, newVisits, gaps };
+  return { spend, line: lineShown, lineUnit: unitShown, newVisits, gaps };
 }
-
-/** 広告ページの取得データには空き枠が無い。診断の固定値とは別。 */
-export const ADS_SLOTS_PENDING_NOTE = "広告ページの取得データに空き枠は無い";
 
 export interface DiagnosisMetricStore {
   name: string;
@@ -221,9 +241,11 @@ export function diagnosisPendingLines(
   since: string,
   until: string,
   totalSpendYen: number,
+  visitsReady = true,
 ): string[] {
   const lines: string[] = [];
   for (const store of stores) {
+    if (beforeOpening(store.name, until)) continue;
     const spend = formatYen(store.spendYen);
     const line = formatCount(store.lineReg);
     const unit = diagnosisLineUnit(store.spendYen, store.lineReg, store.costPerRegYen);
@@ -243,6 +265,7 @@ export function diagnosisPendingLines(
       ["空き枠", slots],
     ];
     for (const [metric, value] of parts) {
+      if (!visitsReady && metric === "新規来店") continue;
       if (value.text === PENDING_LABEL) {
         lines.push(`${store.name}の${metric}：${PENDING_LABEL}（${value.note ?? "数値が無い"}）`);
       }
@@ -251,7 +274,7 @@ export function diagnosisPendingLines(
   const gap = spendRemainder(stores, totalSpendYen);
   if (gap) {
     lines.push(
-      `全店の広告費 ${formatYen(gap.total).text} と、院ごとの広告費を足した ${formatYen(gap.storeSum).text} は ${formatYen(Math.abs(gap.diff)).text} ずれる。合計は診断の記載のまま`,
+      `全店の広告費 ${formatYen(gap.total).text} と、営業中の院の広告費を足した ${formatYen(gap.storeSum).text} は ${formatYen(Math.abs(gap.diff)).text} ずれる`,
     );
   }
   return lines;

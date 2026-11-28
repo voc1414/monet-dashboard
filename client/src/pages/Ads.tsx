@@ -29,7 +29,8 @@ import { hpbStartMonth, proratedMonthlyAmounts, proratedMonthlyFee } from "@/lib
 import { newVisitCoverage, type NewVisitCoverage } from "@/lib/newVisitCoverage";
 import { CURRENT_ADS_DIAGNOSIS } from "@/data/adsDiagnosis";
 import {
-  ADS_SLOTS_PENDING_NOTE,
+  beforeOpening,
+  BEFORE_OPENING_LABEL,
   diagnosisSlots,
   formatCount,
   formatYen,
@@ -243,6 +244,9 @@ function MetricTable({
   const newVisitsKnown = rows.some((row) => newOf(row.name) != null);
 
   const firstCol = firstColLabel || (typeKey === "shukyaku" ? "店舗" : "エリア");
+  const openRows = rows.filter((row) => !beforeOpening(row.name, periodUntil ?? ""));
+  const earlyRows = rows.filter((row) => beforeOpening(row.name, periodUntil ?? ""));
+  const ordered = [...openRows, ...earlyRows];
   return (
     <div className="rounded-2xl border border-border/60 bg-white/70 shadow-sm overflow-hidden">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-border/50">
@@ -277,8 +281,9 @@ function MetricTable({
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => {
+            {ordered.map((r) => {
               const b = r.bucket;
+              const early = beforeOpening(r.name, periodUntil ?? "");
               const cplV = cpl(b.spend, b.lead);
               const ctrV = ctr(b.click, b.impr);
               const line = showLine
@@ -290,9 +295,10 @@ function MetricTable({
                 line: showLine ? line : 0,
                 newVisits: showNew ? newOf(r.name) : 0,
                 periodUntil: periodUntil ?? "",
+                beforeOpening: early,
               });
               return (
-                <tr key={r.name} className="border-b border-border/30">
+                <tr key={r.name} className={`border-b border-border/30 ${early ? "text-muted-foreground" : ""}`}>
                   <td className="text-left px-3 py-2 font-medium text-foreground">
                     {r.kubun && (
                       <span
@@ -304,6 +310,9 @@ function MetricTable({
                       </span>
                     )}
                     {r.name}
+                    {early && (
+                      <span className="ml-1.5 text-[10px] font-medium text-muted-foreground">{BEFORE_OPENING_LABEL}</span>
+                    )}
                   </td>
                   <td className="text-right px-3 py-2 tabular-nums">{b.dailyBudget && b.dailyBudget > 0 ? yen(b.dailyBudget) : "—"}</td>
                   <td className="text-right px-3 py-2 tabular-nums">{metrics.spend.text === PENDING_LABEL ? <PendingCell text={metrics.spend.text} note={metrics.spend.note} /> : metrics.spend.text}</td>
@@ -408,18 +417,20 @@ function MetricTable({
 
 function AdsPendingNote({ gaps }: { gaps: string[] }) {
   const slots = CURRENT_ADS_DIAGNOSIS.stores.map((store) => {
+    if (beforeOpening(store.name, parseDiagnosisUntil())) {
+      return `${store.name}：${BEFORE_OPENING_LABEL}`;
+    }
     const shown = diagnosisSlots(store);
-    const body = shown.text === PENDING_LABEL ? `${PENDING_LABEL}（${shown.note ?? "数値が無い"}）` : shown.text;
-    return `${store.name}：${body}`;
+    return `${store.name}：${shown.text}`;
   });
+  const title = gaps.length > 0 ? `確認中 ${gaps.length}・空き枠` : "空き枠";
   return (
     <details className="group mt-2" data-testid="ads-pending">
       <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded border border-border bg-muted/40 px-1.5 py-0.5 text-xs font-semibold text-muted-foreground [&::-webkit-details-marker]:hidden">
         <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90" aria-hidden />
-        確認中・空き枠
+        {title}
       </summary>
       <div className="mt-1 max-w-full space-y-2 pl-4 text-xs text-foreground/80 [word-break:auto-phrase] [text-wrap:pretty]">
-        <p>空き枠：{PENDING_LABEL}（{ADS_SLOTS_PENDING_NOTE}）</p>
         {gaps.length > 0 && (
           <ul className="space-y-0.5">
             {gaps.map((line) => (
@@ -427,7 +438,7 @@ function AdsPendingNote({ gaps }: { gaps: string[] }) {
             ))}
           </ul>
         )}
-        <p>診断画面の空き枠（{CURRENT_ADS_DIAGNOSIS.periodSlots}の固定値）</p>
+        <p>空き枠は広告の取得データには無い。診断の固定値（{CURRENT_ADS_DIAGNOSIS.periodSlots}）</p>
         <ul className="space-y-0.5">
           {slots.map((line) => (
             <li key={line}>{line}</li>
@@ -436,6 +447,10 @@ function AdsPendingNote({ gaps }: { gaps: string[] }) {
       </div>
     </details>
   );
+}
+
+function parseDiagnosisUntil(): string {
+  return CURRENT_ADS_DIAGNOSIS.periodAds.match(/\d{4}-\d{2}-\d{2}/g)?.[1] ?? "";
 }
 
 function NewVisitCoverageNote({ gaps }: { gaps: NewVisitCoverage[] }) {
@@ -589,6 +604,7 @@ export default function Ads() {
     if (!D) return [] as string[];
     return storeRows.flatMap((row) => {
       const line = lookupStoreLine(row.name, D.lmessage.byStoreShort);
+      if (beforeOpening(row.name, D.period.until)) return [];
       const visits = newByStore[canonicalStore(row.name)];
       return storeMetricTexts({
         name: row.name,
