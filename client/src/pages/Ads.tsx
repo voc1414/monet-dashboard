@@ -25,7 +25,7 @@ import type { Bucket, StoreRow, RegionRow, NamedRow } from "@/hooks/useAdsData";
 import { useSalonBoardStylistData, normalizeSalonBoardStore } from "@/hooks/useSalonBoardStylistData";
 import { useSalonBoardDailyNew } from "@/hooks/useSalonBoardDailyNew";
 import { useStoreNewSales } from "@/hooks/useStoreNewSales";
-import { hpbStartMonth } from "@/lib/storeOpening";
+import { hpbStartMonth, proratedMonthlyFee } from "@/lib/storeOpening";
 
 // ===== 表示ヘルパ（webapp.gs と同じ式）=====
 const yen = (n: number) => "¥" + Math.round(n).toLocaleString();
@@ -470,17 +470,16 @@ export default function Ads() {
     return map;
   }, [D, newSalesData]);
 
-  // HPB費用: 月額¥55,000 × 選択期間のうち「その店が掲載している月」の数。
+  // HPB費用: 月額¥55,000 を選択期間の日数で按分し、「その店が掲載している月」だけ足す（2026-11-28）。
+  // 暦の1か月を選べば月額ちょうど。月をまたぐ「過去30日」でも約1か月分になる（以前は2か月分を足していた）。
   // 開店前で未掲載の店は0になる（集客のCPA/ROAS分母に加算。求人は対象外）
   const hpbCostOf = useMemo(() => {
     if (!D) return () => 0;
-    const months = monthsBetween(D.period.since, D.period.until);
     return (storeName: string) => {
       // 開始月は手書きの表 → 店舗マスタの開店日の順で決める。開店日未定の店は計上しない
       const start = hpbStartMonth(storeName, HPB_START_MONTH, canonicalStore);
       if (start === null) return 0;
-      const billed = start ? months.filter((m) => m >= start).length : months.length;
-      return HPB_MONTHLY_FEE * billed;
+      return proratedMonthlyFee(HPB_MONTHLY_FEE, D.period.since, D.period.until, start);
     };
   }, [D]);
 

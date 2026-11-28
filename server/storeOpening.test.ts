@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { hpbStartMonth, openedByMonth } from "@/lib/storeOpening";
+import { hpbStartMonth, openedByMonth, proratedMonthlyFee } from "@/lib/storeOpening";
 
 const key = (n: string) => n.replace(/院/g, "").replace(/[\s　]/g, "");
 const TABLE = { "下伊福院": "2026-08", "岡本院": "2026-09" };
@@ -35,5 +35,20 @@ describe("その月までに開店していた店か（店舗一覧の表示）"
   it("開店日未定は出さない・マスタに無い店は今までどおり出す", () => {
     expect(openedByMonth("高崎院", "2026-11")).toBe(false);
     expect(openedByMonth("どこか院", "2026-11")).toBe(true);
+  });
+});
+
+describe("HPB掲載費の日数按分（提案）", () => {
+  it("暦の1か月は月額ちょうど", () => {
+    expect(proratedMonthlyFee(55000, "2026-10-01", "2026-10-31", "")).toBe(55000);
+    expect(proratedMonthlyFee(55000, "2026-02-01", "2026-02-28", "")).toBe(55000);
+  });
+  it("月をまたぐ30日は約1か月分（2か月分にしない）", () => {
+    // 10/29〜10/31 = 3/31、11/1〜11/27 = 27/30
+    expect(proratedMonthlyFee(55000, "2026-10-29", "2026-11-27", "")).toBe(Math.round(55000 * 3 / 31 + 55000 * 27 / 30));
+  });
+  it("開始月より前は計上しない", () => {
+    expect(proratedMonthlyFee(55000, "2026-10-29", "2026-11-27", "2026-11")).toBe(49500);
+    expect(proratedMonthlyFee(55000, "2026-10-29", "2026-11-27", "2026-12")).toBe(0);
   });
 });

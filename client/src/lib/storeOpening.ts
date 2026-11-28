@@ -41,3 +41,32 @@ export function openedByMonth(storeName: string, ym: string): boolean {
   if (!master.openedOn) return false;
   return master.openedOn <= `${ym}-31`;
 }
+
+/**
+ * HPB掲載費を選択期間の日数で按分して返す（2026-11-28 点検の提案・林さんの了承待ち）。
+ * 月額 × (その月のうち期間に入っている日数 ÷ その月の日数) を、掲載している月だけ足す。
+ * 暦の1か月をまるごと選んだときは今までどおり月額ちょうどになる。
+ * 「過去30日（10/29〜11/27）」のように月をまたぐと、今までは2か月分（¥110,000）を足していた。
+ * start: "" = すべての月を計上、"YYYY-MM" = その月から計上
+ */
+export function proratedMonthlyFee(fee: number, since: string, until: string, start: string): number {
+  if (!since || !until || since > until) return 0;
+  const [sy, sm, sd] = since.split("-").map(Number);
+  const [uy, um, ud] = until.split("-").map(Number);
+  let total = 0;
+  let y = sy;
+  let m = sm;
+  for (let i = 0; i < 400 && (y < uy || (y === uy && m <= um)); i++) {
+    const ym = `${y}-${String(m).padStart(2, "0")}`;
+    const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    const from = y === sy && m === sm ? sd : 1;
+    const to = y === uy && m === um ? ud : days;
+    if (!start || ym >= start) total += (fee * (to - from + 1)) / days;
+    m++;
+    if (m > 12) {
+      m = 1;
+      y++;
+    }
+  }
+  return Math.round(total);
+}
