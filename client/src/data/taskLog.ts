@@ -2,9 +2,44 @@
 import type { TaskLogEntry } from "@/lib/taskSummary";
 
 /** この写しを作った時刻。画面の判定はこの時刻を「いま」として行う */
-export const TASK_LOG_SYNCED_AT = "2026-11-27T21:35:18.261Z";
+export const TASK_LOG_SYNCED_AT = "2026-11-28T06:57:44.633Z";
 
 export const TASK_LOG: TaskLogEntry[] = [
+  {
+    "at": "2026-11-28T14:05:00.000+09:00",
+    "task": "ブログ公開",
+    "result": "成功",
+    "count": 3,
+    "reason": "11/5高槻・11/20下伊福・11/27岡本の欠落分を復旧公開（1808/1887/1929）"
+  },
+  {
+    "at": "2026-11-28T13:30:00.000+09:00",
+    "task": "口コミ返信",
+    "result": "成功",
+    "count": null,
+    "reason": ""
+  },
+  {
+    "at": "2026-11-28T13:30:00.000+09:00",
+    "task": "ブログ公開",
+    "result": "成功",
+    "count": 1,
+    "reason": ""
+  },
+  {
+    "at": "2026-11-28T13:30:00.000+09:00",
+    "task": "L Message集計",
+    "result": "成功",
+    "count": 24,
+    "reason": ""
+  },
+  {
+    "at": "2026-11-28T07:42:00.000+09:00",
+    "task": "サロンボード取得",
+    "result": "要確認",
+    "count": 15,
+    "reason": "月別集計取得スキップ/失敗/タイムアウト：store_official.csv は前回値のまま"
+  },
   {
     "at": "2026-11-28T06:00:00.000+09:00",
     "task": "HPBブログ 原稿づくり",
