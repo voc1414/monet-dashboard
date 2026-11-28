@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CURRENT_ADS_DIAGNOSIS, storesInGradeOrder } from "../client/src/data/adsDiagnosis";
+import { CURRENT_ADS_DIAGNOSIS, snapshotFixedLabel, storesInGradeOrder } from "../client/src/data/adsDiagnosis";
 
 describe("集客広告 店舗診断 2026-11-27", () => {
   const stores = storesInGradeOrder(CURRENT_ADS_DIAGNOSIS.stores);
@@ -29,6 +29,17 @@ describe("集客広告 店舗診断 2026-11-27", () => {
     for (const store of stores) {
       expect(store.action).not.toContain("確認中");
     }
+  });
+
+  it("見出しは期間と取得日の固定値で、ライブの広告ページと区別できる", () => {
+    expect(snapshotFixedLabel(CURRENT_ADS_DIAGNOSIS)).toBe("10/28〜11/26の固定値（11/27取得）");
+    expect(
+      snapshotFixedLabel({
+        id: "custom",
+        periodAds: "2026-10-28〜2026-11-26",
+        sources: [{ id: "meta", label: "Meta", fetchedAt: "2026-11-27 15:05" }],
+      }),
+    ).toBe("10/28〜11/26の固定値（11/27取得）");
   });
 
   it("全店合計は診断の記載どおり", () => {

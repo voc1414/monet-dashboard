@@ -7,7 +7,7 @@
  */
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Megaphone, Loader2, AlertTriangle, Calendar } from "lucide-react";
+import { Megaphone, Loader2, AlertTriangle, Calendar, ChevronRight } from "lucide-react";
 import { Select as UiSelect, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   LineChart,
@@ -26,6 +26,7 @@ import { useSalonBoardStylistData, normalizeSalonBoardStore } from "@/hooks/useS
 import { useSalonBoardDailyNew } from "@/hooks/useSalonBoardDailyNew";
 import { useStoreNewSales } from "@/hooks/useStoreNewSales";
 import { hpbStartMonth, proratedMonthlyAmounts, proratedMonthlyFee } from "@/lib/storeOpening";
+import { newVisitCoverage, type NewVisitCoverage } from "@/lib/newVisitCoverage";
 
 // ===== 表示ヘルパ（webapp.gs と同じ式）=====
 const yen = (n: number) => "¥" + Math.round(n).toLocaleString();
@@ -166,6 +167,7 @@ function MetricTable({
   newByStore,
   newSalesByStore,
   hpbCostOf,
+  newVisitNoteOf,
   firstColLabel,
 }: {
   typeKey: TypeKey;
@@ -178,6 +180,8 @@ function MetricTable({
   newSalesByStore?: Record<string, number>;
   /** HPB費用を店舗名から返す（掲載開始月より前の月は計上しない）。集客の店舗別テーブルのみ。CPA/ROASの分母に加算 */
   hpbCostOf?: (storeName: string) => number;
+  /** その店の新規来店が選択期間の全日ぶん無いとき、注意文。全日そろっている店は null */
+  newVisitNoteOf?: (storeName: string) => string | null;
   firstColLabel?: string;
 }) {
   const showLine = typeKey === "shukyaku" ? !!byStore : !!byRegion;
@@ -278,7 +282,17 @@ function MetricTable({
                     <td className="text-right px-3 py-2 tabular-nums font-medium text-foreground">
                       {(() => {
                         const nv = newOf(r.name);
-                        return nv != null ? numf(nv) : "—";
+                        const note = newVisitNoteOf?.(r.name) ?? null;
+                        return (
+                          <span className="inline-flex items-center justify-end gap-1">
+                            {nv != null ? numf(nv) : "—"}
+                            {note && (
+                              <span className="text-amber-600" title={note} aria-label={note}>
+                                <AlertTriangle className="w-3 h-3" aria-hidden />
+                              </span>
+                            )}
+                          </span>
+                        );
                       })()}
                     </td>
                   )}
@@ -344,6 +358,26 @@ function MetricTable({
         </table>
       </div>
     </div>
+  );
+}
+
+function NewVisitCoverageNote({ gaps }: { gaps: NewVisitCoverage[] }) {
+  if (gaps.length === 0) return null;
+  return (
+    <details className="group mt-2" data-testid="new-visit-coverage">
+      <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-700 [&::-webkit-details-marker]:hidden">
+        <AlertTriangle className="h-3 w-3" aria-hidden />
+        新規来店：{gaps.length}店で日数が足りません
+        <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90" aria-hidden />
+      </summary>
+      <ul className="mt-1 max-w-full space-y-0.5 pl-4 text-xs font-medium text-amber-800 [word-break:auto-phrase] [text-wrap:pretty]">
+        {gaps.map((g) => (
+          <li key={g.store}>
+            {g.store}：{g.message}
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 
@@ -420,10 +454,10 @@ export default function Ads() {
 
   // 新規来店数（サロンボード）。日次タブ daily_new があれば選択期間に「厳密一致」で合算（推奨）。
   // 未生成の間は月次 stylist_flat にフォールバック（選択期間に重なる月を合算＝該当月計）。
-  const { newByStore, totalNew, newLabel } = useMemo(() => {
+  const { newByStore, totalNew, newLabel, usingDaily } = useMemo(() => {
     const map: Record<string, number> = {};
     let total = 0;
-    if (!D) return { newByStore: map, totalNew: 0, newLabel: "サロンボード" };
+    if (!D) return { newByStore: map, totalNew: 0, newLabel: "サロンボード", usingDaily: false };
     const since = D.period.since;
     const until = D.period.until;
     // 日次（厳密）優先
@@ -437,7 +471,7 @@ export default function Ads() {
       }
     }
     if (dailyHit) {
-      return { newByStore: map, totalNew: total, newLabel: `サロンボード ${since}〜${until}` };
+      return { newByStore: map, totalNew: total, newLabel: `サロンボード ${since}〜${until}`, usingDaily: true };
     }
     // フォールバック: 月次（該当月計）
     const months = monthsBetween(since, until);
@@ -454,8 +488,23 @@ export default function Ads() {
         : months.length > 1
         ? `サロンボード ${months[0]}〜${months[months.length - 1]}計（月次）`
         : "サロンボード";
-    return { newByStore: map, totalNew: total, newLabel: label };
+    return { newByStore: map, totalNew: total, newLabel: label, usingDaily: false };
   }, [D, dailyNew, sbData]);
+
+  // 日次で足しているときだけ、店ごとに「期間の何日分しか無いか」を出す。
+  // 月次フォールバック中は日次の欠測を来店数の説明にしない。全日そろっている店は出さない。
+  const visitGaps = useMemo(() => {
+    if (!D || !usingDaily) return [] as NewVisitCoverage[];
+    return newVisitCoverage(
+      dailyNew.map((r) => ({ store: normalizeSalonBoardStore(r.store), date: r.date })),
+      D.period.since,
+      D.period.until,
+    );
+  }, [D, usingDaily, dailyNew]);
+  const newVisitNoteOf = useMemo(() => {
+    const by = new Map(visitGaps.map((g) => [canonicalStore(g.store), g.message]));
+    return (name: string) => by.get(canonicalStore(name)) ?? null;
+  }, [visitGaps]);
 
   // 新規売上（サロンボード明細 store_newsales）を店舗別・月別に集め、HPB費用と同じ日数按分で合計する（ROASの分子）。
   // 暦の1か月を選んだときは月次の金額そのまま。月をまたぐ「過去30日」は、各月の値をその月に入る日数で割る。
@@ -536,7 +585,7 @@ export default function Ads() {
           <Megaphone className="w-5 h-5 text-primary" />
           <h1 className="text-xl font-bold text-foreground">monet Meta広告 ダッシュボード</h1>
         </div>
-        <p className="text-sm text-muted-foreground flex items-center flex-wrap gap-x-2 gap-y-1">
+        <div className="text-sm text-muted-foreground flex items-center flex-wrap gap-x-2 gap-y-1">
           <span>{D ? `${D.period.since} 〜 ${D.period.until}` : "—"}</span>
           {latestDataDate && (
             <span className="text-xs">データ: 〜{latestDataDate}</span>
@@ -559,7 +608,8 @@ export default function Ads() {
               LINE登録データが抜けている日: {fmtMissing(missingDates.lmessage)}
             </span>
           )}
-        </p>
+        </div>
+        <NewVisitCoverageNote gaps={visitGaps} />
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Calendar className="w-4 h-4 text-muted-foreground" aria-hidden />
@@ -651,7 +701,7 @@ export default function Ads() {
           <div className="space-y-6">
             {showShukyaku &&
               (view === "store" ? (
-                <MetricTable typeKey="shukyaku" rows={storeRows} title="店舗別 一覧（直営・FC統合）" badge="集客" byStore={D.lmessage.byStoreShort} newByStore={newByStore} newSalesByStore={newSalesByStore} hpbCostOf={hpbCostOf} />
+                <MetricTable typeKey="shukyaku" rows={storeRows} title="店舗別 一覧（直営・FC統合）" badge="集客" byStore={D.lmessage.byStoreShort} newByStore={newByStore} newSalesByStore={newSalesByStore} hpbCostOf={hpbCostOf} newVisitNoteOf={newVisitNoteOf} />
               ) : (
                 <NonStoreTable typeKey="shukyaku" rows={view === "campaign" ? D.byCampaign : D.byAdset} title={view === "campaign" ? "キャンペーン別 一覧" : "広告セット別 一覧"} badge="集客" labelCol={view === "campaign" ? "キャンペーン名" : "広告セット名"} />
               ))}
