@@ -8,6 +8,7 @@ import { ChevronRight } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
 import {
   CURRENT_ADS_DIAGNOSIS,
+  lpMetricLines,
   snapshotFixedLabel,
   storesInGradeOrder,
   type DiagnosisGrade,
@@ -73,7 +74,9 @@ function Metric({
     <div className="min-w-0 py-2">
       <div className="text-[11px] text-muted-foreground">{label}</div>
       <div className="text-sm font-semibold text-foreground tabular-nums [word-break:auto-phrase]">{value}</div>
-      <div className="text-[10px] leading-snug text-muted-foreground [word-break:auto-phrase]">{source}</div>
+      {source ? (
+        <div className="text-[10px] leading-snug text-muted-foreground [word-break:auto-phrase]">{source}</div>
+      ) : null}
     </div>
   );
 }
@@ -143,7 +146,7 @@ function StoreRow({
           <Metric label="CTR" value={pctOrNone(store.ctrPct)} source={src("meta")} />
           <Metric label="CPM" value={yen(store.cpmYen)} source={src("meta")} />
           <Metric label="空き枠（2週間）" value={slotsShown.text} source={withNote(src("slots"), slotsShown.note)} />
-          <Metric label="LP 95%到達" value={store.lpReachPct == null ? store.lpNote : `${store.lpReachPct}% ${store.lpNote}`} source={src("lp")} />
+          <Metric label="LP 95%到達" {...lpMetricLines(store, src("lp"))} />
           <Metric label="広告費" value={spend.text} source={withNote(src("meta"), spend.note)} />
           <Metric label="リード" value={numOrNone(store.leads)} source={src("meta")} />
           <Metric label="LINE登録" value={line.text} source={withNote(src("line"), line.note)} />
