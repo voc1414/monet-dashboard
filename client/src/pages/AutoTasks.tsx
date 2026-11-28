@@ -135,6 +135,12 @@ export default function AutoTasks() {
           <h1 className="flex items-center gap-2 text-xl font-bold text-foreground">
             <Activity className="w-5 h-5 text-primary" />
             自動タスク
+            {/* 帯が無いときも、いつ時点の画面かは分かるようにする（帯があるときは帯の右端に出る） */}
+            {!headline && (
+              <span className="ml-auto text-xs font-normal tabular-nums whitespace-nowrap text-muted-foreground" data-testid="tasks-synced-at">
+                {formatJstShort(TASK_LOG_SYNCED_AT)} 時点
+              </span>
+            )}
           </h1>
           <details className="group mt-1">
             <summary className="flex min-h-[44px] cursor-pointer list-none items-center gap-1 text-xs font-medium text-muted-foreground [&::-webkit-details-marker]:hidden">

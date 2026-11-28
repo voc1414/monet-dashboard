@@ -12,8 +12,11 @@ describe("広告: 空の店舗・地域をキャンペーン名から補う（20
     // 岡山: 地域はあるが店舗が空
     expect(fillRegionAndStore("集客/モネ/岡山/リード/FC", "岡山エリア", ""))
       .toEqual({ region: "岡山エリア", tenpo: "下伊福院" });
-    // 兵庫の集客: 地域も店舗も空
+    // 兵庫は 2026-11-28 から芦屋院（開店日未定）も店舗一覧に入ったので、地域だけでは店舗を決めない
     expect(fillRegionAndStore("集客/モネ/兵庫/リード/FC", "", ""))
+      .toEqual({ region: "兵庫エリア", tenpo: "" });
+    // 広告セット名に店舗があれば、兵庫でも店舗まで補える
+    expect(fillRegionAndStore("集客/モネ/兵庫/リード/FC", "", "", "集客/モネ/兵庫/岡本/リード/FC", ["岡本院", "芦屋院"]))
       .toEqual({ region: "兵庫エリア", tenpo: "岡本院" });
     // 求人も同じ店舗に寄る
     expect(fillRegionAndStore("求人/モネ/岡山/リード/FC", "岡山エリア", "").tenpo)

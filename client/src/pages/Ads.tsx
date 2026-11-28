@@ -25,6 +25,7 @@ import type { Bucket, StoreRow, RegionRow, NamedRow } from "@/hooks/useAdsData";
 import { useSalonBoardStylistData, normalizeSalonBoardStore } from "@/hooks/useSalonBoardStylistData";
 import { useSalonBoardDailyNew } from "@/hooks/useSalonBoardDailyNew";
 import { useStoreNewSales } from "@/hooks/useStoreNewSales";
+import { hpbStartMonth } from "@/lib/storeOpening";
 
 // ===== 表示ヘルパ（webapp.gs と同じ式）=====
 const yen = (n: number) => "¥" + Math.round(n).toLocaleString();
@@ -475,7 +476,9 @@ export default function Ads() {
     if (!D) return () => 0;
     const months = monthsBetween(D.period.since, D.period.until);
     return (storeName: string) => {
-      const start = HPB_START_MONTH[canonicalStore(storeName)] ?? HPB_START_MONTH[storeName];
+      // 開始月は手書きの表 → 店舗マスタの開店日の順で決める。開店日未定の店は計上しない
+      const start = hpbStartMonth(storeName, HPB_START_MONTH, canonicalStore);
+      if (start === null) return 0;
       const billed = start ? months.filter((m) => m >= start).length : months.length;
       return HPB_MONTHLY_FEE * billed;
     };

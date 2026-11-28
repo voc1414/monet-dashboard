@@ -32,8 +32,10 @@ export const STORE_MASTER: StoreMasterEntry[] = [
   { name: "土橋院", area: "広島エリア", openedOn: "2026-04-25" },
   { name: "下伊福院", area: "岡山エリア", openedOn: "2026-09-10" },
   { name: "岡本院", area: "兵庫エリア", openedOn: "2026-09-17" },
-  { name: "本通院", area: "広島エリア", openedOn: null },
-  { name: "春日院", area: "福岡エリア", openedOn: null },
+  { name: "春日院", area: "福岡エリア", openedOn: "2026-11-12" },
+  { name: "本通院", area: "広島エリア", openedOn: "2026-12-21" },
+  { name: "高崎院", area: "群馬エリア", openedOn: null },
+  { name: "芦屋院", area: "兵庫エリア", openedOn: null },
 ];
 
 /** 指定日（既定=今日）までに開店している店だけを、エリアごとにまとめる */
