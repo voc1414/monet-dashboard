@@ -173,11 +173,59 @@ export interface LineWindow {
   missingEdges: string[];
 }
 
+/** 求人で都道府県・都市名が付かない流入。エリア合計や全体のLINE登録には入れない。 */
+export interface KyujinOtherLine {
+  tagId: string;
+  tagName: string;
+  count: number;
+}
+
 export interface LmessageData {
   byStoreShort: Record<string, number>;
   byRegion: Record<string, number>;
+  /**
+   * 求人のうち、名前の先頭が都道府県でも既知の都市でもない流入。
+   * 同じ人にエリアの流入タグも付いていることがあり、二重に数えない。
+   * エリア合計・全体のLINE登録合計・登録単価・登録率の分子には含めない。
+   */
+  kyujinOther: KyujinOtherLine[];
   asOf: string;
   window: LineWindow;
+}
+
+/** 画面に出す求人のエリアなし流入。0人のときは出さない。 */
+export const KYUJIN_OTHER_LABEL = "その他（エリアなし）";
+
+/**
+ * 全体のLINE登録。求人の「その他（エリアなし）」は含めない。
+ * 登録単価と登録率の分子もこの数にする（その他を足すと、エリアタグと二重になる）。
+ */
+export function lineRegistrationTotal(lm: Pick<LmessageData, "byStoreShort" | "byRegion">): number {
+  let n = 0;
+  for (const k in lm.byStoreShort) n += lm.byStoreShort[k] || 0;
+  for (const k in lm.byRegion) n += lm.byRegion[k] || 0;
+  return n;
+}
+
+/** 求人エリア行のLINE登録合計。その他は byRegion に入っていない。 */
+export function kyujinAreaLineTotal(byRegion: Record<string, number>): number {
+  let n = 0;
+  for (const k in byRegion) n += byRegion[k] || 0;
+  return n;
+}
+
+export function kyujinOtherTotal(lines: KyujinOtherLine[]): number {
+  return lines.reduce((n, line) => n + (line.count > 0 ? line.count : 0), 0);
+}
+
+/**
+ * 求人セクションの要約。人数が0のときは null（帯を出さない）。
+ * タグごとの内訳はこの文字列に入れない。
+ */
+export function kyujinOtherSummary(lines: KyujinOtherLine[]): string | null {
+  const total = kyujinOtherTotal(lines);
+  if (total <= 0) return null;
+  return `${KYUJIN_OTHER_LABEL} ${total}人`;
 }
 
 export interface SpendLead {
@@ -519,6 +567,7 @@ export function getLmessageData(rows: LmsgRow[], since: string, until: string): 
   }
   const byStoreShort: Record<string, number> = {};
   const byRegion: Record<string, number> = {};
+  const kyujinOther: KyujinOtherLine[] = [];
   let maxDate = "";
   for (const k in endMap) {
     const end = endMap[k];
@@ -529,18 +578,25 @@ export function getLmessageData(rows: LmsgRow[], since: string, until: string): 
     const tag = end.tagName || "";
     const shortName = tag.replace(/流入$/, "");
     if (end.date > maxDate) maxDate = end.date;
+    // _ で始まる試験タグは集客・求人とも集計しない（その他にも入れない）
+    if (isTestLineTag(tag)) continue;
     if (end.category === "集客") {
-      if (isTestLineTag(tag)) continue;
       byStoreShort[shortName] = (byStoreShort[shortName] || 0) + displayCount;
     } else if (end.category === "求人") {
       const pref = tagToPref(shortName);
       if (pref) {
         const k2 = pref + "エリア";
         byRegion[k2] = (byRegion[k2] || 0) + displayCount;
+      } else if (displayCount > 0) {
+        // 先頭が都道府県・都市名でない求人タグは、名前を書き足さなくてもその他へ
+        kyujinOther.push({ tagId: end.tagId || "", tagName: tag, count: displayCount });
       }
     }
   }
-  return { byStoreShort, byRegion, asOf: maxDate, window };
+  kyujinOther.sort(
+    (a, b) => b.count - a.count || a.tagName.localeCompare(b.tagName, "ja") || a.tagId.localeCompare(b.tagId),
+  );
+  return { byStoreShort, byRegion, kyujinOther, asOf: maxDate, window };
 }
 
 /** since〜until の消化額・リード。LINE登録の実期間に合わせるときに使う。空の since は下限なし。 */

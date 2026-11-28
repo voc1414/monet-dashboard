@@ -20,8 +20,8 @@ import {
   Legend,
 } from "recharts";
 import DashboardLayout from "@/components/DashboardLayout";
-import { useAdsData, getDashboardData, normalizeRegion, missingDatesInSpan, formatLineWindowNote, ADS_PERIOD_OPTIONS, DEFAULT_ADS_PERIOD } from "@/hooks/useAdsData";
-import type { Bucket, StoreRow, RegionRow, NamedRow } from "@/hooks/useAdsData";
+import { useAdsData, getDashboardData, normalizeRegion, missingDatesInSpan, formatLineWindowNote, lineRegistrationTotal, kyujinOtherSummary, ADS_PERIOD_OPTIONS, DEFAULT_ADS_PERIOD } from "@/hooks/useAdsData";
+import type { Bucket, StoreRow, RegionRow, NamedRow, KyujinOtherLine } from "@/hooks/useAdsData";
 import { useSalonBoardStylistData, normalizeSalonBoardStore } from "@/hooks/useSalonBoardStylistData";
 import { useSalonBoardDailyNew } from "@/hooks/useSalonBoardDailyNew";
 import { useStoreNewSales } from "@/hooks/useStoreNewSales";
@@ -464,6 +464,38 @@ function parseDiagnosisUntil(): string {
   return CURRENT_ADS_DIAGNOSIS.periodAds.match(/\d{4}-\d{2}-\d{2}/g)?.[1] ?? "";
 }
 
+/**
+ * 求人のエリアなし流入。最初の行は人数の要約だけ。
+ * タグごとの内訳はタップで開く。0人のときは何も出さない（緑の帯は出さない）。
+ * 要対応の帯にはしない。エリアに属さない流入を、合計とは別に見せるだけ。
+ */
+function KyujinOtherNote({ lines }: { lines: KyujinOtherLine[] }) {
+  const summary = kyujinOtherSummary(lines);
+  if (!summary) return null;
+  const shown = lines.filter((line) => line.count > 0);
+  return (
+    <details className="group rounded-xl border border-border/50 bg-white/70 px-4 text-sm" data-testid="kyujin-other">
+      <summary className="flex min-h-[44px] cursor-pointer list-none flex-wrap items-center gap-x-2 gap-y-0.5 py-2 font-medium text-foreground [&::-webkit-details-marker]:hidden">
+        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" aria-hidden />
+        <span>求人 {summary}</span>
+        <span className="text-xs font-normal text-muted-foreground">合計には含めていません</span>
+      </summary>
+      <div className="pb-3 pl-5 text-xs text-foreground/80">
+        <ul className="space-y-0.5">
+          {shown.map((line) => (
+            <li key={`${line.tagId}:${line.tagName}`}>
+              {(line.tagName || "").trim() || (line.tagId ? `タグ ${line.tagId}` : "（名前なし）")} {numf(line.count)}人
+            </li>
+          ))}
+        </ul>
+        <p className="mt-2 text-muted-foreground [word-break:auto-phrase] [text-wrap:pretty]">
+          同じ人にエリアの流入タグも付いていることがあるため、求人のエリア合計・LINE登録の合計・単価・登録率には足していません。
+        </p>
+      </div>
+    </details>
+  );
+}
+
 
 // キャンペーン別/広告セット別テーブル（LINE列なし）
 function NonStoreTable({ typeKey, rows, title, badge, labelCol }: { typeKey: TypeKey; rows: NamedRow[]; title: string; badge: string; labelCol: string }) {
@@ -505,9 +537,8 @@ export default function Ads() {
     if (type === "all" || type === "kyujin") {
       lead += D.cur.kyujin.lead; spend += D.cur.kyujin.spend; impr += D.cur.kyujin.impr; click += D.cur.kyujin.click; freqW += D.cur.kyujin.freqWeighted; prevLead += D.prev.kyujin.lead; prevSpend += D.prev.kyujin.spend;
     }
-    let lineTot = 0;
-    for (const k in D.lmessage.byStoreShort) lineTot += D.lmessage.byStoreShort[k];
-    for (const k in D.lmessage.byRegion) lineTot += D.lmessage.byRegion[k];
+    // 求人の「その他（エリアなし）」は合計・単価・登録率の分子に入れない
+    const lineTot = lineRegistrationTotal(D.lmessage);
     // 登録単価の消化額は、LINE登録と同じ実期間（端がずれたときだけ選択期間と違う）
     let lineSpend = 0;
     if (type === "all" || type === "shukyaku") lineSpend += D.lineAligned.shukyaku.spend;
@@ -841,6 +872,7 @@ export default function Ads() {
               ) : (
                 <NonStoreTable typeKey="kyujin" rows={view === "campaign" ? D.byCampaign : D.byAdset} title={view === "campaign" ? "キャンペーン別 一覧" : "広告セット別 一覧"} badge="求人" labelCol={view === "campaign" ? "キャンペーン名" : "広告セット名"} />
               ))}
+            {showKyujin && <KyujinOtherNote lines={D.lmessage.kyujinOther} />}
           </div>
 
           <details className="group mt-6 rounded-xl border border-border/40 bg-muted/30 px-4 text-xs text-muted-foreground">
@@ -848,7 +880,7 @@ export default function Ads() {
               数字の定義
             </summary>
             <p className="pb-4 [word-break:auto-phrase] [text-wrap:pretty]">
-            出典: Meta広告データ（SyncWith）＋ L Message 流入タグ。過去7日・過去30日・過去3ヶ月・過去6ヶ月は昨日まで（当日はまだ増える途中のため含めない）。今月は当月1日から今日まで。CPL警告しきい値=集客¥350超・求人¥3,000超、CTR=集客3%未満・求人2%未満で赤表示。LINE登録数は流入タグ友だちの期間内増分。端の日の行が無いときは、実際に使った行のあいだの日数で数え、登録単価の消化額と登録率のリードもその同じ日数で割る（按分はしない）。途中だけの欠けは合計を変えない。「新規（新規来店数）」はサロンボード実績。日次データ(daily_new)があれば選択期間に厳密一致で合算する。行の無い日は来店ゼロとして扱う（その日に取り消し以外の会計が無いと行を書かない。公式の月次合計と一致する）。データ全体の最新日が選択期間の最終日より前のときだけ、その最新日を警告する。系列が期間の途中から始まる店は、その開始日から集計し、開店前の日は含まない。日次が未反映の間は月次(該当月計)にフォールバック（KPIの注記に出所と範囲を表示）。HPB費用=月額¥55,000を、選択期間のうちその店が掲載している月だけ日数按分する（暦の1か月ちょうどなら月額。開店前で未掲載の店は0）。新規売上も同じ日数按分（暦の1か月ちょうどなら月次の金額そのまま）。CPA=(集客広告費+HPB費用)÷新規来店数、ROAS=按分後の新規売上÷(集客広告費+按分後のHPB費用)。CPL（リード単価）は広告費のみ。集計値のみで個人情報は含みません。
+            出典: Meta広告データ（SyncWith）＋ L Message 流入タグ。過去7日・過去30日・過去3ヶ月・過去6ヶ月は昨日まで（当日はまだ増える途中のため含めない）。今月は当月1日から今日まで。CPL警告しきい値=集客¥350超・求人¥3,000超、CTR=集客3%未満・求人2%未満で赤表示。LINE登録数は流入タグ友だちの期間内増分。端の日の行が無いときは、実際に使った行のあいだの日数で数え、登録単価の消化額と登録率のリードもその同じ日数で割る（按分はしない）。途中だけの欠けは合計を変えない。求人の流入タグで、名前の先頭が都道府県でも都市名でもないものは「その他（エリアなし）」として別に示す。同じ人にエリアの流入タグも付いていることがあり二重に数えないため、その他（エリアなし）は求人のエリア合計・全体のLINE登録合計・登録単価・登録率に含めない。同じ条件のタグが増えても自動でその他に入る。名前が「_」で始まるタグは集計しない。「新規（新規来店数）」はサロンボード実績。日次データ(daily_new)があれば選択期間に厳密一致で合算する。行の無い日は来店ゼロとして扱う（その日に取り消し以外の会計が無いと行を書かない。公式の月次合計と一致する）。データ全体の最新日が選択期間の最終日より前のときだけ、その最新日を警告する。系列が期間の途中から始まる店は、その開始日から集計し、開店前の日は含まない。日次が未反映の間は月次(該当月計)にフォールバック（KPIの注記に出所と範囲を表示）。HPB費用=月額¥55,000を、選択期間のうちその店が掲載している月だけ日数按分する（暦の1か月ちょうどなら月額。開店前で未掲載の店は0）。新規売上も同じ日数按分（暦の1か月ちょうどなら月次の金額そのまま）。CPA=(集客広告費+HPB費用)÷新規来店数、ROAS=按分後の新規売上÷(集客広告費+按分後のHPB費用)。CPL（リード単価）は広告費のみ。集計値のみで個人情報は含みません。
             </p>
             {lineMiddle.length > 0 && (
               <p className="pb-4 [word-break:auto-phrase] [text-wrap:pretty]" data-testid="line-middle-gaps">
