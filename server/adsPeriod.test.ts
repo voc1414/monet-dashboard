@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   ADS_PERIOD_OPTIONS,
@@ -5,6 +7,10 @@ import {
   formatLineWindowNote,
   getDashboardData,
   getLmessageData,
+  kyujinAreaLineTotal,
+  kyujinOtherSummary,
+  kyujinOtherTotal,
+  lineRegistrationTotal,
   missingDatesInSpan,
   resolvePeriod,
   type LmsgRow,
@@ -230,5 +236,99 @@ describe("LINE登録の欠損", () => {
     const lm = getLmessageData(rows, SINCE, UNTIL);
     expect(lm.byStoreShort["大阪堀江"]).toBe(70);
     expect(lm.byStoreShort["_ping2"]).toBeUndefined();
+    expect(lm.kyujinOther).toEqual([]);
+  });
+});
+
+function kyujin(date: string, count: number, tagName: string, tagId: string, botId = "2E6jG1"): LmsgRow {
+  return {
+    date,
+    botId,
+    botName: "求人",
+    category: "求人",
+    tagId,
+    tagName,
+    count,
+  };
+}
+
+describe("求人のエリアなし流入", () => {
+  function rows(): LmsgRow[] {
+    return [
+      kyujin("2026-11-20", 10, "大阪流入", "osaka"),
+      kyujin("2026-11-27", 18, "大阪流入", "osaka"),
+      kyujin("2026-11-20", 1, "神戸流入", "kobe"),
+      kyujin("2026-11-27", 4, "神戸流入", "kobe"),
+      kyujin("2026-11-20", 100, "ウェビナー流入", "2523411"),
+      kyujin("2026-11-27", 108, "ウェビナー流入", "2523411"),
+      kyujin("2026-11-20", 50, "IGストーリー流入", "2626811"),
+      kyujin("2026-11-27", 55, "IGストーリー流入", "2626811"),
+      // 名前をコードに書いていなくても、エリアが決まらなければその他へ
+      kyujin("2026-11-20", 0, "会社説明会流入", "future", "another-bot"),
+      kyujin("2026-11-27", 2, "会社説明会流入", "future", "another-bot"),
+      kyujin("2026-11-20", 5, "空の説明会流入", "zero"),
+      kyujin("2026-11-27", 5, "空の説明会流入", "zero"),
+      kyujin("2026-11-20", 1, "_社内テスト", "ping"),
+      kyujin("2026-11-27", 9, "_社内テスト", "ping"),
+      { ...line("2026-11-20", 20), tagName: "ウェビナー流入", tagId: "shu-web" },
+      { ...line("2026-11-27", 23), tagName: "ウェビナー流入", tagId: "shu-web" },
+    ];
+  }
+
+  it("都道府県も都市名も無い求人タグはエリアに足さず、その他に分ける", () => {
+    const lm = getLmessageData(rows(), SINCE, UNTIL);
+    expect(lm.byRegion["大阪エリア"]).toBe(8);
+    expect(lm.byRegion["兵庫エリア"]).toBe(3);
+    expect(kyujinAreaLineTotal(lm.byRegion)).toBe(11);
+    expect(lm.byRegion["その他"]).toBeUndefined();
+    expect(lm.byRegion["その他（エリアなし）"]).toBeUndefined();
+    expect(lm.kyujinOther).toEqual([
+      { tagId: "2523411", tagName: "ウェビナー流入", count: 8 },
+      { tagId: "2626811", tagName: "IGストーリー流入", count: 5 },
+      { tagId: "future", tagName: "会社説明会流入", count: 2 },
+    ]);
+    expect(lm.kyujinOther.some((t) => t.tagName.startsWith("_"))).toBe(false);
+    expect(lm.kyujinOther.some((t) => t.tagName === "空の説明会流入")).toBe(false);
+    // 集客の同名タグは店舗側のまま。求人のその他には混ぜない
+    expect(lm.byStoreShort["ウェビナー"]).toBe(3);
+    expect(lm.kyujinOther.filter((t) => t.tagId === "shu-web")).toEqual([]);
+  });
+
+  it("その他は全体のLINE登録・エリア合計・単価の分子に入らない", () => {
+    const lm = getLmessageData(rows(), SINCE, UNTIL);
+    const area = kyujinAreaLineTotal(lm.byRegion);
+    const other = kyujinOtherTotal(lm.kyujinOther);
+    const total = lineRegistrationTotal(lm);
+    expect(other).toBe(15);
+    expect(total).toBe(area + 3);
+    expect(total).not.toBe(area + other + 3);
+    const spend = 30000;
+    expect(Math.round(spend / total)).not.toBe(Math.round(spend / (total + other)));
+    expect(kyujinOtherSummary(lm.kyujinOther)).toBe("その他（エリアなし） 15人");
+    expect(kyujinOtherSummary(lm.kyujinOther)).not.toContain("ウェビナー");
+    expect(kyujinOtherSummary([])).toBeNull();
+    expect(kyujinOtherSummary([{ tagId: "a", tagName: "増えていない流入", count: 0 }])).toBeNull();
+
+    const dash = getDashboardData(raw([], rows()), "7", new Date(2026, 10, 28));
+    expect(dash.lmessage.kyujinOther.map((t) => t.tagId)).toEqual(["2523411", "2626811", "future"]);
+    expect(lineRegistrationTotal(dash.lmessage)).toBe(total);
+    expect(kyujinAreaLineTotal(dash.lmessage.byRegion)).toBe(area);
+  });
+
+  it("数字の定義にその他を合計へ含めないと書き、0人のときは帯を出さない", () => {
+    const ads = readFileSync(path.resolve(import.meta.dirname, "../client/src/pages/Ads.tsx"), "utf8");
+    expect(ads).toContain(
+      "その他（エリアなし）は求人のエリア合計・全体のLINE登録合計・登録単価・登録率に含めない",
+    );
+    const start = ads.indexOf("function KyujinOtherNote");
+    const end = ads.indexOf("// キャンペーン別/広告セット別テーブル");
+    const fn = ads.slice(start, end);
+    expect(fn).toContain("if (!summary) return null");
+    expect(fn).toContain("<details");
+    expect(fn).toContain("<summary");
+    expect(fn).toContain("kyujinOtherSummary");
+    expect(fn).not.toMatch(/emerald|bg-green|text-green/);
+    expect(ads).toContain("{showKyujin && <KyujinOtherNote lines={D.lmessage.kyujinOther} />}");
+    expect(ads).toContain("const lineTot = lineRegistrationTotal(D.lmessage)");
   });
 });
