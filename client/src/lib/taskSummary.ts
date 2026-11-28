@@ -301,7 +301,7 @@ export function summarizeTasks(log: TaskLogEntry[], gbp: GbpEntry[], syncedAt: D
   });
 }
 
-/** 写しが古すぎないか（取り込みは 8:30／21:30 で最大13時間空く。GitHub の定時実行の遅れを見込み16時間を超えたら止まっている） */
+/** 写しが古すぎないか（取り込みは 8:17〜22:17 の2時間おき。夜間は約10時間空く。GitHub の定時実行の遅れを見込み16時間を超えたら止まっている） */
 export const SYNC_STALE_HOURS = 16;
 export function syncIsStale(syncedAt: Date, now: Date): boolean {
   return now.getTime() - syncedAt.getTime() > SYNC_STALE_HOURS * 60 * MIN;

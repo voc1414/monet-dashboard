@@ -148,7 +148,7 @@ export default function AutoTasks() {
               この画面の見方
             </summary>
             <p className="pb-2 pl-5 text-xs text-muted-foreground [word-break:auto-phrase] [text-wrap:pretty]">
-              {"monetの自動タスクが予定どおり動いたかの一覧です。毎日 8:30 と 21:30 に更新されます。予定日より2日以上遅れると黄、3日以上遅れると赤になります。"}
+              {"monetの自動タスクが予定どおり動いたかの一覧です。8時台から22時台まで2時間おきに記録を取り込みます（GitHub の混雑で遅れることがあります）。画面の「◯時点」が取り込んだ時刻です。予定日より2日以上遅れると黄、3日以上遅れると赤になります。"}
             </p>
           </details>
         </div>
