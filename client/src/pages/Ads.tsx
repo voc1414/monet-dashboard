@@ -213,7 +213,7 @@ function MetricTable({
   newSalesByStore?: Record<string, number>;
   /** HPB費用を店舗名から返す（掲載開始月より前の月は計上しない）。集客の店舗別テーブルのみ。CPA/ROASの分母に加算 */
   hpbCostOf?: (storeName: string) => number;
-  /** その店の新規来店が選択期間の全日ぶん無いとき、注意文。全日そろっている店は null */
+  /** 系列が選択期間の途中から始まる店の注記。行の無い日を0件と数える店は null */
   newVisitNoteOf?: (storeName: string) => string | null;
   /** 新規来店が無い店の注記（開店前・春日の11/9など）に使う期間の終了日 */
   periodUntil?: string;
@@ -315,6 +315,7 @@ function MetricTable({
                 periodUntil: periodUntil ?? "",
                 beforeOpening: early,
               });
+              const startNote = newVisitNoteOf?.(r.name) ?? null;
               return (
                 <tr key={r.name} className={`border-b border-border/30 ${early ? "text-muted-foreground" : ""}`}>
                   <td className="text-left px-3 py-2 font-medium text-foreground">
@@ -331,6 +332,11 @@ function MetricTable({
                     {early && (
                       <span className="ml-1.5 text-[10px] font-medium text-muted-foreground">{BEFORE_OPENING_LABEL}</span>
                     )}
+                    {startNote && metrics.newVisits.text !== PENDING_LABEL && (
+                      <span className="mt-0.5 block max-w-[16rem] text-[10px] font-normal leading-snug text-muted-foreground whitespace-normal">
+                        {startNote}
+                      </span>
+                    )}
                   </td>
                   <td className="text-right px-3 py-2 tabular-nums">{b.dailyBudget && b.dailyBudget > 0 ? yen(b.dailyBudget) : "—"}</td>
                   <td className="text-right px-3 py-2 tabular-nums">{metrics.spend.text === PENDING_LABEL ? <PendingCell text={metrics.spend.text} note={metrics.spend.note} /> : metrics.spend.text}</td>
@@ -342,22 +348,9 @@ function MetricTable({
                   <td className="text-right px-3 py-2 tabular-nums">{NB(b.lead)}</td>
                   {showNew && (
                     <td className="text-right px-3 py-2 tabular-nums font-medium text-foreground">
-                      {(() => {
-                        const note = newVisitNoteOf?.(r.name) ?? null;
-                        const shown = metrics.newVisits.text === PENDING_LABEL
-                          ? <PendingCell text={metrics.newVisits.text} note={metrics.newVisits.note} />
-                          : metrics.newVisits.text;
-                        return (
-                          <span className="inline-flex items-center justify-end gap-1">
-                            {shown}
-                            {note && metrics.newVisits.text !== PENDING_LABEL && (
-                              <span className="text-amber-600" title={note} aria-label={note}>
-                                <AlertTriangle className="w-3 h-3" aria-hidden />
-                              </span>
-                            )}
-                          </span>
-                        );
-                      })()}
+                      {metrics.newVisits.text === PENDING_LABEL
+                        ? <PendingCell text={metrics.newVisits.text} note={metrics.newVisits.note} />
+                        : metrics.newVisits.text}
                     </td>
                   )}
                   {showCpaRoas && (
@@ -471,25 +464,6 @@ function parseDiagnosisUntil(): string {
   return CURRENT_ADS_DIAGNOSIS.periodAds.match(/\d{4}-\d{2}-\d{2}/g)?.[1] ?? "";
 }
 
-function NewVisitCoverageNote({ gaps }: { gaps: NewVisitCoverage[] }) {
-  if (gaps.length === 0) return null;
-  return (
-    <details className="group mt-2" data-testid="new-visit-coverage">
-      <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-700 [&::-webkit-details-marker]:hidden">
-        <AlertTriangle className="h-3 w-3" aria-hidden />
-        新規来店：{gaps.length}店で日数が足りません
-        <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90" aria-hidden />
-      </summary>
-      <ul className="mt-1 max-w-full space-y-0.5 pl-4 text-xs font-medium text-amber-800 [word-break:auto-phrase] [text-wrap:pretty]">
-        {gaps.map((g) => (
-          <li key={g.store}>
-            {g.store}：{g.message}
-          </li>
-        ))}
-      </ul>
-    </details>
-  );
-}
 
 // キャンペーン別/広告セット別テーブル（LINE列なし）
 function NonStoreTable({ typeKey, rows, title, badge, labelCol }: { typeKey: TypeKey; rows: NamedRow[]; title: string; badge: string; labelCol: string }) {
@@ -568,10 +542,11 @@ export default function Ads() {
 
   // 新規来店数（サロンボード）。日次タブ daily_new があれば選択期間に「厳密一致」で合算（推奨）。
   // 未生成の間は月次 stylist_flat にフォールバック（選択期間に重なる月を合算＝該当月計）。
-  const { newByStore, totalNew, newLabel, usingDaily, newVisitKnown } = useMemo(() => {
+  const { newByStore, totalNew, newLabel, usingDaily, newVisitKnown, visitCoverage } = useMemo(() => {
     const map: Record<string, number> = {};
     let total = 0;
-    if (!D) return { newByStore: map, totalNew: 0, newLabel: "サロンボード", usingDaily: false, newVisitKnown: false };
+    const noCoverage: NewVisitCoverage = { stale: null, startNotes: [], knownStores: [] };
+    if (!D) return { newByStore: map, totalNew: 0, newLabel: "サロンボード", usingDaily: false, newVisitKnown: false, visitCoverage: noCoverage };
     const since = D.period.since;
     const until = D.period.until;
     // 日次（厳密）優先
@@ -585,7 +560,19 @@ export default function Ads() {
       }
     }
     if (dailyHit) {
-      return { newByStore: map, totalNew: total, newLabel: `サロンボード ${since}〜${until}`, usingDaily: true, newVisitKnown: true };
+      // 系列の開始から daily_new 全体の最新日までで行が無い日は来店ゼロ。
+      // 期間内の行が1件も無い店も、その範囲が期間と重なれば 0 として確定する。
+      // 要対応は、全体の最新日が選択期間の最終日より前のときだけ。問題が無いときは帯を出さない。
+      const coverage = newVisitCoverage(
+        dailyNew.map((r) => ({ store: normalizeSalonBoardStore(r.store), date: r.date })),
+        since,
+        until,
+      );
+      for (const store of coverage.knownStores) {
+        const key = canonicalStore(store);
+        if (map[key] == null) map[key] = 0;
+      }
+      return { newByStore: map, totalNew: total, newLabel: `サロンボード ${since}〜${until}`, usingDaily: true, newVisitKnown: true, visitCoverage: coverage };
     }
     // フォールバック: 月次（該当月計）
     const months = monthsBetween(since, until);
@@ -604,23 +591,14 @@ export default function Ads() {
         : months.length > 1
         ? `サロンボード ${months[0]}〜${months[months.length - 1]}計（月次）`
         : "サロンボード";
-    return { newByStore: map, totalNew: total, newLabel: label, usingDaily: false, newVisitKnown: monthlyHit };
+    return { newByStore: map, totalNew: total, newLabel: label, usingDaily: false, newVisitKnown: monthlyHit, visitCoverage: noCoverage };
   }, [D, dailyNew, sbData]);
 
-  // 日次で足しているときだけ、店ごとに「期間の何日分しか無いか」を出す。
-  // 月次フォールバック中は日次の欠測を来店数の説明にしない。全日そろっている店は出さない。
-  const visitGaps = useMemo(() => {
-    if (!D || !usingDaily) return [] as NewVisitCoverage[];
-    return newVisitCoverage(
-      dailyNew.map((r) => ({ store: normalizeSalonBoardStore(r.store), date: r.date })),
-      D.period.since,
-      D.period.until,
-    );
-  }, [D, usingDaily, dailyNew]);
+  // 系列が期間の途中から始まる店だけ、店名の下へ控えめな注記。月次フォールバック中は出さない。
   const newVisitNoteOf = useMemo(() => {
-    const by = new Map(visitGaps.map((g) => [canonicalStore(g.store), g.message]));
+    const by = new Map(visitCoverage.startNotes.map((n) => [canonicalStore(n.store), n.message]));
     return (name: string) => by.get(canonicalStore(name)) ?? null;
-  }, [visitGaps]);
+  }, [visitCoverage]);
 
   const storeGapLines = useMemo(() => {
     if (!D) return [] as string[];
@@ -744,8 +722,13 @@ export default function Ads() {
               LINE登録データが抜けている日: {fmtMissing(lineEdges)}
             </span>
           )}
+          {visitCoverage.stale && (
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5" data-testid="new-visit-coverage">
+              <AlertTriangle className="w-3 h-3" />
+              {visitCoverage.stale.message}
+            </span>
+          )}
         </div>
-        <NewVisitCoverageNote gaps={visitGaps} />
         <AdsPendingNote gaps={storeGapLines} />
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -865,7 +848,7 @@ export default function Ads() {
               数字の定義
             </summary>
             <p className="pb-4 [word-break:auto-phrase] [text-wrap:pretty]">
-            出典: Meta広告データ（SyncWith）＋ L Message 流入タグ。過去7日・過去30日・過去3ヶ月・過去6ヶ月は昨日まで（当日はまだ増える途中のため含めない）。今月は当月1日から今日まで。CPL警告しきい値=集客¥350超・求人¥3,000超、CTR=集客3%未満・求人2%未満で赤表示。LINE登録数は流入タグ友だちの期間内増分。端の日の行が無いときは、実際に使った行のあいだの日数で数え、登録単価の消化額と登録率のリードもその同じ日数で割る（按分はしない）。途中だけの欠けは合計を変えない。「新規（新規来店数）」はサロンボード実績。日次データ(daily_new)があれば選択期間に厳密一致で合算、未反映の間は月次(該当月計)にフォールバック（KPIの注記に出所と範囲を表示）。HPB費用=月額¥55,000を、選択期間のうちその店が掲載している月だけ日数按分する（暦の1か月ちょうどなら月額。開店前で未掲載の店は0）。新規売上も同じ日数按分（暦の1か月ちょうどなら月次の金額そのまま）。CPA=(集客広告費+HPB費用)÷新規来店数、ROAS=按分後の新規売上÷(集客広告費+按分後のHPB費用)。CPL（リード単価）は広告費のみ。集計値のみで個人情報は含みません。
+            出典: Meta広告データ（SyncWith）＋ L Message 流入タグ。過去7日・過去30日・過去3ヶ月・過去6ヶ月は昨日まで（当日はまだ増える途中のため含めない）。今月は当月1日から今日まで。CPL警告しきい値=集客¥350超・求人¥3,000超、CTR=集客3%未満・求人2%未満で赤表示。LINE登録数は流入タグ友だちの期間内増分。端の日の行が無いときは、実際に使った行のあいだの日数で数え、登録単価の消化額と登録率のリードもその同じ日数で割る（按分はしない）。途中だけの欠けは合計を変えない。「新規（新規来店数）」はサロンボード実績。日次データ(daily_new)があれば選択期間に厳密一致で合算する。行の無い日は来店ゼロとして扱う（その日に取り消し以外の会計が無いと行を書かない。公式の月次合計と一致する）。データ全体の最新日が選択期間の最終日より前のときだけ、その最新日を警告する。系列が期間の途中から始まる店は、その開始日から集計し、開店前の日は含まない。日次が未反映の間は月次(該当月計)にフォールバック（KPIの注記に出所と範囲を表示）。HPB費用=月額¥55,000を、選択期間のうちその店が掲載している月だけ日数按分する（暦の1か月ちょうどなら月額。開店前で未掲載の店は0）。新規売上も同じ日数按分（暦の1か月ちょうどなら月次の金額そのまま）。CPA=(集客広告費+HPB費用)÷新規来店数、ROAS=按分後の新規売上÷(集客広告費+按分後のHPB費用)。CPL（リード単価）は広告費のみ。集計値のみで個人情報は含みません。
             </p>
             {lineMiddle.length > 0 && (
               <p className="pb-4 [word-break:auto-phrase] [text-wrap:pretty]" data-testid="line-middle-gaps">
