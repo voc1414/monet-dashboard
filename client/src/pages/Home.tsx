@@ -18,6 +18,7 @@ import { getNpsClass, NPS_INDUSTRY_AVERAGE } from "@/lib/npsClass";
 
 import { validateStoreReport, getAlertSummary } from "@/lib/reportValidation";
 import { useStores } from "@/hooks/useStores";
+import { openedByMonth } from "@/lib/storeOpening";
 
 import heroImage from "@/assets/monet-salon.jpg";
 import storeThumb from "@/assets/monet-store.jpg";
@@ -103,7 +104,12 @@ export default function Home() {
     return activeFilterMonths;
   }, [activeFilterMonths]);
 
-  const storeStats = ALL_STORES.map((name) => {
+  // 選んだ期間の最後の月までに開店していない店は出さない（例: 11/12 開店の春日院を「先月=10月」に出さない）
+  const lastSelectedMonth = selectedMonthsList && selectedMonthsList.length ? [...selectedMonthsList].sort()[selectedMonthsList.length - 1] : undefined;
+  const visibleStores = lastSelectedMonth ? ALL_STORES.filter((name) => openedByMonth(name, lastSelectedMonth)) : ALL_STORES;
+  const visibleAreaStores = AREA_STORES.filter((a) => a.stores.some((n) => visibleStores.includes(n)));
+
+  const storeStats = visibleStores.map((name) => {
     const nps = filteredStoreStats.find((s) => s.shortName === name);
 
     // 月末報告書: 単月の場合はその月、複数月の場合は各月ごとに取得して合算、全期間は undefined
@@ -204,7 +210,7 @@ export default function Home() {
   const totalAllRetailSales = storesWithReport.reduce((s, st) => s + st.totalRetailSales, 0);
   const totalAllCustomers = storesWithReport.reduce((s, st) => s + st.totalCustomers, 0);
   const overallUnitPrice = totalAllCustomers > 0 ? Math.round(totalAllSales / totalAllCustomers) : 0;
-  const storeCount = Math.max(storesWithNps.length, storesWithReport.length, ALL_STORES.length);
+  const storeCount = Math.max(storesWithNps.length, storesWithReport.length, visibleStores.length);
 
   /* エリアトグル状態（デフォルト全開 — closedAreasで管理） */
   const [closedAreas, setClosedAreas] = useState<Set<string>>(new Set());
@@ -314,7 +320,7 @@ export default function Home() {
 
       {/* エリア別トグル店舗一覧 */}
       <div className="space-y-3">
-        {AREA_STORES.map((areaGroup) => {
+        {visibleAreaStores.map((areaGroup) => {
           const isOpen = !closedAreas.has(areaGroup.area);
           const areaStores = storeStats.filter((s) => areaGroup.stores.includes(s.shortName));
 

@@ -2,8 +2,9 @@ import { describe, it, expect } from "vitest";
 import { STORE_MASTER, openedAreaStores } from "@/data/storeMaster";
 
 describe("店舗マスタ（Notion「DB_monet店舗一覧」由来・2026-08-20 追加 / 2026-09-13 更新）", () => {
-  it("11店すべてが入っている", () => {
-    expect(STORE_MASTER).toHaveLength(11);
+  it("全店が入っている（2026-11-28 時点で13店。Notion に店が増えても落ちないよう下限で見る）", () => {
+    expect(STORE_MASTER.length).toBeGreaterThanOrEqual(13);
+    expect(STORE_MASTER.map((s) => s.name)).toContain("春日院");
     expect(STORE_MASTER.map((s) => s.name)).toContain("下伊福院");
     expect(STORE_MASTER.map((s) => s.name)).toContain("岡本院");
   });

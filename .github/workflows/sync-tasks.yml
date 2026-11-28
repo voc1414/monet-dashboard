@@ -1,13 +1,19 @@
 # 自動タスク実行記録の写し（client/src/data/taskLog.ts）を Notion「DB_monet 自動タスク実行記録」に合わせる。
-# 書き込み元は Mac mini の自動タスク（HPBブログ 6:00・20:00／サロンボード取得 7:30）。
-# 毎日 8:30 と 21:30（日本時間）に取り込み、管理画面の「自動タスク」タブへ反映する。Googleマップの公開履歴も同時に写す。
-# 写しには取り込み時刻が入るので、毎回コミットされる（画面は「この時刻の時点」で判定するため）。
+# 書き込み元は Mac mini の自動タスク（HPBブログ 6:00・20:00／サロンボード取得 7:30／ルーチン確認 13:30）。
+# 2026-11-28 点検で 8:30／21:30 の1日2回から、8時台〜22時台の2時間おき（毎時17分）に増やした。
+#   理由: GitHub の定時実行は混雑で大きく遅れ、実測で 6〜9時間遅れ・1日1回しか動かない日があった
+#   （11/27 14:16、11/28 06:35 のみ）。13:30 の確認結果が翌朝まで画面に出ず、11/28 は朝の分が昼になっても入っていなかった。
+#   回数を増やして、遅れても次の回で拾えるようにする。毎時0分と30分は混むので17分にずらす。
+# 写しの中身が変わったときだけコミットする。中身が同じでも、前回の写しから3時間半たっていれば
+# 取り込み時刻を進めるためにコミットする（画面は「この時刻の時点」で判定するため。16時間で「止まっています」）。
+# 店舗マスタ（Notion「DB_monet店舗一覧」→ storeMaster.ts）も同じ回で写す。トークンが店舗一覧に
+# 接続されていないと 404 になるので、その場合は店舗マスタだけ飛ばして他は続ける。
 # 2026-11-26 林さん「この案で作って」。鍵は repo シークレット NOTION_TOKEN（hayashin-guard）。
 name: Sync task log
 
 on:
   schedule:
-    - cron: "30 23,12 * * *" # 8:30／21:30（日本時間）
+    - cron: "17 23,1,3,5,7,9,11,13 * * *" # 8:17〜22:17 の2時間おき（日本時間）
   workflow_dispatch:
 
 permissions:
@@ -37,19 +43,44 @@ jobs:
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
         run: node scripts/sync-gbp-history.mjs
+      # 店舗マスタ。トークンが店舗一覧に未接続（404）のときは失敗しても止めない（他の写しは続ける）
+      - name: 店舗マスタも写し直す
+        continue-on-error: true
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+        run: node scripts/sync-store-master.mjs
+      - name: 変わったか
+        id: diff
+        run: |
+          files="client/src/data/taskLog.ts client/src/data/gbpHistory.ts client/src/data/storeMaster.ts"
+          changed=false
+          # 取り込み時刻の行だけの差は「変わった」に数えない
+          if ! git diff --quiet -I 'TASK_LOG_SYNCED_AT' -- $files; then
+            changed=true
+            git diff --stat -- $files
+          fi
+          prev=$(git show HEAD:client/src/data/taskLog.ts | sed -n 's/.*TASK_LOG_SYNCED_AT = "\([^"]*\)".*/\1/p')
+          age=$(( $(date +%s) - $(date -d "$prev" +%s 2>/dev/null || echo 0) ))
+          echo "前回の写しから $((age / 3600)) 時間"
+          if [ "$age" -ge 12600 ]; then changed=true; fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
       # vite7 と @builder.io/vite-plugin-jsx-loc の peer 衝突があるため legacy-peer-deps 必須
-      - run: npm ci --legacy-peer-deps
-      - name: 型チェック (tsc --noEmit)
+      - if: steps.diff.outputs.changed == 'true'
+        run: npm ci --legacy-peer-deps
+      - if: steps.diff.outputs.changed == 'true'
+        name: 型チェック (tsc --noEmit)
         run: npx tsc --noEmit
-      - name: テスト (vitest)
+      - if: steps.diff.outputs.changed == 'true'
+        name: テスト (vitest)
         run: npx vitest run
-      - name: コミットして本番へ反映
+      - if: steps.diff.outputs.changed == 'true'
+        name: コミットして本番へ反映
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add client/src/data/taskLog.ts client/src/data/gbpHistory.ts
+          git add client/src/data/taskLog.ts client/src/data/gbpHistory.ts client/src/data/storeMaster.ts
           git commit -m "自動タスク実行記録の写しをNotionに合わせて更新（$(TZ=Asia/Tokyo date '+%F %H:%M')）"
           git pull --rebase origin main
           git push origin HEAD:main

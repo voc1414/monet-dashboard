@@ -19,6 +19,7 @@ import {
   formatJstShort,
   gbpRuns,
   headlineForTasks,
+  statusDot,
   summarizeTasks,
   syncIsStale,
   type Lamp,
@@ -47,7 +48,7 @@ function Reason({ text }: { text: string }) {
 
 const RANK: Record<Lamp, number> = { gray: 0, green: 1, yellow: 2, red: 3 };
 
-/** 文字の色：ランプは遅れの日数で決まる（2日で黄・3日で赤）。緑のままでも遅れ・失敗・要確認は文字で知らせる */
+/** 文字の色：ランプは遅れの日数で決まる（2日で黄・3日で赤）。直近がエラーで点だけ黄でも、ランプが緑のあいだ文字は赤のまま */
 function tone(s: TaskStatus): string {
   if (s.lamp !== "green") return LAMP[s.lamp].text;
   const r = s.latest?.result;
@@ -135,6 +136,12 @@ export default function AutoTasks() {
           <h1 className="flex items-center gap-2 text-xl font-bold text-foreground">
             <Activity className="w-5 h-5 text-primary" />
             自動タスク
+            {/* 帯が無いときも、いつ時点の画面かは分かるようにする（帯があるときは帯の右端に出る） */}
+            {!headline && (
+              <span className="ml-auto text-xs font-normal tabular-nums whitespace-nowrap text-muted-foreground" data-testid="tasks-synced-at">
+                {formatJstShort(TASK_LOG_SYNCED_AT)} 時点
+              </span>
+            )}
           </h1>
           <details className="group mt-1">
             <summary className="flex min-h-[44px] cursor-pointer list-none items-center gap-1 text-xs font-medium text-muted-foreground [&::-webkit-details-marker]:hidden">
@@ -142,7 +149,7 @@ export default function AutoTasks() {
               この画面の見方
             </summary>
             <p className="pb-2 pl-5 text-xs text-muted-foreground [word-break:auto-phrase] [text-wrap:pretty]">
-              {"monetの自動タスクが予定どおり動いたかの一覧です。毎日 8:30 と 21:30 に更新されます。予定日より2日以上遅れると黄、3日以上遅れると赤になります。"}
+              {"monetの自動タスクが予定どおり動いたかの一覧です。8時台から22時台まで2時間おきに記録を取り込みます（GitHub の混雑で遅れることがあります）。画面の「◯時点」が取り込んだ時刻です。予定日より2日以上遅れると黄、3日以上遅れると赤になります。"}
             </p>
           </details>
         </div>
@@ -191,7 +198,7 @@ export default function AutoTasks() {
             {status.map((s) => (
               <li key={s.def.name} className={`rounded-xl border border-border/40 p-3 ${LAMP[s.lamp].row}`}>
                 <div className="flex flex-wrap items-center gap-x-2">
-                  <Dot lamp={s.lamp} />
+                  <Dot lamp={statusDot(s)} />
                   <span className="font-bold whitespace-nowrap">{s.def.name}</span>
                   <span className={`ml-auto text-xs font-medium whitespace-nowrap ${tone(s)}`}>
                     {s.label.length > 6 ? "" : s.label}
@@ -224,7 +231,7 @@ export default function AutoTasks() {
                   <tr key={s.def.name} className={`border-t border-border/40 align-top ${LAMP[s.lamp].row}`}>
                     <td className="py-2 pr-3">
                       <div className="flex items-center gap-2 font-medium whitespace-nowrap">
-                        <Dot lamp={s.lamp} />
+                        <Dot lamp={statusDot(s)} />
                         {s.def.name}
                       </div>
                       <div className="pl-[18px] text-[11px] text-muted-foreground">{s.def.where}</div>

@@ -301,7 +301,17 @@ export function summarizeTasks(log: TaskLogEntry[], gbp: GbpEntry[], syncedAt: D
   });
 }
 
-/** 写しが古すぎないか（取り込みは 8:30／21:30 で最大13時間空く。GitHub の定時実行の遅れを見込み16時間を超えたら止まっている） */
+/**
+ * 一覧の状態の点。遅れのランプ（2日で黄・3日で赤）はそのまま返す。
+ * 直近の実行がエラーのときは、遅れが1日以内でランプが緑でも点だけ黄にする。
+ * ランプ自体は緑のままなので、画面の文字色（エラーは赤）と先頭の帯は変わらない。
+ */
+export function statusDot(s: Pick<TaskStatus, "lamp" | "latest">): Lamp {
+  if (s.lamp === "green" && s.latest?.result === "エラー") return "yellow";
+  return s.lamp;
+}
+
+/** 写しが古すぎないか（取り込みは 8:17〜22:17 の2時間おき。夜間は約10時間空く。GitHub の定時実行の遅れを見込み16時間を超えたら止まっている） */
 export const SYNC_STALE_HOURS = 16;
 export function syncIsStale(syncedAt: Date, now: Date): boolean {
   return now.getTime() - syncedAt.getTime() > SYNC_STALE_HOURS * 60 * MIN;
