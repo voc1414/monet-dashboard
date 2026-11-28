@@ -32,6 +32,23 @@ export function snapshotFixedLabel(
   return `${period}の固定値（${monthDay(fetched)}取得）`;
 }
 
+/** 個別注記が取得日を書いているか。共通の出典行と日付が二重にならないようにする */
+function noteHasFetchedAt(note: string): boolean {
+  return /\d{4}-\d{2}-\d{2}/.test(note) && note.includes("取得");
+}
+
+/**
+ * LP欄の値と出典。注記に取得日時がある店は、その注記だけを出し、共通の出典行は出さない。
+ * 「参考」「不合格」だけの院は、共通の出典行をそのまま出す。
+ */
+export function lpMetricLines(
+  store: Pick<DiagnosisStore, "lpReachPct" | "lpNote">,
+  commonSource: string,
+): { value: string; source: string } {
+  const value = store.lpReachPct == null ? store.lpNote : `${store.lpReachPct}% ${store.lpNote}`;
+  return { value, source: noteHasFetchedAt(store.lpNote) ? "" : commonSource };
+}
+
 /** A（枠不足）→ B（広告・LP）→ C（問題なし）。同区分はスナップショットの並びを保つ */
 export function storesInGradeOrder(stores: DiagnosisStore[]): DiagnosisStore[] {
   return stores

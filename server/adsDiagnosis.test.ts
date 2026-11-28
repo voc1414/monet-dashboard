@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CURRENT_ADS_DIAGNOSIS, snapshotFixedLabel, storesInGradeOrder } from "../client/src/data/adsDiagnosis";
+import { CURRENT_ADS_DIAGNOSIS, lpMetricLines, snapshotFixedLabel, storesInGradeOrder } from "../client/src/data/adsDiagnosis";
 
 describe("集客広告 店舗診断 2026-11-27", () => {
   const stores = storesInGradeOrder(CURRENT_ADS_DIAGNOSIS.stores);
@@ -80,6 +80,33 @@ describe("集客広告 店舗診断 2026-11-27", () => {
       岡本: "参考",
       本通: "参考",
       下伊福: "参考",
+    });
+  });
+
+  it("取得日時つきのLP注記がある店は共通の出典行を出さない", () => {
+    const lp = CURRENT_ADS_DIAGNOSIS.sources.find((s) => s.id === "lp")!;
+    const common = `${lp.label} · ${lp.fetchedAt}`;
+    expect(common).toBe("LP Clarity「モネ集客総合」スマホ過去30日 · 2026-11-27 20:50頃");
+
+    for (const store of CURRENT_ADS_DIAGNOSIS.stores) {
+      const lines = lpMetricLines(store, common);
+      if (store.name === "堀江2nd") {
+        expect(lines.value).toBe(`23.93% ${store.lpNote}`);
+        expect(lines.source).toBe("");
+        expect(`${lines.value}\n${lines.source}`).not.toContain("2026-11-27 20:50");
+      } else {
+        expect(lines.value).toBe(`${store.lpReachPct}% ${store.lpNote}`);
+        expect(lines.source).toBe(common);
+      }
+    }
+
+    expect(lpMetricLines({ lpReachPct: 27.24, lpNote: "参考" }, common)).toEqual({
+      value: "27.24% 参考",
+      source: common,
+    });
+    expect(lpMetricLines({ lpReachPct: 22.35, lpNote: "不合格" }, common)).toEqual({
+      value: "22.35% 不合格",
+      source: common,
     });
   });
 
